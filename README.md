@@ -1,2 +1,0 @@
-# starclass
-Stellar Classification

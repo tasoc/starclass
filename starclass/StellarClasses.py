@@ -19,4 +19,13 @@ class StellarClasses(enum.Enum):
 	"""
 
 	SOLARLIKE = 'solar'
-	CLASSICAL = 'classical'
+	TRANSECLIPSE = 'eclipse'
+	RRLYRCEPH = 'rrl/ceph'
+	GDOR = 'gdor'
+	DSCT = 'dsct'
+	RAPID = 'rapid'
+	TRANSIENT = 'transient'
+	CONTACT_ROT = 'contact/rot'
+	APERIODIC = 'aperiodic'
+	CONSTANT = 'constant'
+	

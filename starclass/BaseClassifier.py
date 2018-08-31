@@ -8,10 +8,10 @@ All other specific stellar classification algorithms will inherit from BaseClass
 """
 
 from __future__ import division, print_function, with_statement, absolute_import
+import numpy as np
 import os.path
 import logging
-import enum
-from lightkurve import TessLightCurveFile
+from lightkurve import TessLightCurve
 
 __docformat__ = 'restructuredtext'
 
@@ -33,17 +33,17 @@ class BaseClassifier(object):
 
 		# Store the input:
 		self.plot = plot
-		
+
 	def __enter__(self):
 		return self
 
 	def __exit__(self, *args):
 		self.close()
-	
+
 	def close(self):
 		"""Close the classifier."""
 		pass
-	
+
 	def classify(self, lightcurve, features):
 		"""
 		Classify a star from the lightcurve and other features.
@@ -55,7 +55,7 @@ class BaseClassifier(object):
 		Parameters:
 			lightcurve (``lightkurve.TessLightCurve`` object): Lightcurve.
 			features (dict): Dictionary of other features.
-			
+
 		Returns:
 			dict: Dictionary of classifications
 
@@ -67,7 +67,7 @@ class BaseClassifier(object):
 		res = self.do_classify(lightcurve, features)
 		# Check results
 		return res
-		
+
 	def do_classify(self, lightcurve, features):
 		"""
 		This method should be overwritten by child classes.
@@ -76,10 +76,39 @@ class BaseClassifier(object):
 			NotImplementedError
 		"""
 		raise NotImplementedError()
-		
-	def load_star(self, starid):
-		fname = os.path.join()
-		
-		lightcurve = TessLightCurveFile(fname, default_mask)
+
+	def train(self, lightcurves, labels):
+		"""
+		Raises:
+			NotImplementedError
+		"""
+		raise NotImplementedError()
+
+	def load_star(self, task, fname):
+		"""Recieve a task from the TaskManager and load the lightcurve."""
+
+		# Load lightcurve file and create a TessLightCurve object:
+		if fname.endswith('.noisy') or fname.endswith('.sysnoise'):
+			data = np.loadtxt(fname)
+			lightcurve = TessLightCurve(
+				time=data[:,0],
+				flux=data[:,1],
+				flux_err=data[:,2],
+				quality=np.asarray(data[:,3], dtype='int32'),
+				time_format='jd',
+				time_scale='tdb',
+				ticid=task['starid'],
+				camera=task['camera'],
+				ccd=task['ccd'],
+				sector=2,
+				#ra=0,
+				#dec=0,
+				quality_bitmask=2+8+256 # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK
+			)
+
+		# Load features from cache file, or calculate them
+		# and put them into cache file for other classifiers
+		# to use later on:
 		features = {}
+
 		return lightcurve, features

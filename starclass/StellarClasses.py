@@ -19,4 +19,27 @@ class StellarClasses(enum.Enum):
 	"""
 
 	SOLARLIKE = 'solar'
-	CLASSICAL = 'classical'
+
+	TRANSIT = 'transit'
+
+	RRLYR = 'RR Lyrae'
+	CEPHEID = 'Cepheid'
+
+	DSCT = 'delta Scuti'
+	BCEP = 'beta Cepheid'
+
+	GDOR = 'gamma Doradus'
+	SPB = 'Slowly pulsating B star'
+
+	# Rapid pulsators:
+	ROAP = 'roAp'
+	SDB = 'sdB'
+	WD = 'White Dwarf'
+
+	TRANSIENT = 'transient'
+
+	SPOTS = 'Spot modulation'
+
+	LPV = 'Long period variable'
+
+	CONSTANT = 'constant'

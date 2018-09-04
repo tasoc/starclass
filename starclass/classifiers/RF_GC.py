@@ -78,7 +78,7 @@ class RFGCClassifier(BaseClassifier):
 
 		Parameters:
 			lightcurve (``lightkurve.TessLightCurve`` object): Lightcurve.
-			features (dict): Dictionary of other features.
+			featdict (dict): Dictionary of other features.
 
 		Returns:
 			dict: Dictionary of stellar classifications.
@@ -93,20 +93,20 @@ class RFGCClassifier(BaseClassifier):
             logger.error('Classifier has not been trained. Exiting.')
             result = {
 			StellarClasses.SOLARLIKE: -10,
-			StellarClasses.TRANSECLIPSE: -10,
-			StellarClasses.RRLYRCEPH = -10,
-			StellarClasses.GDOR = -10,
-			StellarClasses.DSCT = -10,
-			StellarClasses.TRANSIENT = -10,
-			StellarClasses.CONTACT_ROT = -10,
-			StellarClasses.APERIODIC = -10,
-			StellarClasses.CONSTANT = -10,
+			StellarClasses.ECLIPSE: -10,
+			StellarClasses.RRCEPH: -10,
+			StellarClasses.GDOR_SPB: -10,
+			StellarClasses.DSCT_BCEP: -10,
+			StellarClasses.TRANSIENT: -10,
+			StellarClasses.CONTACT_ROT: -10,
+			StellarClasses.APERIODIC: -10,
+			StellarClasses.CONSTANT: -10,
 			StellarClasses.RAPID: -10
 		    }
 		    return result
         
         # Assumes that if self.classifier.trained=True, 
-        # then self.classifier.som is not None
+        # ...then self.classifier.som is not None
         logger.info("Calculating features...")
         featarray = fc.featcalc_single(lightcurve,featdict,self.classifier.som)
         logger.info("Features calculated.")
@@ -116,20 +116,9 @@ class RFGCClassifier(BaseClassifier):
 		classprobs = self.classifier.predict_proba(featarray)
         logger.info("Classification complete")
         
-		# Dummy result where the target is 98% a solar-like
-		# and 2% classical pulsator:
-		result = {
-			StellarClasses.SOLARLIKE: 0.98,
-			StellarClasses.TRANSECLIPSE:   ,
-			StellarClasses.RRLYRCEPH =   ,
-			StellarClasses.GDOR =   ,
-			StellarClasses.DSCT =   ,
-			StellarClasses.TRANSIENT =   ,
-			StellarClasses.CONTACT_ROT =   ,
-			StellarClasses.APERIODIC =   ,
-			StellarClasses.CONSTANT =   ,
-			StellarClasses.RAPID: -10
-		}
+        result = {}
+        for c,cla in emnumerate(self.classifier.classes_)
+		    result[cla] = classprobs[c]
 
 		return result
 
@@ -162,83 +151,34 @@ class RFGCClassifier(BaseClassifier):
             features = fc.featcalc_set(lightcurves,featdict,self.classifier.som)
         else:
             features = np.genfromtxt(featuredat)
-            
-        self.classifier.oob_score = True
-        self.classifier.fit(features,labels)
-        logger.info('Trained. OOB Score = '+str(self.classifier.oob_score_))
-        self.classifier.trained = True
+        
+        try:
+            self.classifier.oob_score = True
+            self.classifier.fit(features,labels)
+            logger.info('Trained. OOB Score = '+str(self.classifier.oob_score_))
+            self.classifier.oob_score = False
+            self.classifier.trained = True
+        except:
+            logger.error('Training Error') #add more details...
 
     def loadsom(self,somfile, dimx=1, dimy=400, cardinality=64):
         self.classifier.som = fc.loadSOM(somfile, dimx, dimy, cardinality)   
 
-    def defineGroups_tdasim3(self):
-        '''
-		Hardwired class definitions. Could use updating to be versatile.
-				
-		Returns
-		-----------------
-		groups: ndarray, size (nobjects)
-        '''
-        ids = self.features[:,0]
-        groups = np.zeros(len(ids))
-        for i in range(len(ids)):
-            idx = np.where(self.metaids=='Star'+str(int(ids[i])))[0][0]
-            if self.types[idx].strip(' ') == 'Eclipse':
-                groups[i] = 1
-            elif 'Cepheid' in self.types[idx].strip(' '):
-                groups[i] = 2
-            elif 'Solar-like' in self.types[idx].strip(' '):
-                groups[i] = 3
-            elif 'RR Lyrae; RRab' in self.types[idx].strip(' '):
-                groups[i] = 4    
-            elif 'RR Lyrae; ab type' in self.types[idx].strip(' '):
-                groups[i] = 4 
-            elif 'RR Lyrae; RRc' in self.types[idx].strip(' '):
-                groups[i] = 5
-            elif 'RR Lyrae; c type' in self.types[idx].strip(' '):
-                groups[i] = 5
-            elif 'RR Lyrae; RRd' in self.types[idx].strip(' '):
-                groups[i] = 6
-            elif 'bCep+SPB hybrid' in self.types[idx].strip(' '):
-                groups[i] = 7            
-            elif 'bCep' in self.types[idx].strip(' '):
-                groups[i] = 8    
-            elif 'SPB' in self.types[idx].strip(' '):
-                groups[i] = 9
-            elif 'bumpy' in self.types[idx].strip(' '):
-                groups[i] = 10                                                         
-            elif self.types[idx].strip(' ') == 'LPV;MIRA' or self.types[idx].strip(' ') == 'LPV;SR':
-                groups[i] = 11
-            elif self.types[idx].strip(' ') == 'roAp':
-                groups[i] = 12
-            elif self.types[idx].strip(' ') == 'Constant':
-                groups[i] = 13
-            elif 'dSct+gDor hybrid' in self.types[idx].strip(' '): #early to avoid gDor misgrouping
-                groups[i] = 0
-            elif 'gDor' in self.types[idx].strip(' '):
-                groups[i] = 14 
-            elif 'dsct' in self.types[idx].strip(' '):
-                groups[i] = 15  
-        return groups
         
-    def plotConfMatrix(self,cfmatrixfile='cfmatrix_noisyv2.txt'):
+    def plotConfMatrix(self,conffmatrix,ticklabels):
         '''
-		Plot a confusion matrix. Axes size and labels are hardwired. Could use
-		updating to be versatile, along with defineGroups(). Defaults to use 
-		self.cfmatrix, will use input file if not populated.
+		Plot a confusion matrix. Axes size and labels are hardwired.
 		
 		Parameters
 		-----------------
-		cfmatrixfile: str, optional
-			Filepath to a txt file containing a confusion matrix. Format - np.savetxt
+		cfmatrix: ndarray
+			Confusion matrix. Format - np.savetxt
 			on the output of self.makeConfMatrix()
+		ticklabels
         '''
         import pylab as p
         p.ion()
-        if self.cfmatrix is not None:
-            confmatrix = self.cfmatrix.astype('float')
-        else:
-            confmatrix = np.genfromtxt(cfmatrixfile)
+
         norms = np.sum(confmatrix,axis=1)
         for i in range(len(confmatrix[:,0])):
             confmatrix[i,:] /= norms[i]
@@ -250,66 +190,72 @@ class RFGCClassifier(BaseClassifier):
              for y in range(len(confmatrix[:,0])):
                  if confmatrix[y,x] > 0:
                      if confmatrix[y,x]>0.7:
-                         p.text(x,y,str(np.round(confmatrix[y,x],decimals=2)),va='center',ha='center',color='w')
+                         p.text(x,y,str(np.round(confmatrix[y,x],decimals=2)),
+                         		va='center',ha='center',color='w')
                      else:
-                         p.text(x,y,str(np.round(confmatrix[y,x],decimals=2)),va='center',ha='center')
+                         p.text(x,y,str(np.round(confmatrix[y,x],decimals=2)),
+                         		va='center',ha='center')
 
-        for x in [0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5]:
-            p.plot([x,x],[-0.5,14.5],'k--')
-        for y in [0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5]:
-            p.plot([-0.5,14.5],[y,y],'k--')
-        p.xlim(-0.5,14.5)
-        p.ylim(-0.5,14.5)
+        for x in np.arange(confmatrix.shape[0]):
+            p.plot([x+0.5,x+0.5],[-0.5,confmatrix.shape[0]-0.5],'k--')
+        for y in np.arange(confmatrix.shape[0]:
+            p.plot([-0.5,confmatrix.shape[0]-0.5],[y+0.5,y+0.5],'k--')
+        p.xlim(-0.5,confmatrix.shape[0]-0.5)
+        p.ylim(-0.5,confmatrix.shape[0]-0.5)
         p.xlabel('Predicted Class')
         p.ylabel('True Class')
         #class labels
-        p.xticks([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14],['Eclipse', 'Cepheid', 'Solar', 'RRab', 'RRc', 'RRd', 'b+S hybrid', 'bCep', 'SPB', 'bumpy', ' LPV', 'roAp', 'Const', 'gDor', 'dSct'],rotation='vertical')
-        p.yticks([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14],['Eclipse', 'Cepheid', 'Solar', 'RRab', 'RRc', 'RRd', 'b+S hybrid', 'bCep', 'SPB', 'bumpy', ' LPV', 'roAp', 'Const', 'gDor', 'dSct'])
+        p.xticks(np.arange(confmatrix.shape[0]),ticklabels,rotation='vertical')
+        p.yticks(np.arange(confmatrix.shape[0]),ticklabels)
     
-    def crossValidate(self):
+    def crossValidate(self, features, labels):
         '''
 		Creates cross-validated class probabilities. Splits dataset into groups of 10.
 		May take some time.
+		
+		Parameters
+		-----------------
+		
 		
 		Returns
 		-----------------
 		cvprobs: ndarray, size (nobjects, nclasses)
 			cross-validated class probabilities one row per object
+		classorder:
+		
         '''
         from sklearn.model_selection import KFold
-        shuffleidx = np.random.choice(len(self.groups),len(self.groups),replace=False)
-        cvfeatures = self.features[shuffleidx,1:]
-        cvgroups = self.groups[shuffleidx]
+        shuffleidx = np.random.choice(len(labels),len(labels),replace=False)
+        cvfeatures = features[shuffleidx,:]
+        cvlabels = labels[shuffleidx]
         kf = KFold(n_splits=int(cvfeatures.shape[0]/10))
         probs = []
-        self.oob_score = False
-        for train_index,test_index in kf.split(cvfeatures,cvgroups):
-            print(test_index)
-            self.fit(cvfeatures[train_index,:],cvgroups[train_index])
-            probs.append(self.predict_proba(cvfeatures[test_index,:]))  
-        self.cvprobs = np.vstack(probs)
+        self.classifier.oob_score = False
+        for train_index,test_index in kf.split(cvfeatures,cvlabels):
+            self.classifier.fit(cvfeatures[train_index,:],cvlabels[train_index])
+            sortclasses = np.argsort(self.classifier.classes))
+            tempprobs = self.classifier.predict_proba(cvfeatures[test_index,:])
+            probs.append(tempprobs[sortclasses])
+        cvprobs = np.vstack(probs)
         unshuffleidx = np.argsort(shuffleidx)
-        self.cvprobs = self.cvprobs[unshuffleidx]
-        return self.cvprobs
+        cvprobs = cvprobs[unshuffleidx]
+        return cvprobs,self.classifier.classes_[sortclasses]
     
-    def makeConfMatrix(self,cvprobfile='cvprobs_noisy.txt'):
+    def makeConfMatrix(self,classprobs,correct_labels):
         '''
-		Generates a confusion matrix from a set of class probabilities. Defaults to 
-		use self.cvprobs. If not populated, reads from input file.
+		Generates a confusion matrix from a set of class probabilities.
 		
 		Parameters
 		-----------------
-		cvprobfile: str, optional
-			Filepath to an array of class probabilities, size (nobjects, nclasses)
+		classprobs: ndarray
+			Array of class probabilities, size (nobjects, nclasses)
 		
 		Returns
 		-----------------
 		cfmatrix: ndarray, size (nclasses, nclasses)
 			Confusion matrix for the classifier. 
         '''
-        if self.cvprobs is None:
-            self.cvprobs = np.genfromtxt(cvprobfile)
         from sklearn.metrics import confusion_matrix
-        self.class_vals=np.argmax(self.cvprobs,axis=1)+1
-        self.cfmatrix = confusion_matrix(self.groups,self.class_vals)
-        return self.cfmatrix
+        class_vals=np.argmax(classprobs,axis=1)+1
+        cfmatrix = confusion_matrix(correct_labels,class_vals)
+        return cfmatrix

@@ -17,8 +17,10 @@ from .. import BaseClassifier, StellarClasses
 
 
 class Classifier_obj(RandomForestClassifier):
-
-    def __init(self, n_estimators=1000, max_features=3, min_samples_split=2)
+    """
+    Wrapper for sklearn RandomForestClassifier with attached SOM.
+    """
+    def __init__(self, n_estimators=1000, max_features=3, min_samples_split=2):
         super().__init__(self, n_estimators=n_estimators, 
         								max_features=max_features, 
         								min_samples_split=min_samples_split,
@@ -27,83 +29,92 @@ class Classifier_obj(RandomForestClassifier):
         self.som = None								
     
 class RFGCClassifier(BaseClassifier):
-	"""
-	General Random Forest
+    """
+    General Random Forest
 
-	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
-	
-	No option to internally save/load as yet, but if you pre-calculate features, 
-	training is fast.
-	Or you can pickle dump/load the class from an external script.
-	"""
+    .. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 
-	def __init__(self, saved_rf=None, somfile=None, dimx=1, dimy=400, cardinality=64,
+    """
+    def __init__(self, saved_rf=None, somfile=None, dimx=1, dimy=400, cardinality=64,
 				  n_estimators=1000, max_features=3, min_samples_split=2, 
 				  *args, **kwargs):
-		"""
-		Initialize the classifier object.
-		"""
-		# Initialise parent
-		super(self.__class__, self).__init__(*args, **kwargs)
+        """
+        Initialize the classifier object.
 		
-		if saved_rf is not None and os.path.exists(saved_rf):
-		    #load pre-trained classifier
-		    self.classifier = pickle.load(saved_rf)
-		else:
-		    self.classifier = Classifier_obj(n_estimators, max_features, 
+        Parameters:
+		    saved_rf (str): Filepath to previously pickled Classifier_obj.
+		    somfile (str): Filepath to trained SOM saved using fc.kohonenSave
+		    dimx (int): dimension 1 of SOM in somfile, if given
+		    dimy (int): dimension 2 of SOM in somfile, if given
+		    cardinality (int): N bins per SOM pixel in somfile, if given
+		    n_estimators (int): number of trees in forest
+		    max_features (int): see sklearn.RandomForestClassifier
+        	min_samples_split (int): see sklearn.RandomForestClassifier
+        """
+        # Initialise parent
+        super(self.__class__, self).__init__(*args, **kwargs)
+		
+        if saved_rf is not None and os.path.exists(saved_rf):
+            #load pre-trained classifier
+            self.classifier = pickle.load(saved_rf)
+        else:
+            self.classifier = Classifier_obj(n_estimators, max_features, 
 		    								  min_samples_split)
-		    
         if self.classifier.som is None and somfile is not None:
             #load som
             self.classifier.som = fc.loadSOM(somfile, dimx, dimy, cardinality)
             
 
     def save(self,outfile):
+        """
+        Saves the classifier object with pickle.
+        """
         pickle.dump(self.classifier,outfile)
         
     def load(self,infile):
+        """
+        Loads classifier object.
+        """
         self.classifier = pickle.load(infile)
                
-	def do_classify(self, lightcurve, featdict):
-		"""
-		My classification that will be run on each lightcurve
+    def do_classify(self, lightcurve, featdict):
+        """
+        Classify a single lightcurve.
+        Assumes lightcurve time is in days
+        Assumes featdict contains ['freq1'],['freq2']...['freq6'] in units of muHz
+        Assumes featdict contains ['amp1'],['amp2'],['amp3'] 
+	    							(amplitudes not amplitude ratios)
+        Assumes featdict contains ['phase1'],['phase2'],['phase3'] 
+	    							(phases not phase differences)
 
-	    Assumes lightcurves are in days
-	    
-	    Assumes featdict contains ['freq1'],['freq2'] etc in units of muHz
-	    
-	    Assumes featdict contains ['amp1'],['amp2'] etc (amplitudes not amplitude ratios)
-	    
-	    Assumes featdict contains ['phase1'],['phase2'] etc (phases not phase differences)
-
-		Parameters:
+        Parameters:
 			lightcurve (``lightkurve.TessLightCurve`` object): Lightcurve.
 			featdict (dict): Dictionary of other features.
 
-		Returns:
-			dict: Dictionary of stellar classifications.
-		"""
-		# Start a logger that should be used to output e.g. debug information:
-		logger = logging.getLogger(__name__)
+        Returns:
+			dict: Dictionary of stellar classifications. -10 for NA results.
+        """
+        # Start a logger that should be used to output e.g. debug information:
+        logger = logging.getLogger(__name__)
 		
-		#update to access lightcurve id parameter, if exists
-		#logger.info("Object ID: "+str(lightcurve.id)) 
+        #update to access lightcurve id parameter, if exists
+        #logger.info("Object ID: "+str(lightcurve.id)) 
 		
         if not self.classifier.trained:
             logger.error('Classifier has not been trained. Exiting.')
             result = {
-			StellarClasses.SOLARLIKE: -10,
-			StellarClasses.ECLIPSE: -10,
-			StellarClasses.RRCEPH: -10,
-			StellarClasses.GDOR_SPB: -10,
-			StellarClasses.DSCT_BCEP: -10,
-			StellarClasses.TRANSIENT: -10,
-			StellarClasses.CONTACT_ROT: -10,
-			StellarClasses.APERIODIC: -10,
-			StellarClasses.CONSTANT: -10,
-			StellarClasses.RAPID: -10
-		    }
-		    return result
+            StellarClasses.SOLARLIKE: -10,
+            StellarClasses.ECLIPSE: -10,
+            StellarClasses.RRCEPH: -10,
+            StellarClasses.GDOR_SPB: -10,
+            StellarClasses.DSCT_BCEP: -10,
+            StellarClasses.TRANSIENT: -10,
+            StellarClasses.CONTACT_ROT: -10,
+            StellarClasses.APERIODIC: -10,
+            StellarClasses.CONSTANT: -10,
+            StellarClasses.RAPID: -10
+            }
+            return result
         
         # Assumes that if self.classifier.trained=True, 
         # ...then self.classifier.som is not None
@@ -111,44 +122,49 @@ class RFGCClassifier(BaseClassifier):
         featarray = fc.featcalc_single(lightcurve,featdict,self.classifier.som)
         logger.info("Features calculated.")
         
-		# Do the magic:
-		logger.info("We are starting the magic...")
-		classprobs = self.classifier.predict_proba(featarray)
+        # Do the magic:
+        logger.info("We are starting the magic...")
+        classprobs = self.classifier.predict_proba(featarray)
         logger.info("Classification complete")
         
         result = {}
-        for c,cla in emnumerate(self.classifier.classes_)
-		    result[cla] = classprobs[c]
+        for c,cla in emnumerate(self.classifier.classes_):
+            result[cla] = classprobs[c]
+        return result
 
-		return result
+    def train(self, lightcurves, labels, featdict, featuredat=None):
+        """
+        Train the classifier.
+        Assumes lightcurve time is in days
+        Assumes featdict contains ['freq1'],['freq2']...['freq6'] in units of muHz
+        Assumes featdict contains ['amp1'],['amp2'],['amp3'] 
+	    							(amplitudes not amplitude ratios)
+        Assumes featdict contains ['phase1'],['phase2'],['phase3'] 
+	    							(phases not phase differences)
 
-	def train(self, lightcurves, labels, featdict, featuredat=None):
-	    """
-	    Assumes lightcurves are in days
-	    
-	    Assumes featdict contains ['freq1'],['freq2'] etc in units of muHz
-	    
-	    Assumes featdict contains ['amp1'],['amp2'] etc (amplitudes not amplitude ratios)
-	    
-	    Assumes featdict contains ['phase1'],['phase2'] etc (phases not phase differences)
-	    
-	    """
-		# Start a logger that should be used to output e.g. debug information:
-		logger = logging.getLogger(__name__)
+        Parameters:
+			lightcurves (iterable of ``lightkurve.TessLightCurve`` objects): Lightcurves.
+			labels (ndarray, [n_objects]): labels for training set lightcurves.
+			featdict (dict): Dictionary of other features. Each feature in same order
+								as lightcurves.
+			featuredat (str): filepath of pre-calculated features, if available.
+        """
+        # Start a logger that should be used to output e.g. debug information:
+        logger = logging.getLogger(__name__)
 		    
-		# Check for pre-calculated features
+        # Check for pre-calculated features
         if featuredat is None:
             logger.info('No feature file given. Calculating.')
                 
             # Check for pre-calculated som
-		    if self.classifier.som is None:
-		        logger.info('No SOM loaded. Creating new SOM, saving to ''./som.txt''.')
-		        #dataprep and train SOM. Save to default loc.
-		        self.classifier.som = fc.trainSOM(lightcurves, 
+            if self.classifier.som is None:
+                logger.info('No SOM loaded. Creating new SOM, saving to ''./som.txt''.')
+                #dataprep and train SOM. Save to default loc.
+                self.classifier.som = fc.trainSOM(lightcurves, 
 		        									featdict, 
 		        									outfile='som.txt')
 		            
-            features = fc.featcalc_set(lightcurves,featdict,self.classifier.som)
+                features = fc.featcalc_set(lightcurves,featdict,self.classifier.som)
         else:
             features = np.genfromtxt(featuredat)
         
@@ -162,6 +178,9 @@ class RFGCClassifier(BaseClassifier):
             logger.error('Training Error') #add more details...
 
     def loadsom(self,somfile, dimx=1, dimy=400, cardinality=64):
+        """
+        Loads a SOM, if not done at init.
+        """
         self.classifier.som = fc.loadSOM(somfile, dimx, dimy, cardinality)   
 
         
@@ -169,12 +188,10 @@ class RFGCClassifier(BaseClassifier):
         '''
 		Plot a confusion matrix. Axes size and labels are hardwired.
 		
-		Parameters
-		-----------------
-		cfmatrix: ndarray
-			Confusion matrix. Format - np.savetxt
-			on the output of self.makeConfMatrix()
-		ticklabels
+		Parameters:
+			cfmatrix (ndarray, [nobj x n_classes]): Confusion matrix. Format - np.savetxt 
+							on the output of self.makeConfMatrix()
+			ticklabels (array, [n_classes]): labels for plot axes. 
         '''
         import pylab as p
         p.ion()
@@ -198,7 +215,7 @@ class RFGCClassifier(BaseClassifier):
 
         for x in np.arange(confmatrix.shape[0]):
             p.plot([x+0.5,x+0.5],[-0.5,confmatrix.shape[0]-0.5],'k--')
-        for y in np.arange(confmatrix.shape[0]:
+        for y in np.arange(confmatrix.shape[0]):
             p.plot([-0.5,confmatrix.shape[0]-0.5],[y+0.5,y+0.5],'k--')
         p.xlim(-0.5,confmatrix.shape[0]-0.5)
         p.ylim(-0.5,confmatrix.shape[0]-0.5)
@@ -213,16 +230,14 @@ class RFGCClassifier(BaseClassifier):
 		Creates cross-validated class probabilities. Splits dataset into groups of 10.
 		May take some time.
 		
-		Parameters
-		-----------------
+		Parameters:
+			features (ndarray, [n_objects x n_features]): Array of all features.
+			labels (ndarray, [n_objects]): labels for each row of features
 		
-		
-		Returns
-		-----------------
-		cvprobs: ndarray, size (nobjects, nclasses)
-			cross-validated class probabilities one row per object
-		classorder:
-		
+		Returns:
+			cvprobs: (ndarray, [nobjects, nclasses]: cross-validated class probabilities
+			classorder (ndarray, [n_classes]): classes corresponding to each column 
+												of cvprobs
         '''
         from sklearn.model_selection import KFold
         shuffleidx = np.random.choice(len(labels),len(labels),replace=False)
@@ -233,7 +248,7 @@ class RFGCClassifier(BaseClassifier):
         self.classifier.oob_score = False
         for train_index,test_index in kf.split(cvfeatures,cvlabels):
             self.classifier.fit(cvfeatures[train_index,:],cvlabels[train_index])
-            sortclasses = np.argsort(self.classifier.classes))
+            sortclasses = np.argsort(self.classifier.classes_)
             tempprobs = self.classifier.predict_proba(cvfeatures[test_index,:])
             probs.append(tempprobs[sortclasses])
         cvprobs = np.vstack(probs)
@@ -245,15 +260,12 @@ class RFGCClassifier(BaseClassifier):
         '''
 		Generates a confusion matrix from a set of class probabilities.
 		
-		Parameters
-		-----------------
-		classprobs: ndarray
-			Array of class probabilities, size (nobjects, nclasses)
+		Parameters:
+			classprobs (ndarray, [n_objects,n_classes]): Class probabilities
+			correct_labels (ndarray, [n_objects]): True labels.
 		
-		Returns
-		-----------------
-		cfmatrix: ndarray, size (nclasses, nclasses)
-			Confusion matrix for the classifier. 
+		Returns:
+			cfmatrix (ndarray, [nclasses, nclasses]): Confusion matrix.
         '''
         from sklearn.metrics import confusion_matrix
         class_vals=np.argmax(classprobs,axis=1)+1

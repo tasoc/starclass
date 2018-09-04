@@ -1,3 +1,11 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Utilities for the RF-GC classifier (general random forest).
+
+.. codeauthor::  David Armstrong <d.j.armstrong@warwick.ac.uk>
+"""
+
 import numpy as np
 import os
 import glob
@@ -65,6 +73,8 @@ def featcalc_set(lightcurves, featdict, som,
 
 def prepLCs(lc,linflatten=False):
     """
+    Creates lightcurves for my, Guy Davies', and Lisa Bugnet's features. Each has 
+    different preferences for NANs, zeros, normalisation and units.
     """
     nancut = (lc.flux==0) | np.isnan(lc.flux)
     norm = np.median(lc.flux[~nancut])
@@ -90,10 +100,11 @@ def prepLCs(lc,linflatten=False):
 def trainSOM(lightcurves,featdict,outfile,cardinality=64,dimx=1,dimy=400,
 				nsteps=300,learningrate=0.1):
 	"""
+	Top level function for training a SOM.
 	"""
-    SOMarray = SOM_alldataprep(lightcurves,featdict['freq1'],cardinality)
-    som = SOM_train(SOMarray,outfile,cardinality,dimx,dimy,nsteps,learningrate)
-    return som
+	SOMarray = SOM_alldataprep(lightcurves,featdict['freq1'],cardinality)
+	som = SOM_train(SOMarray,outfile,cardinality,dimx,dimy,nsteps,learningrate)
+	return som
 
 def loadSOM(somfile, dimx=1, dimy=400, cardinality=64):
     """

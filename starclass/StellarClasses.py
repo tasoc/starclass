@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Enum of all the possible stellar classes.
-
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
@@ -12,34 +11,39 @@ import enum
 __docformat__ = 'restructuredtext'
 
 class StellarClasses(enum.Enum):
-	"""
-	Enum of all the possible stellar classes.
-
-	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
-	"""
-
-	SOLARLIKE = 'solar'
-
-	TRANSIT = 'transit'
-
-	RRLYR = 'RR Lyrae'
-	CEPHEID = 'Cepheid'
-
-	DSCT = 'delta Scuti'
-	BCEP = 'beta Cepheid'
-
-	GDOR = 'gamma Doradus'
-	SPB = 'Slowly pulsating B star'
-
-	# Rapid pulsators:
-	ROAP = 'roAp'
-	SDB = 'sdB'
-	WD = 'White Dwarf'
-
-	TRANSIENT = 'transient'
-
-	SPOTS = 'Spot modulation'
-
-	LPV = 'Long period variable'
-
-	CONSTANT = 'constant'
+    """
+    Enum of all the possible stellar classes.
+    .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+    """
+    
+    #General classes
+    SOLARLIKE = 'solar'
+    ECLIPSE = 'trans/eclipse'
+    RRCEPH = 'RRLyr/Ceph'
+    DSCT_BCEP = 'dSct/bCep'
+    GDOR_SPB = 'gDor/spB'
+    TRANSIENT = 'transient'
+    CONTACT_ROT = 'contactEB/spots'
+    APERIODIC = 'aperiodic'
+    CONSTANT = 'constant'
+    
+    #if we do them:
+    RAPID = 'rapid'
+        
+    #Level 2 classes
+    LPV = 'Long period variable'    
+    SPOTS = 'Spot modulation'
+    
+    GDOR = 'gamma Doradus'
+    SPB = 'Slowly pulsating B star'
+    
+    DSCT = 'delta Scuti'
+    BCEP = 'beta Cepheid'
+    
+    RRLYR = 'RR Lyrae'
+    CEPHEID = 'Cepheid'
+                    
+    # Rapid pulsators:
+    ROAP = 'roAp'
+    SDB = 'sdB'
+    WD = 'White Dwarf'

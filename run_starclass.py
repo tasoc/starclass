@@ -14,7 +14,10 @@ import matplotlib.pyplot as plt
 import sqlite3
 import os.path
 from tqdm import tqdm
+import argparse
+import logging
 from starclass import BaseClassifier, StellarClasses
+from starclass.RFGCClassifier.RF_GC import RFGCClassifier
 
 # Point this to the directory where the TDA simulations are stored
 # URL: https://tasoc.dk/wg0/SimData
@@ -23,6 +26,9 @@ INPUT_DIR = r'F:\tda_simulated_data'
 
 #----------------------------------------------------------------------------------------------
 def generate_todolist():
+
+	logger = logging.getLogger(__name__)
+
 	# Make sure some directories exist:
 	#os.makedirs(os.path.join(INPUT_DIR, 'sysnoise_by_sectors'), exist_ok=True)
 	#os.makedirs(os.path.join(INPUT_DIR, 'noisy_by_sectors'), exist_ok=True)
@@ -71,7 +77,7 @@ def generate_todolist():
 		cursor.execute("CREATE INDEX variability_idx ON diagnostics (variability);")
 		conn.commit()
 
-		print("Step 1: Reading file and extracting information...")
+		logger.info("Step 1: Reading file and extracting information...")
 		pri = 0
 		starlist = np.genfromtxt(os.path.join(INPUT_DIR, 'Data_Batch_TDA4_r1.txt'), delimiter=',', dtype=None)
 		for k, star in tqdm(enumerate(starlist), total=len(starlist)):
@@ -161,7 +167,7 @@ def generate_todolist():
 				ecllat
 			))
 
-		print("Step 2: Figuring out where targets are on CCDs...")
+		logger.info("Step 2: Figuring out where targets are on CCDs...")
 		cursor.execute("SELECT MIN(eclon) AS min_eclon, MAX(eclon) AS max_eclon FROM diagnostics;")
 		row = cursor.fetchone()
 		eclon_min = row['min_eclon']
@@ -205,7 +211,7 @@ def generate_todolist():
 		conn.commit()
 		cursor.close()
 
-	print("DONE.")
+	logger.info("DONE.")
 
 #----------------------------------------------------------------------------------------------
 def training_set_lightcurves():
@@ -225,16 +231,18 @@ def training_set_lightcurves():
 #----------------------------------------------------------------------------------------------
 def training_set_labels():
 
-	data = np.genfromtxt(os.path.join(INPUT_DIR, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10))
+	logger = logging.getLogger(__name__)
+
+	data = np.genfromtxt(os.path.join(INPUT_DIR, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
 
 	# Translation of Mikkel's identifiers into the broader
 	# classes we have defined in StellarClasses:
 	translate = {
 		'Solar-like': StellarClasses.SOLARLIKE,
-		'Transit': StellarClasses.TRANSIT,
-		'Eclipse': StellarClasses.TRANSIT,
-		'multi': StellarClasses.TRANSIT,
-		'MMR': StellarClasses.TRANSIT,
+		'Transit': StellarClasses.ECLIPSE,
+		'Eclipse': StellarClasses.ECLIPSE,
+		'multi': StellarClasses.ECLIPSE,
+		'MMR': StellarClasses.ECLIPSE,
 		'RR Lyrae': StellarClasses.RRLYR,
 		'RRab': StellarClasses.RRLYR,
 		'RRc': StellarClasses.RRLYR,
@@ -265,7 +273,7 @@ def training_set_labels():
 	lookup = []
 	for row in data:
 		#starid = int(row[0][4:])
-		labels = row[1].decode("utf-8").strip().split(';')
+		labels = row[1].strip().split(';')
 		lbls = []
 		for lbl in labels:
 			lbl = lbl.strip()
@@ -278,7 +286,7 @@ def training_set_labels():
 			else:
 				c = translate.get(lbl.strip())
 				if c is None:
-					print(lbl)
+					logger.error("Unknown label: %s", lbl)
 				else:
 					lbls.append(c)
 
@@ -289,6 +297,34 @@ def training_set_labels():
 #----------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 
+	# Parse command line arguments:
+	parser = argparse.ArgumentParser(description='Run TASOC Stellar Classification pipeline on single star.')
+	parser.add_argument('-m', '--method', help='Photometric method to use.', default='rfgc', choices=('rfgc', ))
+	parser.add_argument('-t', '--train', help='Train classifier', action='store_true')
+	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
+	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
+	#parser.add_argument('starid', type=int, help='TIC identifier of target.', nargs='?', default=None)
+	args = parser.parse_args()
+
+	# Set logging level:
+	logging_level = logging.INFO
+	if args.quiet:
+		logging_level = logging.WARNING
+	elif args.debug:
+		logging_level = logging.DEBUG
+
+	# Setup logging:
+	formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+	console = logging.StreamHandler()
+	console.setFormatter(formatter)
+	logger = logging.getLogger(__name__)
+	logger.addHandler(console)
+	logger.setLevel(logging_level)
+	logger_parent = logging.getLogger('starclass')
+	logger_parent.addHandler(console)
+	logger_parent.setLevel(logging_level)
+
+	# Get input and output folder from environment variables:
 	todo_file = os.path.join(INPUT_DIR, 'todo.sqlite')
 
 	# Needs to be run once
@@ -298,12 +334,17 @@ if __name__ == '__main__':
 	if not os.path.exists(todo_file):
 		generate_todolist()
 
+	# Choose which classifier to use
+	# For now, there is only one...
+	classifier = RFGCClassifier
+
 	# Training:
 	# If we want to run the training, do the following:
-	with BaseClassifier() as stcl:
-		labels = training_set_labels()
-		lightcurves = training_set_lightcurves()
-		#stcl.train(lightcurves, labels)
+	if args.train:
+		with classifier() as stcl:
+			labels = training_set_labels()
+			features = training_set_lightcurves()
+			stcl.train(features, labels)
 
 	# Running:
 	# When simply running the classifier on new stars:
@@ -313,15 +354,16 @@ if __name__ == '__main__':
 
 		cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status=1 ORDER BY todolist.priority;")
 
-		with BaseClassifier() as stcl:
+		with classifier() as stcl:
 
 			for task in cursor.fetchall():
 
 				# ----------------- This code would run on each worker ------------------------
 
 				fname = os.path.join(INPUT_DIR, task['lightcurve']) # These are the lightcurves INCLUDING SYSTEMATIC NOISE
-				lc, features = stcl.load_star(task, fname)
+				features = stcl.load_star(task, fname)
 
+				lc = features['lightcurve']
 				lc.properties()
 
 				plt.close('all')
@@ -330,6 +372,6 @@ if __name__ == '__main__':
 				p = lc.flatten().remove_nans().remove_outliers().fill_gaps().periodogram()
 				p.plot()
 
-				res = stcl.classify(lc, features)
+				res = stcl.classify(features)
 
 				# ----------------- This code would run on each worker ------------------------

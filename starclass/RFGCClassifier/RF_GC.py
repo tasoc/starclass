@@ -83,7 +83,7 @@ class RFGCClassifier(BaseClassifier):
 		"""
 		self.classifier = pickle.load(infile)
 
-	def do_classify(self, lightcurve, featdict):
+	def do_classify(self, features):
 		"""
 		Classify a single lightcurve.
 		Assumes lightcurve time is in days
@@ -113,7 +113,7 @@ class RFGCClassifier(BaseClassifier):
 		# Assumes that if self.classifier.trained=True,
 		# ...then self.classifier.som is not None
 		logger.info("Calculating features...")
-		featarray = fc.featcalc_single(lightcurve, featdict, self.classifier.som)
+		featarray = fc.featcalc_single(features, self.classifier.som)
 		logger.info("Features calculated.")
 
 		# Do the magic:
@@ -126,7 +126,7 @@ class RFGCClassifier(BaseClassifier):
 			result[cla] = classprobs[c]
 		return result
 
-	def train(self, lightcurves, labels, featdict, featuredat=None):
+	def train(self, features, labels, featuredat=None, saveit=False):
 		"""
 		Train the classifier.
 		Assumes lightcurve time is in days
@@ -154,22 +154,23 @@ class RFGCClassifier(BaseClassifier):
 			if self.classifier.som is None:
 				logger.info('No SOM loaded. Creating new SOM, saving to ''./som.txt''.')
 				#dataprep and train SOM. Save to default loc.
-				self.classifier.som = fc.trainSOM(lightcurves,
-													featdict,
-													outfile='som.txt')
+				self.classifier.som = fc.trainSOM(features, outfile='som.txt')
 
-				features = fc.featcalc_set(lightcurves, featdict, self.classifier.som)
+				featarray = fc.featcalc_set(features, self.classifier.som)
 		else:
-			features = np.genfromtxt(featuredat)
+			featarray = np.genfromtxt(featuredat)
 
 		try:
 			self.classifier.oob_score = True
-			self.classifier.fit(features, labels)
+			self.classifier.fit(featarray, labels)
 			logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
 			self.classifier.oob_score = False
 			self.classifier.trained = True
 		except:
 			logger.exception('Training Error') # add more details...
+
+		if saveit:
+			self.save(os.path.join(self.data_dir, 'rfgc_classifier_v01.pickle'))
 
 	def loadsom(self, somfile, dimx=1, dimy=400, cardinality=64):
 		"""

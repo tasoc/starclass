@@ -12,64 +12,65 @@ import glob
 import lightkurve
 
 
-def featcalc_single(lightcurve, featdict, som, 
+def featcalc_single(features, som, 
 					providednfreqs=6, nfrequencies=6, forbiddenfreqs=[13.49/4.],
 					cardinality=64, linflatten=True):
     """
     Calculates features for single lightcurve
     """
-    features = np.zeros(nfrequencies+17)
+    lcurve = features['lightcurve']
+    featout = np.zeros(nfrequencies+17)
     
-    lc, guylc, fliperlc = prepLCs(lc,linflatten)
+    lc, guylc, fliperlc = prepLCs(lcurve,linflatten)
     
-    periods, usedfreqs = checkfrequencies(featdict, nfrequencies, providednfreqs,
+    periods, usedfreqs = checkfrequencies(features, nfrequencies, providednfreqs,
         									forbiddenfreqs, lc.time)
-    features[:nfrequencies] = periods
-    features[nfrequencies:nfrequencies+2] = freq_ampratios(featdict,usedfreqs)
-    features[nfrequencies+2:nfrequencies+4] = freq_phasediffs(featdict,usedfreqs)
+    featout[:nfrequencies] = periods
+    featout[nfrequencies:nfrequencies+2] = freq_ampratios(features,usedfreqs)
+    featout[nfrequencies+2:nfrequencies+4] = freq_phasediffs(features,usedfreqs)
     EBper = EBperiod(lc.time, lc.flux, periods[0],linflatten=linflatten-1)
-    features[0] = EBper #overwrites top period
-    features[nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, 
+    featout[0] = EBper #overwrites top period
+    featout[nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, 
         												cardinality)
-    features[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux, EBper)
-    features[nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
-    features[nfrequencies+10] = median_crossings(lc.flux)
+    featout[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux, EBper)
+    featout[nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
+    featout[nfrequencies+10] = median_crossings(lc.flux)
     try:
-        features[nfrequencies+11:nfrequencies+13] = guy_features(guylc)
-        features[nfrequencies+13:] = Fliper_features(fliperlc)
+        featout[nfrequencies+11:nfrequencies+13] = guy_features(guylc)
+        featout[nfrequencies+13:] = Fliper_features(fliperlc)
     except: #a problem for clean files that don't vary
-        features[self.nfreq+11:] = np.ones(6)-10000
-    return features
+        featout[self.nfreq+11:] = np.ones(6)-10000
+    return featout
 
-def featcalc_set(lightcurves, featdict, som, 
+def featcalc_set(features, som, 
 					providednfreqs=6, nfrequencies=6, forbiddenfreqs=[13.49/4.],
 					cardinality=64, linflatten=True):
     """
     Calculates features for set of lightcurves
     """
-    features = np.zeros([len(lightcurves),nfrequencies+17])
+    featout = np.zeros([len(features),nfrequencies+17])
     
-    for i,lc in enumerate(lightcurves):
-        lc, guylc, fliperlc = prepLCs(lc,linflatten)
+    for i,obj in enumerate(features):
+        lc, guylc, fliperlc = prepLCs(obj['lightcurve'],linflatten)
     
-        periods, usedfreqs = checkfrequencies(featdict[i], nfrequencies, providednfreqs,
+        periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs,
         									 forbiddenfreqs, lc.time)
-        features[i,:nfrequencies] = periods
-        features[i,nfrequencies:nfrequencies+2] = freq_ampratios(featdict[i],usedfreqs)
-        features[i,nfrequencies+2:nfrequencies+4] = freq_phasediffs(featdict[i],usedfreqs)
+        featout[i,:nfrequencies] = periods
+        featout[i,nfrequencies:nfrequencies+2] = freq_ampratios(obj,usedfreqs)
+        featout[i,nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj,usedfreqs)
         EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)
-        features[i,0] = EBper #overwrites top period
-        features[i,nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, 
+        featout[i,0] = EBper #overwrites top period
+        featout[i,nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, 
         													cardinality)
-        features[i,nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux,EBper)
-        features[i,nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
-        features[i,nfrequencies+10] = median_crossings(lc.flux)
+        featout[i,nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux,EBper)
+        featout[i,nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
+        featout[i,nfrequencies+10] = median_crossings(lc.flux)
         try:
-            features[i,nfrequencies+11:nfrequencies+13] = guy_features(guylc)
-            features[i,nfrequencies+13:] = Fliper_features(fliperlc)
+            featout[i,nfrequencies+11:nfrequencies+13] = guy_features(guylc)
+            featout[i,nfrequencies+13:] = Fliper_features(fliperlc)
         except: #a problem for clean files that don't vary
-            features[i,self.nfreq+11:] = np.ones(6)-10000
-    return features
+            featout[i,self.nfreq+11:] = np.ones(6)-10000
+    return featout
 
 def prepLCs(lc,linflatten=False):
     """
@@ -97,12 +98,12 @@ def prepLCs(lc,linflatten=False):
     return lc, guylc, fliperlc
 
 
-def trainSOM(lightcurves,featdict,outfile,cardinality=64,dimx=1,dimy=400,
+def trainSOM(features,outfile,cardinality=64,dimx=1,dimy=400,
 				nsteps=300,learningrate=0.1):
 	"""
 	Top level function for training a SOM.
 	"""
-	SOMarray = SOM_alldataprep(lightcurves,featdict['freq1'],cardinality)
+	SOMarray = SOM_alldataprep(features,cardinality)
 	som = SOM_train(SOMarray,outfile,cardinality,dimx,dimy,nsteps,learningrate)
 	return som
 
@@ -192,7 +193,7 @@ def kohonenSave(layer,outfile):  #basically a 3d >> 2d saver
 
 
 
-def SOM_alldataprep(lightcurves, frequencies, outfile=None, cardinality=64,
+def SOM_alldataprep(features, outfile=None, cardinality=64,
 					linflatten=True):
     ''' Function to create an array of normalised lightcurves to train a SOM
         
@@ -211,7 +212,10 @@ def SOM_alldataprep(lightcurves, frequencies, outfile=None, cardinality=64,
         Array of phase-folded, binned lightcurves
     '''    
     SOMarray = np.ones(cardinality)
-    for lc,freq in zip(lightcurves,frequencies): 
+    for obj in features: 
+        lc = obj['lightcurve']
+        freq = obj['freq1']
+        
         time, flux = lc.time.copy(), lc.flux.copy()
 
         #linear flatten lc
@@ -220,8 +224,7 @@ def SOM_alldataprep(lightcurves, frequencies, outfile=None, cardinality=64,
             
         #check double period
         per = 1./(freq*1e-6)/86400. #convert to days    
-        EBper = EBperiod(time, flux, per)
-            
+        EBper = EBperiod(time, flux, per)  
         if EBper > 0: #ignores others
             binlc,range = prepFilePhasefold(time, flux, EBper,cardinality)
             SOMarray = np.vstack((SOMarray,binlc))

@@ -1,16 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Created on Mon Apr  9 14:17:00 2018
-
-@author: Lisa Bugnet
-@contact: lisa.bugnet@cea.fr
 This code is the property of L. Bugnet (please see and cite Bugnet et al.,2018).
 
-The user should use the FLIPER class to calculate FliPer values
-from 0.2,0.7,7,20 and 50 muHz.
+The user should use the FliPer method to calculate FliPer values
+from 0.2 ,0.7, 7, 20 and 50 muHz.
 
-A calling example is reported at the beginning of the code
+.. codeauthor:: Lisa Bugnet <lisa.bugnet@cea.fr>
+.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
 from __future__ import division
@@ -88,7 +85,7 @@ def FliPer(lightcurve):
 	star_tab_psd = _compute_ps(lightcurve.time, flux_ppm)
 
 	#star_tab_psd = _APODIZATION(star_tab_psd)
-	end = 277# muHz
+	end = 277 # muHz
 
 	# Function that computes photon noise from last 100 bins of the spectra
 	noise = np.mean(star_tab_psd[1][-100:])

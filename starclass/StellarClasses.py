@@ -15,34 +15,34 @@ class StellarClasses(enum.Enum):
     Enum of all the possible stellar classes.
     .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
     """
-    
+
     #General classes
     SOLARLIKE = 'solar'
     ECLIPSE = 'trans/eclipse'
-    RRCEPH = 'RRLyr/Ceph'
+    RRLYR_CEPHEID = 'RRLyr/Ceph'
     DSCT_BCEP = 'dSct/bCep'
     GDOR_SPB = 'gDor/spB'
     TRANSIENT = 'transient'
     CONTACT_ROT = 'contactEB/spots'
     APERIODIC = 'aperiodic'
     CONSTANT = 'constant'
-    
+
     #if we do them:
     RAPID = 'rapid'
-        
+
     #Level 2 classes
-    LPV = 'Long period variable'    
+    LPV = 'Long period variable'
     SPOTS = 'Spot modulation'
-    
+
     GDOR = 'gamma Doradus'
     SPB = 'Slowly pulsating B star'
-    
+
     DSCT = 'delta Scuti'
     BCEP = 'beta Cepheid'
-    
+
     RRLYR = 'RR Lyrae'
     CEPHEID = 'Cepheid'
-                    
+
     # Rapid pulsators:
     ROAP = 'roAp'
     SDB = 'sdB'

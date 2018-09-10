@@ -229,7 +229,7 @@ def training_set_lightcurves():
 			yield stcl.load_star(task, fname)
 
 #----------------------------------------------------------------------------------------------
-def training_set_labels():
+def training_set_labels(level='L1'):
 
 	logger = logging.getLogger(__name__)
 
@@ -237,37 +237,70 @@ def training_set_labels():
 
 	# Translation of Mikkel's identifiers into the broader
 	# classes we have defined in StellarClasses:
-	translate = {
-		'Solar-like': StellarClasses.SOLARLIKE,
-		'Transit': StellarClasses.ECLIPSE,
-		'Eclipse': StellarClasses.ECLIPSE,
-		'multi': StellarClasses.ECLIPSE,
-		'MMR': StellarClasses.ECLIPSE,
-		'RR Lyrae': StellarClasses.RRLYR,
-		'RRab': StellarClasses.RRLYR,
-		'RRc': StellarClasses.RRLYR,
-		'RRd':  StellarClasses.RRLYR,
-		'Cepheid': StellarClasses.CEPHEID,
-		'FM': StellarClasses.CEPHEID,
-		'1O': StellarClasses.CEPHEID,
-		'1O2O': StellarClasses.CEPHEID,
-		'FM1O': StellarClasses.CEPHEID,
-		'Type II': StellarClasses.CEPHEID,
-		'Anomaleous': StellarClasses.CEPHEID,
-		'SPB': StellarClasses.SPB,
-		'dsct': StellarClasses.DSCT,
-		'bumpy': StellarClasses.DSCT, # Is this right?
-		'gDor': StellarClasses.GDOR,
-		'bCep': StellarClasses.BCEP,
-		'roAp': StellarClasses.ROAP,
-		'sdBV': StellarClasses.SDB,
-		'Flare': StellarClasses.TRANSIENT,
-		'Spots': StellarClasses.SPOTS,
-		'LPV': StellarClasses.LPV,
-		'MIRA': StellarClasses.LPV,
-		'SR': StellarClasses.LPV,
-		'Constant': StellarClasses.CONSTANT
-	}
+	if level == 'L1':
+		translate = {
+			'Solar-like': StellarClasses.SOLARLIKE,
+			'Transit': StellarClasses.ECLIPSE,
+			'Eclipse': StellarClasses.ECLIPSE,
+			'multi': StellarClasses.ECLIPSE,
+			'MMR': StellarClasses.ECLIPSE,
+			'RR Lyrae': StellarClasses.RRLYR_CEPHEID,
+			'RRab': StellarClasses.RRLYR_CEPHEID,
+			'RRc': StellarClasses.RRLYR_CEPHEID,
+			'RRd':  StellarClasses.RRLYR_CEPHEID,
+			'Cepheid': StellarClasses.RRLYR_CEPHEID,
+			'FM': StellarClasses.RRLYR_CEPHEID,
+			'1O': StellarClasses.RRLYR_CEPHEID,
+			'1O2O': StellarClasses.RRLYR_CEPHEID,
+			'FM1O': StellarClasses.RRLYR_CEPHEID,
+			'Type II': StellarClasses.RRLYR_CEPHEID,
+			'Anomaleous': StellarClasses.RRLYR_CEPHEID,
+			'SPB': StellarClasses.GDOR_SPB,
+			'dsct': StellarClasses.DSCT_BCEP,
+			'bumpy': StellarClasses.DSCT_BCEP, # Is this right?
+			'gDor': StellarClasses.GDOR_SPB,
+			'bCep': StellarClasses.DSCT_BCEP,
+			'roAp': StellarClasses.RAPID,
+			'sdBV': StellarClasses.RAPID,
+			'Flare': StellarClasses.TRANSIENT,
+			'Spots': StellarClasses.SPOTS,
+			'LPV': StellarClasses.LPV,
+			'MIRA': StellarClasses.LPV,
+			'SR': StellarClasses.LPV,
+			'Constant': StellarClasses.CONSTANT
+		}
+	elif level == 'L2':
+		translate = {
+			'Solar-like': StellarClasses.SOLARLIKE,
+			'Transit': StellarClasses.ECLIPSE,
+			'Eclipse': StellarClasses.ECLIPSE,
+			'multi': StellarClasses.ECLIPSE,
+			'MMR': StellarClasses.ECLIPSE,
+			'RR Lyrae': StellarClasses.RRLYR,
+			'RRab': StellarClasses.RRLYR,
+			'RRc': StellarClasses.RRLYR,
+			'RRd':  StellarClasses.RRLYR,
+			'Cepheid': StellarClasses.CEPHEID,
+			'FM': StellarClasses.CEPHEID,
+			'1O': StellarClasses.CEPHEID,
+			'1O2O': StellarClasses.CEPHEID,
+			'FM1O': StellarClasses.CEPHEID,
+			'Type II': StellarClasses.CEPHEID,
+			'Anomaleous': StellarClasses.CEPHEID,
+			'SPB': StellarClasses.SPB,
+			'dsct': StellarClasses.DSCT,
+			'bumpy': StellarClasses.DSCT, # Is this right?
+			'gDor': StellarClasses.GDOR,
+			'bCep': StellarClasses.BCEP,
+			'roAp': StellarClasses.ROAP,
+			'sdBV': StellarClasses.SDB,
+			'Flare': StellarClasses.TRANSIENT,
+			'Spots': StellarClasses.SPOTS,
+			'LPV': StellarClasses.LPV,
+			'MIRA': StellarClasses.LPV,
+			'SR': StellarClasses.LPV,
+			'Constant': StellarClasses.CONSTANT
+		}
 
 	# Create list of all the classes for each star:
 	lookup = []
@@ -300,6 +333,7 @@ if __name__ == '__main__':
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run TASOC Stellar Classification pipeline on single star.')
 	parser.add_argument('-m', '--method', help='Photometric method to use.', default='rfgc', choices=('rfgc', ))
+	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	parser.add_argument('-t', '--train', help='Train classifier', action='store_true')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
@@ -341,9 +375,9 @@ if __name__ == '__main__':
 	# Training:
 	# If we want to run the training, do the following:
 	if args.train:
-		with classifier() as stcl:
+		with classifier(level=args.level) as stcl:
 			labels = training_set_labels()
-			features = training_set_lightcurves()
+			features = training_set_lightcurves(level=args.level)
 			stcl.train(features, labels)
 
 	# Running:
@@ -354,7 +388,7 @@ if __name__ == '__main__':
 
 		cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status=1 ORDER BY todolist.priority;")
 
-		with classifier() as stcl:
+		with classifier(level=args.level) as stcl:
 
 			for task in cursor.fetchall():
 

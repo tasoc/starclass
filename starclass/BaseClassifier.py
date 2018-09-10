@@ -23,7 +23,7 @@ class BaseClassifier(object):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	def __init__(self, plot=False):
+	def __init__(self, level='L1', plot=False):
 		"""
 		Initialize the classifier object.
 
@@ -35,8 +35,12 @@ class BaseClassifier(object):
 			data_dir (string): Path to directory where classifiers store auxiliary data.
 		"""
 
+		# Check the input:
+		assert level in ('L1', 'L2'), "Invalid level"
+
 		# Store the input:
 		self.plot = plot
+		self.level = level
 
 		self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
 

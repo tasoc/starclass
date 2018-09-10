@@ -60,8 +60,7 @@ class BaseClassifier(object):
 		performance metrics.
 
 		Parameters:
-			lightcurve (``lightkurve.TessLightCurve`` object): Lightcurve.
-			features (dict): Dictionary of other features.
+			features (dict): Dictionary of features, including the lightcurve itself.
 
 		Returns:
 			dict: Dictionary of classifications
@@ -80,7 +79,7 @@ class BaseClassifier(object):
 		This method should be overwritten by child classes.
 
 		Parameters:
-			features (dict): Features of star, including the lightcurve itself.
+			features (dict): Dictionary of features of star, including the lightcurve itself.
 
 		Returns:
 			dict: Dictionary where the keys should be from ``StellarClasses`` and the

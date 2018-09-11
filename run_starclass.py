@@ -214,14 +214,18 @@ def generate_todolist():
 	logger.info("DONE.")
 
 #----------------------------------------------------------------------------------------------
-def training_set_lightcurves():
+def training_set_features(datalevel='raw'):
 
-	data = np.genfromtxt(os.path.join(INPUT_DIR, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10))
-	with BaseClassifier() as stcl:
+	data = np.genfromtxt(os.path.join(INPUT_DIR, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
+	with BaseClassifier(features_cache=os.path.join(INPUT_DIR, 'features_%s.sqlite' % datalevel)) as stcl:
 		for row in data:
 			starid = int(row[0][4:])
-			fname = os.path.join(INPUT_DIR, 'sysnoise', 'Star%d.sysnoise' % starid) # # These are the lightcurves INCLUDING SYSTEMATIC NOISE
+			if datalevel == 'raw':
+				fname = os.path.join(INPUT_DIR, 'sysnoise', 'Star%d.sysnoise' % starid) # # These are the lightcurves INCLUDING SYSTEMATIC NOISE
+			elif datalevel == 'corr':
+				fname = os.path.join(INPUT_DIR, 'noisy', 'Star%d.noisy' % starid) # # These are the lightcurves WITHOUT SYSTEMATIC NOISE
 			task = {
+				'priority': starid,
 				'starid': starid,
 				'camera': None,
 				'ccd': None
@@ -257,7 +261,7 @@ def training_set_labels(level='L1'):
 			'Anomaleous': StellarClasses.RRLYR_CEPHEID,
 			'SPB': StellarClasses.GDOR_SPB,
 			'dsct': StellarClasses.DSCT_BCEP,
-			'bumpy': StellarClasses.DSCT_BCEP, # Is this right?
+			'bumpy': StellarClasses.GDOR_SPB,
 			'gDor': StellarClasses.GDOR_SPB,
 			'bCep': StellarClasses.DSCT_BCEP,
 			'roAp': StellarClasses.RAPID,
@@ -289,7 +293,7 @@ def training_set_labels(level='L1'):
 			'Anomaleous': StellarClasses.CEPHEID,
 			'SPB': StellarClasses.SPB,
 			'dsct': StellarClasses.DSCT,
-			'bumpy': StellarClasses.DSCT, # Is this right?
+			'bumpy': StellarClasses.DSCT, # This is not right - Should we make a specific class for these?
 			'gDor': StellarClasses.GDOR,
 			'bCep': StellarClasses.BCEP,
 			'roAp': StellarClasses.ROAP,
@@ -334,6 +338,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Run TASOC Stellar Classification pipeline on single star.')
 	parser.add_argument('-m', '--method', help='Photometric method to use.', default='rfgc', choices=('rfgc', ))
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
+	parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-t', '--train', help='Train classifier', action='store_true')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
@@ -360,6 +365,7 @@ if __name__ == '__main__':
 
 	# Get input and output folder from environment variables:
 	todo_file = os.path.join(INPUT_DIR, 'todo.sqlite')
+	features_cache = os.path.join(INPUT_DIR, 'features_%s.sqlite' % args.datalevel)
 
 	# Needs to be run once
 	# This basically extracts information from Mikkels simulations
@@ -375,9 +381,9 @@ if __name__ == '__main__':
 	# Training:
 	# If we want to run the training, do the following:
 	if args.train:
-		with classifier(level=args.level) as stcl:
-			labels = training_set_labels()
-			features = training_set_lightcurves(level=args.level)
+		with classifier(level=args.level, features_cache=features_cache) as stcl:
+			labels = training_set_labels(level=args.level)
+			features = training_set_features(datalevel=args.datalevel)
 			stcl.train(features, labels)
 
 	# Running:
@@ -388,7 +394,7 @@ if __name__ == '__main__':
 
 		cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status=1 ORDER BY todolist.priority;")
 
-		with classifier(level=args.level) as stcl:
+		with classifier(level=args.level, features_cache=features_cache) as stcl:
 
 			for task in cursor.fetchall():
 

@@ -12,6 +12,7 @@ import tempfile
 import subprocess
 import logging
 import os.path
+import warnings
 
 def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 	"""
@@ -43,7 +44,7 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 			fid.write("%.16e %.16e\n" % (lc.time[i], lc.flux[i]))
 
 		# Construct command to be issued, calling the SLSCLEAN program:
-		cmd = 'slsclean "{inp:s}" -hifac {hifac:d} -ofac {ofac:d} -nmax {numfreq:d}'.format(
+		cmd = 'slsclean "{inp:s}" -hifac {hifac:d} -ofac {ofac:d} -nmax {numfreq:d} -nots'.format(
 			inp=fname,
 			hifac=hifac,
 			ofac=ofac,
@@ -61,22 +62,23 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 			raise Exception(ret[1])
 
 		# Load results from the output file:
-		freqs, amps, phases = np.loadtxt(fname + '.slscleanlog', comments='#', usecols=(1, 3, 5), unpack=True, ndmin=2)
+		with warnings.catch_warnings():
+			warnings.filterwarnings('ignore', message='loadtxt: Empty input file: ', category=UserWarning)
+			data = np.loadtxt(fname + '.slscleanlog', comments='#', usecols=(1, 3, 5), unpack=True, ndmin=2).reshape(-1, 3)
 
 		# Make sure to clean up after ourselves:
 		os.remove(fname + '.slscleanlog')
-		os.remove(fname + '.slsclean')
 
 	# Restructure lists into dictionary of features:
 	features = {}
 	for k in range(numfreq):
-		if k >= len(freqs):
+		if k >= data.shape[0]:
 			features['freq' + str(k+1)] = np.nan
 			features['amp' + str(k+1)] = np.nan
 			features['phase' + str(k+1)] = np.nan
 		else:
-			features['freq' + str(k+1)] = freqs[k]
-			features['amp' + str(k+1)] = amps[k]
-			features['phase' + str(k+1)] = phases[k]
+			features['freq' + str(k+1)] = data[k, 0]
+			features['amp' + str(k+1)] = data[k, 1]
+			features['phase' + str(k+1)] = data[k, 2]
 
 	return features

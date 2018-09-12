@@ -21,7 +21,7 @@ def featcalc_single(features, som,
     lcurve = features['lightcurve']
     featout = np.zeros(nfrequencies+17)
     
-    lc, guylc, fliperlc = prepLCs(lcurve,linflatten)
+    lc = prepLCs(lcurve,linflatten)
     
     periods, usedfreqs = checkfrequencies(features, nfrequencies, providednfreqs,
         									forbiddenfreqs, lc.time)
@@ -35,11 +35,9 @@ def featcalc_single(features, som,
     featout[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux, EBper)
     featout[nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
     featout[nfrequencies+10] = median_crossings(lc.flux)
-    try:
-        featout[nfrequencies+11:nfrequencies+13] = guy_features(guylc)
-        featout[nfrequencies+13:] = Fliper_features(fliperlc)
-    except: #a problem for clean files that don't vary
-        featout[self.nfreq+11:] = np.ones(6)-10000
+    featout[nfrequencies+11] = features['Fphi']
+    featout[nfrequencies+12] = features['Fplo']
+    featout[nfrequencies+13:] = features['Fp07'], features['Fp7'], features['Fp20'], features['Fp50']
     return featout
 
 def featcalc_set(features, som, 
@@ -51,7 +49,7 @@ def featcalc_set(features, som,
     featout = np.zeros([len(features),nfrequencies+17])
     
     for i,obj in enumerate(features):
-        lc, guylc, fliperlc = prepLCs(obj['lightcurve'],linflatten)
+        lc = prepLCs(obj['lightcurve'],linflatten)
     
         periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs,
         									 forbiddenfreqs, lc.time)
@@ -65,26 +63,19 @@ def featcalc_set(features, som,
         featout[i,nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux,EBper)
         featout[i,nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
         featout[i,nfrequencies+10] = median_crossings(lc.flux)
-        try:
-            featout[i,nfrequencies+11:nfrequencies+13] = guy_features(guylc)
-            featout[i,nfrequencies+13:] = Fliper_features(fliperlc)
-        except: #a problem for clean files that don't vary
-            featout[i,self.nfreq+11:] = np.ones(6)-10000
+        featout[i,nfrequencies+11] = features['Fphi']
+        featout[i,nfrequencies+12] = features['Fplo']
+        featout[i,nfrequencies+13:] = features['Fp07'], features['Fp7'], features['Fp20'], features['Fp50']
     return featout
 
 def prepLCs(lc,linflatten=False):
     """
-    Creates lightcurves for my, Guy Davies', and Lisa Bugnet's features. Each has 
-    different preferences for NANs, zeros, normalisation and units.
+    Nancut and normalises lightcurve. Optionally removes linear trend.
     """
     nancut = (lc.flux==0) | np.isnan(lc.flux)
     norm = np.median(lc.flux[~nancut])
     lc.flux /= norm
     lc.flux_err /= norm
-    time_sec = (lc.time - lc.time[0]) * 24.0 * 3600.0
-    flux_ppm = (lc.flux.copy() - 1.0) * 1e6
-    fluxzero = flux_ppm.copy()
-    fluxzero[nancut] = 0.  
         
     lc.time = lc.time[~nancut]
     lc.flux = lc.flux[~nancut]
@@ -93,9 +84,7 @@ def prepLCs(lc,linflatten=False):
     if linflatten:
         lc.flux = lc.flux - np.polyval(np.polyfit(lc.time,lc.flux,1),lc.time) + 1
             
-    fliperlc = lightkurve.LightCurve(time=time_sec, flux=fluxzero)
-    guylc = lightkurve.LightCurve(time=time_sec[~nancut],flux=flux_ppm[~nancut])
-    return lc, guylc, fliperlc
+    return lc
 
 
 def trainSOM(features,outfile,cardinality=64,dimx=1,dimy=400,
@@ -401,7 +390,7 @@ def prepFilePhasefold(time, flux, period, cardinality):
 
 def SOMloc(som, per, time, flux, cardinality): 
     """
-    Returns the location on the current som using the current loaded lc,
+    Returns location on the current som for given lc,
     and binned amplitude.
         
     Inputs
@@ -526,7 +515,7 @@ def phase_features(time, flux, per):
     time
     flux
     per: 			float
-        Period to phasefold self.lc at.
+        Period to phasefold lc at.
           	
     Returns
     -----------------
@@ -542,7 +531,7 @@ def phase_features(time, flux, per):
 
 def p2p_features(flux):
     """
-    Returns p2p features on self.lc
+    Returns p2p features on lc
 
     Inputs
     -----------------
@@ -566,57 +555,4 @@ def median_crossings(flux):
     fluxoffset = flux - np.median(flux)
     signchanges = fluxoffset[1:] * fluxoffset[:-1]
     return np.sum(signchanges<0)
-        
-def get_metric(ds, low_f=1.0, high_f=288.0, white_npts=100):
-    """
-    Features from Guy Davies  
-    """
-    white = np.median(ds.power[-white_npts:])
-    mean = np.mean(ds.power[(ds.freq > low_f) \
-                                      & (ds.freq < high_f)])
-    med = np.median(ds.power[(ds.freq > low_f) \
-                                      & (ds.freq < high_f)])
-    std = np.std(ds.power[(ds.freq > low_f) \
-                                      & (ds.freq < high_f)])
-    return white, mean, med, std
-
-def guy_features(guylc, sigmaclip=3.0):
-    """
-    Features from Guy Davies  
-    """
-    from TDAdata import Dataset
-    ds = Dataset()
-    vars_dict = {'Flicker': [['w100', 'mean1', 'med1', 'std1'],[0.5, 288.0, 100]]}
-                
-    ds.time = guylc.time
-    ds.flux = guylc.flux
-               
-    sel = np.where(np.abs(ds.flux) < mad_std(ds.flux) * sigma_clip)
-
-    ds.flux_fix = ds.flux[sel]
-    ds.time_fix = ds.time[sel] 
-        
-    ds.power_spectrum()
-
-    tmp = vars_dict['Flicker'][1]
-    w, m, mm, s = get_metric(ds, low_f=tmp[0], high_f=tmp[1], white_npts=tmp[2])
-    return w, m-w
-
-def Fliper_features(fliperlc):
-    """
-    Fliper features from Lisa Bugnet.
-    """
-    import FLIPER_TESS_FUNCTION as FLIPER
-    from PSD_CALCULATION import CONVERT
-        
-    cv = CONVERT()
-
-    cadence = np.median(np.diff(fliperlc.time))
-    tottime = fliperlc.time[-1]-fliperlc.time[0]
-        
-    star_tab_psd = cv.compute_ps(fliperlc.time, fliperlc.flux, cadence, tottime)
-    fp = FLIPER.FLIPER()
-    Fliper_values=fp.Fp(star_tab_psd)
-    return Fliper_values.fp07[0], Fliper_values.fp7[0], \
-           Fliper_values.fp20[0], Fliper_values.fp50[0]
-        
+            

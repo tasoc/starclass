@@ -94,5 +94,7 @@ def FliPer(lightcurve):
 		'Fp07': _region(star_tab_psd, 0.7, end) - noise,
 		'Fp7' : _region(star_tab_psd, 7, end)   - noise,
 		'Fp20': _region(star_tab_psd, 20, end)  - noise,
-		'Fp50': _region(star_tab_psd, 50, end)  - noise
+		'Fp50': _region(star_tab_psd, 50, end)  - noise,
+		'Fphi': _region(star_tab_psd, 0, 28)    - noise,
+		'Fplo': _region(star_tab_psd, 250, end) - noise
 	}

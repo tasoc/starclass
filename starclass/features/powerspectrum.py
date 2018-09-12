@@ -6,10 +6,10 @@
 
 from __future__ import division, with_statement, print_function, absolute_import
 import numpy as np
-import matplotlib.pyplot as plt
 from astropy.stats import LombScargle
 from bottleneck import nanmedian
 from scipy.optimize import minimize_scalar
+from scipy.integrate import simps
 
 class powerspectrum(object):
 
@@ -18,14 +18,11 @@ class powerspectrum(object):
 		self.lightcurve = lightcurve
 		self.fit_mean = fit_mean
 		
-		self.df = 1/(86400*(self.lightcurve.time[-1] - self.lightcurve.time[0]))
-		self.nyquist = 1/(2*86400*nanmedian(np.diff(self.lightcurve.time)))
-
 		indx = np.isfinite(flux)
+		self.df = 1/(86400*(np.max(self.lightcurve.time[indx]) - np.min(self.lightcurve.time[indx]))) # Hz
+		self.nyquist = 1/(2*86400*nanmedian(np.diff(self.lightcurve.time[indx]))) # Hz
 		
-		
-		self.ls = LombScargle(time[indx]*86400, flux[indx], center_data=True, fit_mean=self.fit_mean)
-
+		self.ls = LombScargle(lightcurve.time[indx]*86400, lightcurve.flux[indx], center_data=True, fit_mean=self.fit_mean, normalization='psd')
 		
 	#------------------------------------------------------------------------------
 	def fundamental_spacing_minimum(self):
@@ -37,7 +34,7 @@ class powerspectrum(object):
 		x = 0.5*np.sin(2*np.pi*freq_cen*self.lightcurve.time*86400) + 0.5*np.cos(2*np.pi*freq_cen*self.lightcurve.time*86400)
 
 		# Calculate power spectrum for the given frequency range:
-		ls = LombScargle(time*86400, x, center_data=True, fit_mean=self.fit_mean)
+		ls = LombScargle(self.ls.t, x, center_data=True, fit_mean=self.fit_mean)
 
 		# Minimize the window function around the first minimum:
 		# Normalization is completely irrelevant
@@ -48,18 +45,9 @@ class powerspectrum(object):
 		
 	#------------------------------------------------------------------------------
 	def fundamental_spacing_integral(self):
-
-		# Initial guess for equidistant timestamps:
-		#indx = np.isfinite(flux)
-		freq_cen = 0.5*self.nyquist
-		x = 0.5*np.sin(2*np.pi*freq_cen*time*86400) + 0.5*np.cos(2*np.pi*freq_cen*time*86400)
-
-		# Calculate power spectrum for the given frequency range:
-		ls = LombScargle(time*86400, x, center_data=True, fit_mean=self.fit_mean)
-
-		# Minimize the window function around the first minimum:
-		freq, window = windowfunction(time, oversampling=5)
-		df = trapz(freq, window)
+		# Integrate the windowfunction
+		freq, window = self.windowfunction(oversampling=5)
+		df = simps(window, freq)
 		return df
 		
 	#------------------------------------------------------------------------------
@@ -78,7 +66,7 @@ class powerspectrum(object):
 			ndarray: Corresponding power in units depending on the ``scale`` keyword.
 		"""
 
-		N = len(time[indx])
+		N = len(self.ls.t)
 
 		# The frequency axis in Hertz:
 		if freq is None:
@@ -105,10 +93,10 @@ class powerspectrum(object):
 		Nfreq = int(oversampling*width*1e-6/self.df)
 		freq = freq_cen + (self.df/oversampling) * np.arange(-Nfreq, Nfreq, 1)
 
-		x = 0.5*np.sin(2*np.pi*freq_cen*time*86400) + 0.5*np.cos(2*np.pi*freq_cen*time*86400)
+		x = 0.5*np.sin(2*np.pi*freq_cen*self.ls.t) + 0.5*np.cos(2*np.pi*freq_cen*self.ls.t)
 
 		# Calculate power spectrum for the given frequency range:
-		ls = LombScargle(time*86400, x, center_data=True, fit_mean=True)
+		ls = LombScargle(self.ls.t, x, center_data=True, fit_mean=self.fit_mean)
 		power = ls.power(freq, method='fast', normalization='psd', assume_regular_frequency=True)
 		power /= power[int(len(power)/2)] # Normalize to have maximum of one
 

@@ -11,10 +11,12 @@ from __future__ import division, print_function, with_statement, absolute_import
 import numpy as np
 import os.path
 import logging
-import sqlite3
+import six.moves.cPickle as pickle
 from lightkurve import TessLightCurve
+from astropy.stats import mad_std
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
+from .features.powerspectrum import powerspectrum
 
 __docformat__ = 'restructuredtext'
 
@@ -51,28 +53,14 @@ class BaseClassifier(object):
 		self.features_cache = features_cache
 		self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level))
 
-		self.conn = self.cursor = None
-		if self.features_cache is not None:
-			self.conn = sqlite3.connect(self.features_cache)
-			self.conn.row_factory = sqlite3.Row
-			self.cursor = self.conn.cursor()
-			#self.cursor.execute("DROP TABLE IF EXISTS features;")
-			self.cursor.execute("""CREATE TABLE IF NOT EXISTS features (
-				priority INT PRIMARY KEY NOT NULL,
-				freq1 REAL, freq2 REAL, freq3 REAL, freq4 REAL, freq5 REAL, freq6 REAL,
-				amp1 REAL, amp2 REAL, amp3 REAL, amp4 REAL, amp5 REAL, amp6 REAL,
-				phase1 REAL, phase2 REAL, phase3 REAL, phase4 REAL, phase5 REAL, phase6 REAL,
-				Fp07 REAL, Fp7 REAL, Fp20 REAL, Fp50 REAL
-			);""")
-
+		if self.features_cache is not None and not os.path.exists(self.features_cache):
+			raise ValueError("features_cache directory does not exists")
 
 	def __enter__(self):
 		return self
 
 	def __exit__(self, *args):
 		self.close()
-		if self.cursor: self.cursor.close()
-		if self.conn: self.conn.close()
 
 	def close(self):
 		"""Close the classifier."""
@@ -161,13 +149,13 @@ class BaseClassifier(object):
 		features = None
 		loaded_from_cache = False
 		if self.features_cache:
-			self.cursor.execute("SELECT * FROM features WHERE priority=?;", (task['priority'],))
-			features = self.cursor.fetchone()
-			if features is not None:
-				features = dict(features)
+			features_file = os.path.join(self.features_cache, 'features-' + str(task['priority']) + '.pickle')
+			if os.path.exists(features_file):
 				loaded_from_cache = True
+				with open(features_file, 'rb') as fid:
+					features = pickle.load(fid)
 
-		# No features found in database, so calculate them:
+		# No features found in cache, so calculate them:
 		if features is None:
 			features = self.calc_features(lightcurve)
 			logger.debug(features)
@@ -177,24 +165,8 @@ class BaseClassifier(object):
 
 		# Save features in cache file for later use:
 		if self.features_cache and not loaded_from_cache:
-			# Save features in database:
-			self.cursor.execute("""INSERT INTO features (
-				priority,
-				freq1,freq2,freq3,freq4,freq5,freq6,
-				amp1,amp2,amp3,amp4,amp5,amp6,
-				phase1,phase2,phase3,phase4,phase5,phase6,
-				Fp07,Fp7,Fp20,Fp50
-			) VALUES (
-				:priority,
-				:freq1,:freq2,:freq3,:freq4,:freq5,:freq6,
-				:amp1,:amp2,:amp3,:amp4,:amp5,:amp6,
-				:phase1,:phase2,:phase3,:phase4,:phase5,:phase6,
-				:Fp07,:Fp7,:Fp20,:Fp50
-			);""", features)
-			self.conn.commit()
-
-		# Add the lightcurve as a seperate feature:
-		features['lightcurve'] = lightcurve
+			with open(features_file, 'wb') as fid:
+				pickle.dump(features, fid)
 
 		return features
 
@@ -204,10 +176,23 @@ class BaseClassifier(object):
 		# We start out with an empty list of features:
 		features = {}
 
+		# Add the lightcurve as a seperate feature:
+		features['lightcurve'] = lightcurve
+
+		# Prepare lightcurve for power spectrum calculation:
+		lc = (lightcurve.remove_nans().normalize() - 1.0) * 1e6
+		#lc = lc.remove_outliers(5.0, stdfunc=mad_std) # Sigma clipping
+
+		# Calculate power spectrum:
+		psd = powerspectrum(lc)
+
+		# Save the entire power spectrum object in the features:
+		features['powerspectrum'] = psd
+
 		# Extract primary frequencies from lightcurve and add to features:
 		features.update(freqextr(lightcurve))
 
 		# Calculate FliPer features:
-		features.update(FliPer(lightcurve))
+		features.update(FliPer(psd))
 
 		return features

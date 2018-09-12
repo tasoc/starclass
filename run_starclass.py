@@ -217,7 +217,7 @@ def generate_todolist():
 def training_set_features(datalevel='raw'):
 
 	data = np.genfromtxt(os.path.join(INPUT_DIR, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
-	with BaseClassifier(features_cache=os.path.join(INPUT_DIR, 'features_%s.sqlite' % datalevel)) as stcl:
+	with BaseClassifier(features_cache=os.path.join(INPUT_DIR, 'features_cache_%s' % datalevel)) as stcl:
 		for row in data:
 			starid = int(row[0][4:])
 			if datalevel == 'raw':
@@ -335,11 +335,11 @@ def training_set_labels(level='L1'):
 if __name__ == '__main__':
 
 	# Parse command line arguments:
-	parser = argparse.ArgumentParser(description='Run TASOC Stellar Classification pipeline on single star.')
-	parser.add_argument('-m', '--method', help='Photometric method to use.', default='rfgc', choices=('rfgc', ))
+	parser = argparse.ArgumentParser(description='Utility function for running stellar classifiers.')
+	parser.add_argument('-m', '--method', help='Classifier to use.', default='rfgc', choices=('rfgc', ))
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
-	parser.add_argument('-t', '--train', help='Train classifier', action='store_true')
+	parser.add_argument('-t', '--train', help='Train classifier.', action='store_true')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	#parser.add_argument('starid', type=int, help='TIC identifier of target.', nargs='?', default=None)
@@ -365,7 +365,7 @@ if __name__ == '__main__':
 
 	# Get input and output folder from environment variables:
 	todo_file = os.path.join(INPUT_DIR, 'todo.sqlite')
-	features_cache = os.path.join(INPUT_DIR, 'features_%s.sqlite' % args.datalevel)
+	features_cache = os.path.join(INPUT_DIR, 'features_cache_%s' % args.datalevel)
 
 	# Needs to be run once
 	# This basically extracts information from Mikkels simulations
@@ -391,7 +391,6 @@ if __name__ == '__main__':
 	with sqlite3.connect(todo_file) as conn:
 		conn.row_factory = sqlite3.Row
 		cursor = conn.cursor()
-
 		cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status=1 ORDER BY todolist.priority;")
 
 		with classifier(level=args.level, features_cache=features_cache) as stcl:
@@ -408,9 +407,6 @@ if __name__ == '__main__':
 
 				plt.close('all')
 				lc.plot()
-
-				p = lc.flatten().remove_nans().remove_outliers().fill_gaps().periodogram()
-				p.plot()
 
 				res = stcl.classify(features)
 

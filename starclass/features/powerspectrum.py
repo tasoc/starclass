@@ -6,32 +6,50 @@
 
 from __future__ import division, with_statement, print_function, absolute_import
 import numpy as np
+import matplotlib.pyplot as plt
 from astropy.stats import LombScargle
 from bottleneck import nanmedian
 from scipy.optimize import minimize_scalar
 from scipy.integrate import simps
 
 class powerspectrum(object):
+	"""
+	Attributes:
+		nyquist (float): Nyquist frequency in Hz.
+		df (float): Fundamental frequency spacing in Hz.
+		standard (tuple): Frequency in microHz and power density spectrum sampled
+			from 0 to ``nyquist`` with a spacing of ``df``.
+		ls (``astropy.stats.LombScargle`` object):
+	"""
 
 	def __init__(self, lightcurve, fit_mean=False):
-		
-		self.lightcurve = lightcurve
+		"""
+		Parameters:
+			lightcurve (``lightkurve.LightCurve`` object): Lightcurve to estimate power spectrum for.
+			fit_mean (boolean, optional):
+		"""
+
 		self.fit_mean = fit_mean
-		
-		indx = np.isfinite(flux)
-		self.df = 1/(86400*(np.max(self.lightcurve.time[indx]) - np.min(self.lightcurve.time[indx]))) # Hz
-		self.nyquist = 1/(2*86400*nanmedian(np.diff(self.lightcurve.time[indx]))) # Hz
-		
-		self.ls = LombScargle(lightcurve.time[indx]*86400, lightcurve.flux[indx], center_data=True, fit_mean=self.fit_mean, normalization='psd')
-		
+
+		indx = np.isfinite(lightcurve.flux)
+		self.df = 1/(86400*(np.max(lightcurve.time[indx]) - np.min(lightcurve.time[indx]))) # Hz
+		self.nyquist = 1/(2*86400*nanmedian(np.diff(lightcurve.time[indx]))) # Hz
+
+		self.ls = LombScargle(lightcurve.time[indx]*86400, lightcurve.flux[indx], center_data=True, fit_mean=self.fit_mean) # , normalization='psd'
+
+		# Calculate a better estimate of the fundamental frequency spacing:
+		self.df = self.fundamental_spacing_integral()
+
+		# Calculate standard power density spectrum:
+		self.standard = self.powerspectrum(oversampling=1, nyquist_factor=1, scale='powerdensity')
+
 	#------------------------------------------------------------------------------
 	def fundamental_spacing_minimum(self):
+		"""Estimate fundamental spacing using the first minimum spectral window function."""
 
-		# Initial guess for equidistant timestamps:
-		#indx = np.isfinite(flux)
-
+		# Create "window" time series:
 		freq_cen = 0.5*self.nyquist
-		x = 0.5*np.sin(2*np.pi*freq_cen*self.lightcurve.time*86400) + 0.5*np.cos(2*np.pi*freq_cen*self.lightcurve.time*86400)
+		x = 0.5*np.sin(2*np.pi*freq_cen*self.ls.t) + 0.5*np.cos(2*np.pi*freq_cen*self.ls.t)
 
 		# Calculate power spectrum for the given frequency range:
 		ls = LombScargle(self.ls.t, x, center_data=True, fit_mean=self.fit_mean)
@@ -42,28 +60,30 @@ class powerspectrum(object):
 		res = minimize_scalar(window, [0.75*self.df, self.df, 1.25*self.df])
 		df = res.x
 		return df
-		
+
 	#------------------------------------------------------------------------------
 	def fundamental_spacing_integral(self):
+		"""Estimate fundamental spacing using the integral of the spectral window function."""
 		# Integrate the windowfunction
-		freq, window = self.windowfunction(oversampling=5)
+		freq, window = self.windowfunction(width=100*self.df, oversampling=5)
 		df = simps(window, freq)
-		return df
-		
+		return df*1e-6
+
 	#------------------------------------------------------------------------------
 	def powerspectrum(self, freq=None, oversampling=1, nyquist_factor=1, scale='power'):
 		"""
 		Calculate power spectrum for time series.
 
 		Parameters:
-			freq (ndarray, optional): 
+			freq (ndarray, optional): Frequencies to calculate power spectrum for. If set
+				to None, the full frequency range from 0 to ``nyquist``*``nyquist_factor`` is calculated.
 			oversampling (float, optional): Oversampling factor. Default=1.
 			nyquist_factor (float, optional): Nyquist factor. Default=1.
-			scale (string, optional): 'power', 'powerdensity' and 'amplitude'.
+			scale (string, optional): 'power', 'powerdensity' and 'amplitude'. Default='power'.
 
 		Returns:
-			ndarray: Frequencies in microHz.
-			ndarray: Corresponding power in units depending on the ``scale`` keyword.
+			tuple: Tuple of two ndarray with frequencies in microHz and corresponding
+				power in units depending on the ``scale`` keyword.
 		"""
 
 		N = len(self.ls.t)
@@ -87,10 +107,19 @@ class powerspectrum(object):
 		return freq, power
 
 	#------------------------------------------------------------------------------
-	def windowfunction(self, width=30.0, oversampling=10):
+	def windowfunction(self, width=None, oversampling=10):
+		"""Spectral window function.
+
+		Parameters:
+			width (float, optional): The width in Hz on either side of zero to calculate spectral window.
+			oversampling (float, optional): Oversampling factor. Default=10.
+		"""
+
+		if width is None:
+			width = 100*self.df
 
 		freq_cen = 0.5*self.nyquist
-		Nfreq = int(oversampling*width*1e-6/self.df)
+		Nfreq = int(oversampling*width/self.df)
 		freq = freq_cen + (self.df/oversampling) * np.arange(-Nfreq, Nfreq, 1)
 
 		x = 0.5*np.sin(2*np.pi*freq_cen*self.ls.t) + 0.5*np.cos(2*np.pi*freq_cen*self.ls.t)
@@ -104,12 +133,22 @@ class powerspectrum(object):
 		freq *= 1e6
 		return freq, power
 
-	#------------------------------------------------------------------------------		
+	#------------------------------------------------------------------------------
+	def plot(self):
+
+		plt.figure()
+		plt.loglog(self.psd[0], self.psd[1], 'k-')
+		plt.xlabel('Frequency (muHz)')
+		plt.ylabel('Power density (ppm^2/muHz)')
+		plt.xlim(self.psd[0][0], self.psd[0][-1])
+		plt.show()
+
+	#------------------------------------------------------------------------------
 	#def clean(self):
 	#
 	#	freq, power = self.powerspectrum(oversampling=4, scale='power')
-	#	
+	#
 	#	freq_guess = freq[np.argmax(power)]
-		
-		
-		
+
+
+

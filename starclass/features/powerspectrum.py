@@ -5,9 +5,9 @@
 """
 
 from __future__ import division, with_statement, print_function, absolute_import
-from six.moves import range
 import numpy as np
 import matplotlib.pyplot as plt
+import lightkurve
 from astropy.stats import LombScargle
 from bottleneck import nanmedian
 from scipy.optimize import minimize_scalar
@@ -135,14 +135,26 @@ class powerspectrum(object):
 		return freq, power
 
 	#------------------------------------------------------------------------------
-	def plot(self):
+	def plot(self, ax=None, xlabel='Frequency (muHz)', ylabel=None, style='lightkurve'):
 
-		plt.figure()
-		plt.loglog(self.psd[0], self.psd[1], 'k-')
-		plt.xlabel('Frequency (muHz)')
-		plt.ylabel('Power density (ppm^2/muHz)')
-		plt.xlim(self.psd[0][0], self.psd[0][-1])
-		plt.show()
+		if ylabel is None:
+			ylabel = {
+				'powerdensity': 'Power density (ppm^2/muHz)',
+				'power': 'Power (ppm^2)',
+				'amplitude': 'Amplitude (ppm)'
+			}['powerdensity'] # TODO: Only one setting for now...
+
+		if style is None or style == 'lightkurve':
+			style = lightkurve.MPLSTYLE
+
+		with plt.style.context(style):
+			if ax is None:
+				fig, ax = plt.subplots(1)
+
+			ax.loglog(self.standard[0], self.standard[1], 'k-')
+			ax.set_xlabel('Frequency (muHz)')
+			ax.set_ylabel(ylabel)
+			ax.set_xlim(self.standard[0][0], self.standard[0][-1])
 
 	#------------------------------------------------------------------------------
 	#def clean(self):

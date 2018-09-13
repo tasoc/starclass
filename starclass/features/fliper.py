@@ -10,7 +10,7 @@ from 0.2 ,0.7, 7, 20 and 50 muHz.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division
+from __future__ import division, print_function, with_statement, absolute_import
 import numpy as np
 
 def _APODIZATION(star_tab_psd):
@@ -19,7 +19,7 @@ def _APODIZATION(star_tab_psd):
 	"""
 	freq = star_tab_psd[0]
 	nq = np.max(freq)
-	nu = np.sin(np.pi/2.*freq/nq) / (np.pi/2.*freq/nq)
+	nu = np.sinc(2.*freq/nq)
 	star_tab_psd[1] /= nu**2
 	return star_tab_psd
 
@@ -36,8 +36,8 @@ def FliPer(psd):
 	Compute FliPer values from 0.7, 7, 20, & 50 muHz
 
 	Parameters:
-		lightcurve (`lightkurve.TessLightCurve` object): Lightcurve of which to calculate
-		the FliPer metrics.
+		psd (`powerspectrum` object): Power spectrum of which to calculate
+			the FliPer metrics.
 
 	Returns:
 		dict: Features from FliPer method.

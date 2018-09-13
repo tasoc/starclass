@@ -1,5 +1,7 @@
+six
 numpy
 astropy
 lightkurve
 scikit-learn
-bottleneck
+Bottleneck
+enum-compat

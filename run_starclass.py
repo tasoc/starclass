@@ -16,8 +16,7 @@ import os.path
 from tqdm import tqdm
 import argparse
 import logging
-from starclass import BaseClassifier, StellarClasses
-from starclass.RFGCClassifier.RF_GC import RFGCClassifier
+from starclass import BaseClassifier, StellarClasses, RFGCClassifier
 
 # Point this to the directory where the TDA simulations are stored
 # URL: https://tasoc.dk/wg0/SimData

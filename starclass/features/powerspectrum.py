@@ -5,6 +5,7 @@
 """
 
 from __future__ import division, with_statement, print_function, absolute_import
+from six.moves import range
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.stats import LombScargle

@@ -5,3 +5,4 @@ lightkurve
 scikit-learn
 Bottleneck
 enum-compat
+backports.tempfile

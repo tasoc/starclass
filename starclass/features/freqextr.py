@@ -7,8 +7,8 @@
 
 from __future__ import division, print_function, with_statement, absolute_import
 from six.moves import range
+from backports import tempfile
 import numpy as np
-import tempfile
 import subprocess
 import logging
 import os.path
@@ -19,7 +19,7 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 	Extract the highest amplitude frequencies from the timeseries.
 
 	Parameters:
-		lightcurve (): Lightcurve to extract frequencies for.
+		lightcurve (``lightkurve.LightCurve`` object): Lightcurve to extract frequencies for.
 		numfreq (integer, optional): Number of frequencies to extract.
 		hifac (integer, optional): Nyquist factor.
 		ofac (integer, optional): Oversampling factor used for initial search for peaks in power spectrum.
@@ -36,12 +36,14 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 	lc = (lightcurve.remove_nans().normalize() - 1.0) * 1e6
 
 	# Create temp file to hold the timeseries:
-	with tempfile.NamedTemporaryFile(prefix='slsclean_', mode='w') as fid:
-		fname = fid.name
+	with tempfile.TemporaryDirectory(prefix='slsclean_') as tmpdir:
+		# Name of timeseries file:
+		fname = os.path.join(tmpdir, 'tmp_timeseries')
 
 		# Write timeseries to temp file:
-		for i in range(len(lc.time)):
-			fid.write("%.16e %.16e\n" % (lc.time[i], lc.flux[i]))
+		with open(fname, 'w') as fid:
+			for i in range(len(lc.time)):
+				fid.write("%.16e %.16e\n" % (lc.time[i], lc.flux[i]))
 
 		# Construct command to be issued, calling the SLSCLEAN program:
 		cmd = 'slsclean "{inp:s}" -hifac {hifac:d} -ofac {ofac:d} -nmax {numfreq:d} -nots'.format(
@@ -65,9 +67,6 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 		with warnings.catch_warnings():
 			warnings.filterwarnings('ignore', message='loadtxt: Empty input file: ', category=UserWarning)
 			data = np.loadtxt(fname + '.slscleanlog', comments='#', usecols=(1, 3, 5), unpack=True, ndmin=2).reshape(-1, 3)
-
-		# Make sure to clean up after ourselves:
-		os.remove(fname + '.slscleanlog')
 
 	# Restructure lists into dictionary of features:
 	features = {}

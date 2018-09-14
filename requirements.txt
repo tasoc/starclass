@@ -1,5 +1,8 @@
+six
 numpy
 astropy
 lightkurve
 scikit-learn
-gatspy
+Bottleneck
+enum-compat
+backports.tempfile

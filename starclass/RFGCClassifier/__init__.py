@@ -2,3 +2,4 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import absolute_import
+from .RF_GC  import RFGCClassifier

@@ -244,7 +244,7 @@ def training_set_labels(level='L1'):
 		translate = {
 			'Solar-like': StellarClasses.SOLARLIKE,
 			'Transit': StellarClasses.ECLIPSE,
-			'Eclipse': StellarClasses.ECLIPSE,
+			'Eclipse': StellarClasses.ECLIPSE, #short period EBs should be CONTACT_ROT, not ECLIPSE
 			'multi': StellarClasses.ECLIPSE,
 			'MMR': StellarClasses.ECLIPSE,
 			'RR Lyrae': StellarClasses.RRLYR_CEPHEID,
@@ -266,7 +266,7 @@ def training_set_labels(level='L1'):
 			'roAp': StellarClasses.RAPID,
 			'sdBV': StellarClasses.RAPID,
 			'Flare': StellarClasses.TRANSIENT,
-			'Spots': StellarClasses.SPOTS,
+			'Spots': StellarClasses.CONTACT_ROT,
 			'LPV': StellarClasses.LPV,
 			'MIRA': StellarClasses.LPV,
 			'SR': StellarClasses.LPV,

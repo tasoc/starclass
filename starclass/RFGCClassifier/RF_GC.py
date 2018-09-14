@@ -137,10 +137,8 @@ class RFGCClassifier(BaseClassifier):
 									(phases not phase differences)
 
 		Parameters:
-			lightcurves (iterable of ``lightkurve.TessLightCurve`` objects): Lightcurves.
 			labels (ndarray, [n_objects]): labels for training set lightcurves.
-			featdict (dict): Dictionary of other features. Each feature in same order
-								as lightcurves.
+			features (iterable of dict): features, inc lightcurves
 			featuredat (str): filepath of pre-calculated features, if available.
 		"""
 		# Start a logger that should be used to output e.g. debug information:

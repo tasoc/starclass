@@ -53,7 +53,7 @@ class powerspectrum(object):
 		# Use the un-scaled power spectrum to finding the normalisation factor
 		# which will ensure that Parseval's theorem holds:
 		N = len(self.ls.t)
-		tot_MS = np.sum((lightcurve.flux[indx] - nanmean(lightcurve.flux[indx]))**2)/N
+		tot_MS = np.sum((self.ls.y - nanmean(self.ls.y))**2)/N
 		tot_lomb = np.sum(self.standard[1])
 		self.normfactor = tot_MS/tot_lomb
 

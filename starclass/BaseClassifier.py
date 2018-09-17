@@ -168,7 +168,11 @@ class BaseClassifier(object):
 			logger.debug(features)
 
 		# Add the fields from the task to the list of features:
-		features.update(task)
+		features['priority'] = task['priority']
+		features['starid'] = task['starid']
+		for key in ('tmag', 'mean_flux', 'variance', 'variability'):
+			if key in task.keys():
+				features[key] = task[key]
 
 		# Save features in cache file for later use:
 		if self.features_cache and not loaded_from_cache:

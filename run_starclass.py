@@ -215,21 +215,28 @@ def generate_todolist():
 #----------------------------------------------------------------------------------------------
 def training_set_features(datalevel='raw'):
 
+	todo_file = os.path.join(INPUT_DIR, 'todo.sqlite')
 	data = np.genfromtxt(os.path.join(INPUT_DIR, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
-	with BaseClassifier(features_cache=os.path.join(INPUT_DIR, 'features_cache_%s' % datalevel)) as stcl:
-		for row in data:
-			starid = int(row[0][4:])
-			if datalevel == 'raw':
-				fname = os.path.join(INPUT_DIR, 'sysnoise', 'Star%d.sysnoise' % starid) # # These are the lightcurves INCLUDING SYSTEMATIC NOISE
-			elif datalevel == 'corr':
-				fname = os.path.join(INPUT_DIR, 'noisy', 'Star%d.noisy' % starid) # # These are the lightcurves WITHOUT SYSTEMATIC NOISE
-			task = {
-				'priority': starid,
-				'starid': starid,
-				'camera': None,
-				'ccd': None
-			}
-			yield stcl.load_star(task, fname)
+
+	with sqlite3.connect(todo_file) as conn:
+		conn.row_factory = sqlite3.Row
+		cursor = conn.cursor()
+
+		with BaseClassifier(features_cache=os.path.join(INPUT_DIR, 'features_cache_%s' % datalevel)) as stcl:
+			for row in data:
+				starid = int(row[0][4:])
+
+				# Lightcurve file to load:
+				if datalevel == 'raw':
+					fname = os.path.join(INPUT_DIR, 'sysnoise', 'Star%d.sysnoise' % starid) # # These are the lightcurves INCLUDING SYSTEMATIC NOISE
+				elif datalevel == 'corr':
+					fname = os.path.join(INPUT_DIR, 'noisy', 'Star%d.noisy' % starid) # # These are the lightcurves WITHOUT SYSTEMATIC NOISE
+
+				# Get task info from database:
+				cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE starid=?;", (starid, ))
+				task = dict(cursor.fetchone())
+
+				yield stcl.load_star(task, fname)
 
 #----------------------------------------------------------------------------------------------
 def training_set_labels(level='L1'):

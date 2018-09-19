@@ -37,6 +37,7 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 
 	# Create temp file to hold the timeseries:
 	with tempfile.TemporaryDirectory(prefix='slsclean_') as tmpdir:
+
 		# Name of timeseries file:
 		fname = os.path.join(tmpdir, 'tmp_timeseries')
 
@@ -46,11 +47,12 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 				fid.write("%.16e %.16e\n" % (lc.time[i], lc.flux[i]))
 
 		# Construct command to be issued, calling the SLSCLEAN program:
-		cmd = 'slsclean "{inp:s}" -hifac {hifac:d} -ofac {ofac:d} -nmax {numfreq:d} -nots'.format(
+		cmd = 'slsclean "{inp:s}" -hifac {hifac:d} -ofac {ofac:d} -nmax {numfreq:d} -nots -output {output:s}'.format(
 			inp=fname,
 			hifac=hifac,
 			ofac=ofac,
-			numfreq=numfreq
+			numfreq=numfreq,
+			output=fname+'.slscleanlog'
 		)
 		logger.debug("Running command: %s", cmd)
 
@@ -68,6 +70,7 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 			warnings.filterwarnings('ignore', message='loadtxt: Empty input file: ', category=UserWarning)
 			data = np.loadtxt(fname + '.slscleanlog', comments='#', usecols=(1, 3, 5), unpack=True, ndmin=2).reshape(-1, 3)
 
+        
 	# Restructure lists into dictionary of features:
 	features = {}
 	for k in range(numfreq):

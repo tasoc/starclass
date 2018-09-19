@@ -21,7 +21,7 @@ from starclass import BaseClassifier, StellarClasses, RFGCClassifier
 # Point this to the directory where the TDA simulations are stored
 # URL: https://tasoc.dk/wg0/SimData
 # The directories "sysnoise", "noisy" and "clean" should exist in this directory
-INPUT_DIR = r'F:\tda_simulated_data'
+INPUT_DIR = r'/Users/davidarmstrong/Data/TESS/WG0/TDA4/'
 
 #----------------------------------------------------------------------------------------------
 def generate_todolist():
@@ -372,10 +372,13 @@ if __name__ == '__main__':
 	# TASOC photometry pipeline.
 	if not os.path.exists(todo_file):
 		generate_todolist()
-
+    
+	if not os.path.exists(features_cache):
+		os.makedirs(features_cache)
+		
 	# Choose which classifier to use
 	# For now, there is only one...
-	classifier = RFGCClassifier
+	classifier = RFGCClassifier.RFGCClassifier
 
 	# Training:
 	# If we want to run the training, do the following:

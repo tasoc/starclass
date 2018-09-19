@@ -16,7 +16,7 @@ import os.path
 from tqdm import tqdm
 import argparse
 import logging
-from starclass import BaseClassifier, StellarClasses, RFGCClassifier
+from starclass import TaskManager, BaseClassifier, StellarClasses, RFGCClassifier
 
 # Point this to the directory where the TDA simulations are stored
 # URL: https://tasoc.dk/wg0/SimData
@@ -226,15 +226,17 @@ def training_set_features(datalevel='raw'):
 			for row in data:
 				starid = int(row[0][4:])
 
+				# Get task info from database:
+				cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE starid=?;", (starid, ))
+				task = dict(cursor.fetchone())
+
 				# Lightcurve file to load:
+				# We do not use the one from the database because in the simulations the
+				# raw and corrected light curves are stored in different files.
 				if datalevel == 'raw':
 					fname = os.path.join(INPUT_DIR, 'sysnoise', 'Star%d.sysnoise' % starid) # # These are the lightcurves INCLUDING SYSTEMATIC NOISE
 				elif datalevel == 'corr':
 					fname = os.path.join(INPUT_DIR, 'noisy', 'Star%d.noisy' % starid) # # These are the lightcurves WITHOUT SYSTEMATIC NOISE
-
-				# Get task info from database:
-				cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE starid=?;", (starid, ))
-				task = dict(cursor.fetchone())
 
 				yield stcl.load_star(task, fname)
 
@@ -342,7 +344,7 @@ if __name__ == '__main__':
 
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Utility function for running stellar classifiers.')
-	parser.add_argument('-m', '--method', help='Classifier to use.', default='rfgc', choices=('rfgc', ))
+	parser.add_argument('-c', '--classifier', help='Classifier to use.', default='rfgc', choices=('rfgc', ))
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-t', '--train', help='Train classifier.', action='store_true')
@@ -382,6 +384,7 @@ if __name__ == '__main__':
 
 	# Choose which classifier to use
 	# For now, there is only one...
+	current_classifier = args.classifier
 	classifier = RFGCClassifier
 
 	# Training:
@@ -394,20 +397,25 @@ if __name__ == '__main__':
 
 	# Running:
 	# When simply running the classifier on new stars:
-	with sqlite3.connect(todo_file) as conn:
-		conn.row_factory = sqlite3.Row
-		cursor = conn.cursor()
-		cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE status=1 ORDER BY todolist.priority;")
+	with TaskManager(todo_file) as tm:
 
 		with classifier(level=args.level, features_cache=features_cache) as stcl:
 
-			for task in cursor.fetchall():
+			while True:
+				task = tm.get_task(classifier=current_classifier)
+				if task is None: break
+				tm.start_task(task)
+
+				#if task['classifier'] != current_classifier:
+				#	stcl.close()
+				#	stcl = classifier(level=args.level, features_cache=features_cache)
 
 				# ----------------- This code would run on each worker ------------------------
 
 				fname = os.path.join(INPUT_DIR, task['lightcurve']) # These are the lightcurves INCLUDING SYSTEMATIC NOISE
 				features = stcl.load_star(task, fname)
 
+				print(features)
 				lc = features['lightcurve']
 				lc.properties()
 
@@ -415,5 +423,17 @@ if __name__ == '__main__':
 				lc.plot()
 
 				res = stcl.classify(features)
+				#res = {
+				#	StellarClasses.SOLARLIKE: np.random.rand(),
+				#	StellarClasses.RRLYR: np.random.rand()
+				#}
 
 				# ----------------- This code would run on each worker ------------------------
+
+				# Pad results with metadata and return to TaskManager to be saved:
+				res.update({
+					'priority': task['priority'],
+					'classifier': task['classifier'],
+					'status': 1
+				})
+				tm.save_result(res)

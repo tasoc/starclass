@@ -1,3 +1,3 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:855ea3358fa75cfee1309e7501f434f58c6994db5634ea858b5e121c9f3d337b
-size 177
+In this directory the different classifiers can store auxiliary data needed for their classifiers to run.
+
+This would typically be files generated during the training process. The L1 and L2 subdirectories refers to the levels on which the classifiers are trained.

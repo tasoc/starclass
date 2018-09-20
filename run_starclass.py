@@ -21,7 +21,7 @@ from starclass import TaskManager, BaseClassifier, StellarClasses, RFGCClassifie
 # Point this to the directory where the TDA simulations are stored
 # URL: https://tasoc.dk/wg0/SimData
 # The directories "sysnoise", "noisy" and "clean" should exist in this directory
-INPUT_DIR = r'/Users/davidarmstrong/Data/TESS/WG0/TDA4/'
+INPUT_DIR = r'F:\tda_simulated_data'
 
 #----------------------------------------------------------------------------------------------
 def generate_todolist():
@@ -227,7 +227,7 @@ def training_set_features(datalevel='raw'):
 				starid = int(row[0][4:])
 
 				# Get task info from database:
-				cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE starid=?;", (starid, ))
+				cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE todolist.starid=?;", (starid, ))
 				task = dict(cursor.fetchone())
 
 				# Lightcurve file to load:
@@ -381,10 +381,10 @@ if __name__ == '__main__':
 	# TASOC photometry pipeline.
 	if not os.path.exists(todo_file):
 		generate_todolist()
-    
+
 	if not os.path.exists(features_cache):
 		os.makedirs(features_cache)
-		
+
 	# Choose which classifier to use
 	# For now, there is only one...
 	current_classifier = args.classifier

@@ -52,12 +52,11 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 				fid.write("%.16e %.16e\n" % (lc.time[i], lc.flux[i]))
 
 		# Construct command to be issued, calling the SLSCLEAN program:
-		cmd = 'slsclean "{inp:s}" -hifac {hifac:d} -ofac {ofac:d} -nmax {numfreq:d} -nots -output {output:s}'.format(
+		cmd = 'slsclean "{inp:s}" -hifac {hifac:d} -ofac {ofac:d} -nmax {numfreq:d} -nots'.format(
 			inp=fname,
 			hifac=hifac,
 			ofac=ofac,
-			numfreq=numfreq,
-			output=fname+'.slscleanlog'
+			numfreq=numfreq
 		)
 		logger.debug("Running command: %s", cmd)
 

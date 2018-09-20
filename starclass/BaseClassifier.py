@@ -14,6 +14,7 @@ import logging
 import six.moves.cPickle as pickle
 from lightkurve import TessLightCurve
 from astropy.stats import mad_std
+from .StellarClasses import StellarClasses
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
@@ -87,6 +88,12 @@ class BaseClassifier(object):
 		"""
 		res = self.do_classify(features)
 		# Check results
+		for key, value in res.items():
+			if key not in StellarClasses:
+				raise ValueError("Classifier returned unknown stellar class.")
+			if value < 0 or value > 1:
+				raise ValueError("Classifier should return probability between 0 and 1.")
+
 		return res
 
 	def do_classify(self, features):
@@ -161,7 +168,11 @@ class BaseClassifier(object):
 			logger.debug(features)
 
 		# Add the fields from the task to the list of features:
-		features.update(task)
+		features['priority'] = task['priority']
+		features['starid'] = task['starid']
+		for key in ('tmag', 'mean_flux', 'variance', 'variability'):
+			if key in task.keys():
+				features[key] = task[key]
 
 		# Save features in cache file for later use:
 		if self.features_cache and not loaded_from_cache:

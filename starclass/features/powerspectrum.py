@@ -8,8 +8,9 @@ from __future__ import division, with_statement, print_function, absolute_import
 import numpy as np
 import matplotlib.pyplot as plt
 import lightkurve
+import os.path
 from astropy.stats import LombScargle
-from bottleneck import nanmedian
+from bottleneck import nanmedian, nanmean, nanmax, nanmin
 from scipy.optimize import minimize_scalar
 from scipy.integrate import simps
 
@@ -30,19 +31,36 @@ class powerspectrum(object):
 			fit_mean (boolean, optional):
 		"""
 
+		# Store the input settings:
 		self.fit_mean = fit_mean
 
+		# Calculate standard properties of the timeseries:
 		indx = np.isfinite(lightcurve.flux)
-		self.df = 1/(86400*(np.max(lightcurve.time[indx]) - np.min(lightcurve.time[indx]))) # Hz
+		self.df = 1/(86400*(nanmax(lightcurve.time[indx]) - nanmin(lightcurve.time[indx]))) # Hz
 		self.nyquist = 1/(2*86400*nanmedian(np.diff(lightcurve.time[indx]))) # Hz
+		self.standard = None
 
+		# Create LombScargle object of timeseries, where time is in seconds:
 		self.ls = LombScargle(lightcurve.time[indx]*86400, lightcurve.flux[indx], center_data=True, fit_mean=self.fit_mean) # , normalization='psd'
 
 		# Calculate a better estimate of the fundamental frequency spacing:
 		self.df = self.fundamental_spacing_integral()
 
 		# Calculate standard power density spectrum:
-		self.standard = self.powerspectrum(oversampling=1, nyquist_factor=1, scale='powerdensity')
+		# Start by calculating a complete un-scaled power spectrum:
+		self.standard = self.powerspectrum(oversampling=1, nyquist_factor=1, scale=None)
+
+		# Use the un-scaled power spectrum to finding the normalisation factor
+		# which will ensure that Parseval's theorem holds:
+		N = len(self.ls.t)
+		tot_MS = np.sum((self.ls.y - nanmean(self.ls.y))**2)/N
+		tot_lomb = np.sum(self.standard[1])
+		self.normfactor = tot_MS/tot_lomb
+
+		# Re-scale the standard power spectrum to being in power density:
+		self.standard = list(self.standard)
+		self.standard[1] *= self.normfactor/(self.df*1e6)
+		self.standard = tuple(self.standard)
 
 	#------------------------------------------------------------------------------
 	def fundamental_spacing_minimum(self):
@@ -87,23 +105,30 @@ class powerspectrum(object):
 				power in units depending on the ``scale`` keyword.
 		"""
 
-		N = len(self.ls.t)
-
 		# The frequency axis in Hertz:
+		assume_regular_frequency = False
 		if freq is None:
+			# If what we are really asking for is the standard power density spectrum, we have already
+			# calculated it in the init-function, so just return that:
+			if scale == 'powerdensity' and oversampling == 1 and nyquist_factor == 1 and self.standard:
+				return self.standard
+			# Set the standard frequency axis:
 			freq = np.arange(self.df/oversampling, nyquist_factor*self.nyquist, self.df/oversampling, dtype='float64')
+			assume_regular_frequency = True
 
 		# Calculate power at frequencies using fast Lomb-Scargle periodiogram:
-		power = self.ls.power(freq, normalization='psd', method='fast', assume_regular_frequency=True)
+		power = self.ls.power(freq, normalization='psd', method='fast', assume_regular_frequency=assume_regular_frequency)
 
 		# Different scales:
 		freq *= 1e6 # Rescale frequencies to being in microHz
-		if scale == 'power':
-			power *= 4/N
+		if scale is None:
+			pass
+		elif scale == 'power':
+			power *= self.normfactor
 		elif scale == 'powerdensity':
-			power *= 4/(N*self.df*1e6)
+			power *= self.normfactor/(self.df*1e6)
 		elif scale == 'amplitude':
-			power = np.sqrt(power*4/N)
+			power = np.sqrt(power*self.normfactor)
 
 		return freq, power
 
@@ -135,7 +160,7 @@ class powerspectrum(object):
 		return freq, power
 
 	#------------------------------------------------------------------------------
-	def plot(self, ax=None, xlabel='Frequency (muHz)', ylabel=None, style='lightkurve'):
+	def plot(self, ax=None, xlabel='Frequency (muHz)', ylabel=None, style='powerspectrum'):
 
 		if ylabel is None:
 			ylabel = {
@@ -144,7 +169,9 @@ class powerspectrum(object):
 				'amplitude': 'Amplitude (ppm)'
 			}['powerdensity'] # TODO: Only one setting for now...
 
-		if style is None or style == 'lightkurve':
+		if style is None or style == 'powerspectrum':
+			style = os.path.join(os.path.dirname(__file__), 'powerspectrum.mplstyle')
+		elif style == 'lightkurve':
 			style = lightkurve.MPLSTYLE
 
 		with plt.style.context(style):
@@ -162,6 +189,3 @@ class powerspectrum(object):
 	#	freq, power = self.powerspectrum(oversampling=4, scale='power')
 	#
 	#	freq_guess = freq[np.argmax(power)]
-
-
-

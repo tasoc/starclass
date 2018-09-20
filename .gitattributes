@@ -1,1 +1,2 @@
-starclass/data/** filter=lfs diff=lfs merge=lfs -text
+starclass/data/L1/** filter=lfs diff=lfs merge=lfs -text
+starclass/data/L2/** filter=lfs diff=lfs merge=lfs -text

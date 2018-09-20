@@ -73,7 +73,7 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 		with warnings.catch_warnings():
 			warnings.filterwarnings('ignore', message='loadtxt: Empty input file: ', category=UserWarning)
 			data = np.loadtxt(fname + '.slscleanlog', comments='#', usecols=(1, 3, 5), unpack=True, ndmin=2).reshape(-1, 3)
-			
+
 	# Once we are done, try to cleanup the temp directory
 	# Sometimes this fails so we allow it to try again a few times
 	finally:

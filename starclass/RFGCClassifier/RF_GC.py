@@ -37,7 +37,7 @@ class RFGCClassifier(BaseClassifier):
 
 	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 	"""
-	def __init__(self, saved_rf=None, somfile=None, dimx=1, dimy=400, cardinality=64,
+	def __init__(self, saved_rf=None, somfile='som.txt', dimx=1, dimy=400, cardinality=64,
 		n_estimators=1000, max_features=3, min_samples_split=2, *args, **kwargs):
 		"""
 		Initialize the classifier object.
@@ -65,10 +65,11 @@ class RFGCClassifier(BaseClassifier):
 		if self.classifier.som is None and somfile is not None:
 			#load som
 			somfile = os.path.join(self.data_dir, somfile)
-			self.classifier.som = fc.loadSOM(somfile, dimx, dimy, cardinality)
-
-		if saved_rf is None:
-			self.save(os.path.join(self.data_dir, 'rfgc_classifier_v01.pickle'))
+			if os.path.exists(somfile):
+				self.classifier.som = fc.loadSOM(somfile, dimx, dimy, cardinality)
+			
+		#if saved_rf is None:
+	#		self.save(os.path.join(self.data_dir, 'rfgc_classifier_v01.pickle'))
 
 	def save(self, outfile):
 		"""
@@ -126,7 +127,7 @@ class RFGCClassifier(BaseClassifier):
 			result[cla] = classprobs[c]
 		return result
 
-	def train(self, features, labels, featuredat=None, saveit=False):
+	def train(self, features, labels, featuredat=None, savecl=False, savefeat=False):
 		"""
 		Train the classifier.
 		Assumes lightcurve time is in days
@@ -154,22 +155,63 @@ class RFGCClassifier(BaseClassifier):
 				#dataprep and train SOM. Save to default loc.
 				self.classifier.som = fc.trainSOM(features, outfile='som.txt')
 
-				featarray = fc.featcalc_set(features, self.classifier.som)
+			featarray = fc.featcalc_set(features, self.classifier.som)
 		else:
 			featarray = np.genfromtxt(featuredat)
-
+        
+		#for col in np.arange(featarray.shape[1]):
+		#    print('Column: '+str(col))
+		#    print(np.isfinite(featarray[:,col]).sum(axis=0))
+		#print('Total complete rows:')
+		#print(np.sum(np.isfinite(featarray).sum(axis=1)==featarray.shape[1]))
+		
+		fitlabels = self.parse_labels(labels)
+		
+		if savefeat:
+			np.savetxt(os.path.join(self.data_dir, 'rfgc_classifier_feat.txt'),featarray)
+            
 		try:
 			self.classifier.oob_score = True
-			self.classifier.fit(featarray, labels)
+			self.classifier.fit(featarray, fitlabels)
 			logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
 			self.classifier.oob_score = False
 			self.classifier.trained = True
 		except:
 			logger.exception('Training Error') # add more details...
 
-		if saveit:
+		if savecl:
 			self.save(os.path.join(self.data_dir, 'rfgc_classifier_v01.pickle'))
+        
 
+
+	def parse_labels(self,labels):
+		"""
+		"""
+		fitlabels = []
+		for lbl in labels:
+			#is it multi-labelled? In which case, what takes priority?
+			#or duplicate it once for each label      
+			if len(lbl)>1:#Priority order loosely based on signal clarity
+				if StellarClasses.ECLIPSE in lbl: 
+					fitlabels.append('ECLIPSE')
+				elif StellarClasses.RRLYR_CEPHEID in lbl:
+					fitlabels.append('RRLYR_CEPHEID')
+				elif StellarClasses.CONTACT_ROT in lbl:
+					fitlabels.append('CONTACT_ROT')
+				elif StellarClasses.DSCT_BCEP in lbl:
+					fitlabels.append('DSCT_BCEP')
+				elif StellarClasses.GDOR_SPB in lbl:
+					fitlabels.append('GDOR_SPB')
+				elif StellarClasses.SOLARLIKE in lbl:
+					fitlabels.append('SOLARLIKE')
+				else:
+					fitlabels.append(lbl[0].value)
+			else:
+				#then convert to integer
+				fitlabels.append(lbl[0].value)
+		return np.array(fitlabels)
+        
+        
 	def loadsom(self, somfile, dimx=1, dimy=400, cardinality=64):
 		"""
 		Loads a SOM, if not done at init.

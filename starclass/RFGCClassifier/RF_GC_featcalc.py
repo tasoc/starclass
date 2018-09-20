@@ -46,27 +46,29 @@ def featcalc_set(features, som,
     """
     Calculates features for set of lightcurves
     """
-    featout = np.zeros([len(features),nfrequencies+17])
+    featout = np.zeros([1,nfrequencies+17])
     
-    for i,obj in enumerate(features):
+    for obj in features:
+        objfeatures = np.zeros(nfrequencies+17)
         lc = prepLCs(obj['lightcurve'],linflatten)
     
         periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs,
         									 forbiddenfreqs, lc.time)
-        featout[i,:nfrequencies] = periods
-        featout[i,nfrequencies:nfrequencies+2] = freq_ampratios(obj,usedfreqs)
-        featout[i,nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj,usedfreqs)
+        objfeatures[:nfrequencies] = periods
+        objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj,usedfreqs)
+        objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj,usedfreqs)
         EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)
-        featout[i,0] = EBper #overwrites top period
-        featout[i,nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, 
+        objfeatures[0] = EBper #overwrites top period
+        objfeatures[nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, 
         													cardinality)
-        featout[i,nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux,EBper)
-        featout[i,nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
-        featout[i,nfrequencies+10] = median_crossings(lc.flux)
-        featout[i,nfrequencies+11] = features['Fphi']
-        featout[i,nfrequencies+12] = features['Fplo']
-        featout[i,nfrequencies+13:] = features['Fp07'], features['Fp7'], features['Fp20'], features['Fp50']
-    return featout
+        objfeatures[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux,EBper)
+        objfeatures[nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
+        objfeatures[nfrequencies+10] = median_crossings(lc.flux)
+        objfeatures[nfrequencies+11] = obj['Fphi']
+        objfeatures[nfrequencies+12] = obj['Fplo']
+        objfeatures[nfrequencies+13:] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
+        featout = np.vstack((featout,objfeatures))
+    return featout[1:,:]
 
 def prepLCs(lc,linflatten=False):
     """
@@ -92,7 +94,7 @@ def trainSOM(features,outfile,cardinality=64,dimx=1,dimy=400,
 	"""
 	Top level function for training a SOM.
 	"""
-	SOMarray = SOM_alldataprep(features,cardinality)
+	SOMarray = SOM_alldataprep(features,cardinality=cardinality)
 	som = SOM_train(SOMarray,outfile,cardinality,dimx,dimy,nsteps,learningrate)
 	return som
 
@@ -125,7 +127,7 @@ def loadSOM(somfile, dimx=1, dimy=400, cardinality=64):
         '''
         return np.random.uniform(0,1,size=(dimx,dimy,cardinality))
 
-    import selfsom
+    from . import selfsom
     som = selfsom.SimpleSOMMapper((dimx,dimy),1,initialization_func=Init,learning_rate=0.1)
     loadk = kohonenLoad(somfile)
     som.train(loadk)  #purposeless but tricks the SOM into thinking it's been trained. Don't ask.
@@ -182,8 +184,7 @@ def kohonenSave(layer,outfile):  #basically a 3d >> 2d saver
 
 
 
-def SOM_alldataprep(features, outfile=None, cardinality=64,
-					linflatten=True):
+def SOM_alldataprep(features, outfile=None, cardinality=64):
     ''' Function to create an array of normalised lightcurves to train a SOM
         
     Parameters
@@ -193,7 +194,6 @@ def SOM_alldataprep(features, outfile=None, cardinality=64,
 	outfile:		str, optional
 		Filepath to save array to. If not populated, just returns array
 	cardinality
-	linflatten
 		            
     Returns
     -----------------
@@ -203,25 +203,23 @@ def SOM_alldataprep(features, outfile=None, cardinality=64,
     SOMarray = np.ones(cardinality)
     for obj in features: 
         lc = obj['lightcurve']
-        freq = obj['freq1']
+        lc = prepLCs(lc,linflatten=True)
         
+        freq = obj['freq1']
+
         time, flux = lc.time.copy(), lc.flux.copy()
 
-        #linear flatten lc
-        if linflatten:
-            flux = flux - np.polyval(np.polyfit(time,flux,1),time) + 1
-            
         #check double period
         per = 1./(freq*1e-6)/86400. #convert to days    
         EBper = EBperiod(time, flux, per)  
         if EBper > 0: #ignores others
             binlc,range = prepFilePhasefold(time, flux, EBper,cardinality)
             SOMarray = np.vstack((SOMarray,binlc))
-    if outfile:
+    if outfile is not None:
         np.savetxt(outfile,SOMarray[1:,:])
     return SOMarray[1:,:] #drop first line as this is just ones
     
-def SOM_train(SOMarray, outfile=None, dimx=1, dimy=400, 
+def SOM_train(SOMarray, outfile=None, cardinality=64, dimx=1, dimy=400, 
 				nsteps=300, learningrate=0.1):
     ''' Function to train a SOM
         
@@ -245,7 +243,7 @@ def SOM_train(SOMarray, outfile=None, dimx=1, dimy=400,
     som object:		object
         Trained som
     '''
-    import selfsom
+    from . import selfsom
         
     cardinality = SOMarray.shape[1]
         
@@ -388,7 +386,7 @@ def prepFilePhasefold(time, flux, period, cardinality):
     binnedlc = binnedlc[np.argsort(binnedlc[:,0]),:]
     return binnedlc[:,1],maxflux-minflux
 
-def SOMloc(som, per, time, flux, cardinality): 
+def SOMloc(som, time, flux, per, cardinality): 
     """
     Returns location on the current som for given lc,
     and binned amplitude.
@@ -436,19 +434,20 @@ def checkfrequencies(featdictrow, nfreqs, providednfreqs, forbiddenfreqs, time):
     j = 0
     while len(freqs)<nfreqs:
         freqdict = featdictrow['freq'+str(j+1)]
-        freq = 1./(freqdict*1e-6)/86400.  #convert to days
+        if np.isfinite(freqdict):
+            freq = 1./(freqdict*1e-6)/86400.  #convert to days
 
-        #check to cut bad frequencies
-        cut = False
-        if (freq < 0) or (freq > np.max(time)-np.min(time)):
-            cut = True
-        for freqtocut in forbiddenfreqs:
-            for k in range(4):  #cuts 4 harmonics of frequency, within +-3% of given frequency
-                if (1./freq > (1./((k+1)*freqtocut))*(1-0.01)) & (1./freq < (1./((k+1)*freqtocut))*(1+0.01)):
-                    cut = True
-        if not cut:
-            freqs.append(freq)
-            self.usedfreqs.append(j)
+            #check to cut bad frequencies
+            cut = False
+            if (freq < 0) or (freq > np.max(time)-np.min(time)):
+                cut = True
+            for freqtocut in forbiddenfreqs:
+                for k in range(4):  #cuts 4 harmonics of frequency, within +-3% of given frequency
+                    if (1./freq > (1./((k+1)*freqtocut))*(1-0.01)) & (1./freq < (1./((k+1)*freqtocut))*(1+0.01)):
+                        cut = True
+            if not cut:
+                freqs.append(freq)
+                usedfreqs.append(j)
         j += 1
         if j >= providednfreqs:
             break
@@ -456,7 +455,7 @@ def checkfrequencies(featdictrow, nfreqs, providednfreqs, forbiddenfreqs, time):
     gap = nfreqs - len(freqs)
     if gap > 0:
         for k in range(gap):
-            freqs.append(-10)
+            freqs.append(np.max(time)-np.min(time))
     return np.array(freqs), np.array(usedfreqs)
         
 def freq_ampratios(featdictrow, usedfreqs):
@@ -499,11 +498,11 @@ def freq_phasediffs(featdictrow, usedfreqs):
     if len(usedfreqs) >= 2:
         phi21 = featdictrow['phase'+str(usedfreqs[1]+1)] - 2*featdictrow['phase'+str(usedfreqs[0]+1)]
     else:
-        phi21 = -10
+        phi21 = 0
     if len(usedfreqs) >= 3:
         phi31 = featdictrow['phase'+str(usedfreqs[2]+1)] - 3*featdictrow['phase'+str(usedfreqs[0]+1)]
     else:
-        phi31 = -10
+        phi31 = 0
     return phi21,phi31    
 
 def phase_features(time, flux, per):

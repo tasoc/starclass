@@ -1,5 +1,4 @@
-# This file is a modified part of the PyMVPA package, distributed as a part of the 
-# TransitSOM code accompanying the paper Armstrong et al 2016.
+# This file is a modified part of the PyMVPA package.
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -23,17 +22,12 @@
 
 
 """Self-organizing map (SOM)."""
-
-__docformat__ = 'restructuredtext'
-
+"""Finally without mvpa2 dependency."""
 
 import numpy as np
-from mvpa2.mappers.base import Mapper, accepts_dataset_as_samples
 
-#if __debug__:
-#    from mvpa2.base import debug
 
-class SimpleSOMMapper(Mapper):
+class SimpleSOMMapper(object):
     """Mapper using a self-organizing map (SOM) for dimensionality reduction.
 
     This mapper provides a simple, but pretty fast implementation of a
@@ -75,8 +69,6 @@ class SimpleSOMMapper(Mapper):
             then values in the returned array are taken from a standard normal 
             distribution.  
         """
-        # init base class
-        Mapper.__init__(self)
 
         self.kshape = np.array(kshape, dtype='int')
 
@@ -112,8 +104,25 @@ class SimpleSOMMapper(Mapper):
                               np.ceil(self.kshape[0]/2.).astype('int'),
                               np.ceil(self.kshape[1]/2.).astype('int')])
 
+    def train(self, ds):
+        """
+        The default implementation calls ``_pretrain()``, ``_train()``.
 
-    @accepts_dataset_as_samples
+        Parameters
+        ----------
+        ds: 
+          Training dataset.
+
+        Returns
+        -------
+        None
+        """
+ 
+        self._pretrain(ds)
+
+        self._train(ds)
+
+
     def _pretrain(self, samples):
         """Perform network pre-training.
 
@@ -139,7 +148,6 @@ class SimpleSOMMapper(Mapper):
                              (int(self._dqdshape[2]+1),int(self._dqdshape[3]+1)), dtype='float')
 
 
-    @accepts_dataset_as_samples
     def _train(self, samples):
         """Perform network training.
 
@@ -184,12 +192,7 @@ class SimpleSOMMapper(Mapper):
                         # lower right
                         k[:self._dqdshape[2], :self._dqdshape[3]]))
                             ))  
-            #import pylab as p
-            #p.ion()       
-            #p.figure(2)
-            #p.clf()
-            #p.plot(infl[0,:],'b.-')
-            #print infl.shape                    
+           
             # for all training vectors
             for s in samples:
                 # determine closest unit (as element coordinate)
@@ -199,24 +202,12 @@ class SimpleSOMMapper(Mapper):
                 sample_infl = np.roll(infl,self._dqdshape[2]+b[0],axis=0)
                 sample_infl = np.roll(sample_infl,self._dqdshape[3]+b[1],axis=1)
                 
-                #print b
-                #print sample_infl.shape
-                #print sample_infl[0,:]
-
-                #p.figure(1)
-                #p.clf()
-                #p.plot(sample_infl[0,:],'b.-')
-                #raw_input()
                 # get the adjustment to be made to the Kohonen layer by multiplying
                 # by the difference                      
                 unit_deltas = sample_infl[:, :, np.newaxis] * (s - self._K)
 
                 # apply sample unit delta
                 self._K += unit_deltas
-
-            #if __debug__:
-            #    debug("SOM", "Iteration %d/%d done: ||unit_deltas||=%g" %
-            #          (it, self.niter, np.sqrt(np.sum(unit_deltas ** 2))))
 
 
 
@@ -241,10 +232,6 @@ class SimpleSOMMapper(Mapper):
         curr_lrate = self.lrate * (1 - float(iter)/self.niter)  #linear decay
 
         # compute Gaussian influence kernel
-        #print 'DQD'
-        #print dqd
-        #print self.kshape
-        #raw_input()
         infl = np.exp((-1.0 * np.power(dqd,2) ) / (2 * curr_max_radius**2))
         infl *= curr_lrate
 
@@ -294,16 +281,6 @@ class SimpleSOMMapper(Mapper):
         return self.K[tuple(np.transpose(data))]
 
 
-    def __repr__(self):
-        s = Mapper.__repr__(self).rstrip(' )')
-        # beautify
-        if not s[-1] == '(':
-            s += ' '
-        s += 'kshape=%s, niter=%i, learning_rate=%f, iradius=%f)' \
-                % (str(tuple(self.kshape)), self.niter, self.lrate,
-                   self.radius)
-        return s
-
 
     ##REF: Name was automagically refactored
     def _access_kohonen(self):
@@ -316,6 +293,59 @@ class SimpleSOMMapper(Mapper):
             raise RuntimeError('The SOM needs to be trained before access to the Kohonen layer is possible.')
 
         return self._K
+
+    def forward(self, data):
+        """Map data from input to output space.
+
+        Parameters
+        ----------
+        data : Dataset-like, (at least 2D)-array-like
+          Typically this is a `Dataset`, but it might also be a plain data
+          array, or even something completely different(TM) that is supported
+          by a subclass' implementation. If such an object is Dataset-like it
+          is handled by a dedicated method that also transforms dataset
+          attributes if necessary. If an array-like is passed, it has to be
+          at least two-dimensional, with the first axis separating samples
+          or observations. For single samples `forward1()` might be more
+          appropriate.
+        """
+        if hasattr(data, 'ndim') and data.ndim < 2:
+            raise ValueError(
+                'Mapper.forward() only support mapping of data with '
+                'at least two dimensions, where the first axis '
+                'separates samples/observations. Consider using '
+                'Mapper.forward1() instead.')
+        return self._forward_data(data)
+                
+
+    def __call__(self, ds):
+        """
+        The default implementation calls ``_precall()``, ``_call()``, and
+        finally returns the output of ``_postcall()``.
+
+        Parameters
+        ----------
+        ds: Dataset
+          Input dataset.
+        _call_kwargs: dict, optional
+          Used internally to pass "state" keyword arguments into _call,
+          primarily used internally (e.g. by `generate` method). It is up
+          for a subclass to implement/use it where necessary. `_get_call_kwargs()`
+          method will be used to provide the set of kwargs to be set/used by
+          `generate` or direct `__call__` calls
+
+        Returns
+        -------
+        Dataset
+        """
+
+        result = self._call(ds)
+        #result = self._postcall(ds, result)
+
+        return result
+
+    def _call(self, ds):
+        return self.forward(ds)
 
 
     K = property(fget=_access_kohonen)

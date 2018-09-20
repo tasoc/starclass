@@ -38,7 +38,7 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 
 	# Create temp directory to hold the timeseries:
 	# We should really use tempfile.TemporaryDirectory instead, but it seems
-	# to have some issues with sometimes not being 	# able to clean up after
+	# to have some issues with sometimes not being able to clean up after
 	# itself on some operating systems. Therefore we are using our own
 	# version here which attempts at doing a more robust cleanup
 	tmpdir = mkdtemp(prefix='slsclean_')
@@ -83,7 +83,6 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 				break
 			except:
 				logger.warning("Couldnt delete temp dir on %d try", retries+1)
-				pass
 
 	# Restructure lists into dictionary of features:
 	features = {}

@@ -88,7 +88,18 @@ class RFGCClassifier(BaseClassifier):
 				#load som
 				if os.path.exists(self.somfile):
 					self.classifier.som = fc.loadSOM(self.somfile)		
-					
+		
+		self.class_keys = {}
+		self.class_keys['RRLyr/Ceph'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['transit/eclipse'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['solar'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['dSct/bCep'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['gDor/spB'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['transient'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['contactEB/spots'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['aperiodic'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['constant'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['rapid'] = StellarClasses.RRLYR_CEPHEID			
 			
 			
 	def save(self, outfile, somoutfile='som.txt'):
@@ -161,8 +172,8 @@ class RFGCClassifier(BaseClassifier):
 		
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):
-			result[cla] = classprobs[c]
-		print(result)
+			key = self.class_keys[cla]
+			result[key] = classprobs[c]		
 		return result
 
 	def train(self, features, labels, savecl=True, savefeat=True, overwrite=True):
@@ -194,8 +205,7 @@ class RFGCClassifier(BaseClassifier):
 				precalc = True
 		
 		fitlabels = self.parse_labels(labels)
-		print('Here')
-		print(np.sum(fitlabels=='ECLIPSE'))
+
 		if not precalc:
 			logger.info('No feature file given. Calculating.')
 			

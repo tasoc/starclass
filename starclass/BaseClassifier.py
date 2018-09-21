@@ -11,13 +11,13 @@ from __future__ import division, print_function, with_statement, absolute_import
 import numpy as np
 import os.path
 import logging
-import six.moves.cPickle as pickle
 from lightkurve import TessLightCurve
 from astropy.stats import mad_std
 from .StellarClasses import StellarClasses
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
+from .utilities import savePickle, loadPickle
 
 __docformat__ = 'restructuredtext'
 
@@ -159,8 +159,7 @@ class BaseClassifier(object):
 			features_file = os.path.join(self.features_cache, 'features-' + str(task['priority']) + '.pickle')
 			if os.path.exists(features_file):
 				loaded_from_cache = True
-				with open(features_file, 'rb') as fid:
-					features = pickle.load(fid)
+				features = loadPickle(features_file)
 
 		# No features found in cache, so calculate them:
 		if features is None:
@@ -176,8 +175,7 @@ class BaseClassifier(object):
 
 		# Save features in cache file for later use:
 		if self.features_cache and not loaded_from_cache:
-			with open(features_file, 'wb') as fid:
-				pickle.dump(features, fid)
+			savePickle(features_file, features)
 
 		return features
 

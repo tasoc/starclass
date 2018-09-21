@@ -102,7 +102,7 @@ def makeSOM(features,outfile,overwrite=False,cardinality=64,dimx=1,dimy=400,
 	logger.info('SOM trained.')
 	return som
 
-def loadSOM(somfile, dimx=1, dimy=400, cardinality=64):
+def loadSOM(somfile):
     """
     Loads a previously trained SOM.
         
@@ -111,20 +111,16 @@ def loadSOM(somfile, dimx=1, dimy=400, cardinality=64):
     somfile: 		str
     	Filepath to saved SOM (saved using self.kohonenSave)
         	
-    cardinality: 	int, default 64
-        Number of bins in each SOM pixel
-        	
-    dimx:			int, default 1
-        size of SOM x dimension
-        
-    dimy:			int, default 400
-        size of SOM y dimension
-        	
     Returns
     -----------------
     som:	 object
          Trained som object
     """
+    with open(somfile,'r') as f:
+        lines = f.readlines()
+    newshape = lines[0].strip('\n').split(',')
+    dimx,dimy,cardinality = int(newshape[0]),int(newshape[1]),int(newshape[2])
+           
     def Init(sample):
         '''
         Initialisation function for SOM.

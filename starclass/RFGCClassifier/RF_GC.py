@@ -12,6 +12,7 @@ import os.path
 import numpy as np
 import os
 import pickle
+import itertools
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from sklearn.metrics import confusion_matrix
@@ -37,14 +38,16 @@ class RFGCClassifier(BaseClassifier):
 
 	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 	"""
-	def __init__(self, saved_rf=None, somfile='som.txt', dimx=1, dimy=400, cardinality=64,
-		n_estimators=1000, max_features=3, min_samples_split=2, *args, **kwargs):
+	def __init__(self, saved_rf=None, somfile='som.txt', featfile='rfgc_classifier_feat.txt',
+					dimx=1, dimy=400, cardinality=64, n_estimators=1000, 
+					max_features=3, min_samples_split=2, *args, **kwargs):
 		"""
 		Initialize the classifier object.
 
 		Parameters:
 			saved_rf (str): Filepath to previously pickled Classifier_obj.
 			somfile (str): Filepath to trained SOM saved using fc.kohonenSave
+			featfile (str):	Filepath to pre-calculated features, if available.
 			dimx (int): dimension 1 of SOM in somfile, if given
 			dimy (int): dimension 2 of SOM in somfile, if given
 			cardinality (int): N bins per SOM pixel in somfile, if given
@@ -61,7 +64,9 @@ class RFGCClassifier(BaseClassifier):
 			self.load(saved_rf)
 		else:
 			self.classifier = Classifier_obj(n_estimators=n_estimators, max_features=max_features, min_samples_split=min_samples_split)
-
+		
+		self.featfile = featfile
+		
 		if self.classifier.som is None and somfile is not None:
 			#load som
 			somfile = os.path.join(self.data_dir, somfile)
@@ -127,7 +132,7 @@ class RFGCClassifier(BaseClassifier):
 			result[cla] = classprobs[c]
 		return result
 
-	def train(self, features, labels, featuredat=None, savecl=False, savefeat=False):
+	def train(self, features, labels, savecl=True, savefeat=True, overwrite=False):
 		"""
 		Train the classifier.
 		Assumes lightcurve time is in days
@@ -140,47 +145,58 @@ class RFGCClassifier(BaseClassifier):
 		Parameters:
 			labels (ndarray, [n_objects]): labels for training set lightcurves.
 			features (iterable of dict): features, inc lightcurves
-			featuredat (str): filepath of pre-calculated features, if available.
+	
 		"""
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
 
 		# Check for pre-calculated features
-		if featuredat is None:
+		if self.featfile is None or not os.path.exists(os.path.join(self.data_dir, self.featfile)):
 			logger.info('No feature file given. Calculating.')
 
 			# Check for pre-calculated som
 			if self.classifier.som is None:
-				logger.info('No SOM loaded. Creating new SOM, saving to ''./som.txt''.')
+				logger.info('No SOM loaded. Creating new SOM, saving to ''som.txt''.')
 				#dataprep and train SOM. Save to default loc.
-				self.classifier.som = fc.trainSOM(features, outfile='som.txt')
-
-			featarray = fc.featcalc_set(features, self.classifier.som)
+				#make copy of features iterator
+				features1,features2 = itertools.tee(features,2)
+				self.classifier.som = fc.makeSOM(features1, outfile=os.path.join(self.data_dir, 'som.txt'), overwrite=overwrite)
+				logger.info('SOM created and saved.')
+				featarray = fc.featcalc_set(features2, self.classifier.som)
+			else:	
+				featarray = fc.featcalc_set(features, self.classifier.som)
+			
+			#save features
+			if savefeat:
+				if not os.path.exists(os.path.join(self.data_dir, 'rfgc_classifier_feat.txt')) or overwrite:
+					logger.info('Saving calculated features to rfgc_classifier_feat.txt')
+					np.savetxt(os.path.join(self.data_dir, 'rfgc_classifier_feat.txt'),featarray)
 		else:
-			featarray = np.genfromtxt(featuredat)
+			logger.info('Loading features from pre-calculated file.')
+			featarray = np.genfromtxt(os.path.join(self.data_dir, self.featfile))
         
 		#for col in np.arange(featarray.shape[1]):
 		#    print('Column: '+str(col))
 		#    print(np.isfinite(featarray[:,col]).sum(axis=0))
 		#print('Total complete rows:')
 		#print(np.sum(np.isfinite(featarray).sum(axis=1)==featarray.shape[1]))
-		
-		fitlabels = self.parse_labels(labels)
-		
-		if savefeat:
-			np.savetxt(os.path.join(self.data_dir, 'rfgc_classifier_feat.txt'),featarray)
-            
-		try:
-			self.classifier.oob_score = True
-			self.classifier.fit(featarray, fitlabels)
-			logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
-			self.classifier.oob_score = False
-			self.classifier.trained = True
-		except:
-			logger.exception('Training Error') # add more details...
 
-		if savecl:
-			self.save(os.path.join(self.data_dir, 'rfgc_classifier_v01.pickle'))
+		if featarray is not None:        
+			fitlabels = self.parse_labels(labels)
+		
+			try:
+				self.classifier.oob_score = True
+				self.classifier.fit(featarray, fitlabels)
+				logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
+				self.classifier.oob_score = False
+				self.classifier.trained = True
+			except:
+				logger.exception('Training Error') # add more details...
+
+			if savecl:
+				if not os.path.exists(os.path.join(self.data_dir, 'rfgc_classifier_v01.pickle')) or overwrite:
+					logger.info('Saving pickled classifier instance to rfgc_classifier_v01.pickle')
+					self.save(os.path.join(self.data_dir, 'rfgc_classifier_v01.pickle'))
         
 
 

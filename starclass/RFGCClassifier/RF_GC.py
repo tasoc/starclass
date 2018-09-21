@@ -176,7 +176,7 @@ class RFGCClassifier(BaseClassifier):
 			result[key] = classprobs[c]		
 		return result
 
-	def train(self, features, labels, savecl=True, savefeat=True, overwrite=True):
+	def train(self, features, labels, savecl=True, savefeat=True, overwrite=False):
 		"""
 		Train the classifier.
 		Assumes lightcurve time is in days

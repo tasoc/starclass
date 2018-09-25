@@ -21,7 +21,7 @@ from starclass import TaskManager, BaseClassifier, StellarClasses, RFGCClassifie
 # Point this to the directory where the TDA simulations are stored
 # URL: https://tasoc.dk/wg0/SimData
 # The directories "sysnoise", "noisy" and "clean" should exist in this directory
-INPUT_DIR = r'F:\tda_simulated_data'
+INPUT_DIR = r'/Users/davidarmstrong/Data/TESS/WG0/TDA4/'
 
 #----------------------------------------------------------------------------------------------
 def generate_todolist():
@@ -276,9 +276,9 @@ def training_set_labels(level='L1'):
 			'sdBV': StellarClasses.RAPID,
 			'Flare': StellarClasses.TRANSIENT,
 			'Spots': StellarClasses.CONTACT_ROT,
-			'LPV': StellarClasses.LPV,
-			'MIRA': StellarClasses.LPV,
-			'SR': StellarClasses.LPV,
+			'LPV': StellarClasses.APERIODIC,
+			'MIRA': StellarClasses.APERIODIC,
+			'SR': StellarClasses.APERIODIC,
 			'Constant': StellarClasses.CONSTANT
 		}
 	elif level == 'L2':
@@ -323,11 +323,19 @@ def training_set_labels(level='L1'):
 		for lbl in labels:
 			lbl = lbl.strip()
 			if lbl == 'gDor+dSct hybrid' or lbl == 'dSct+gDor hybrid':
-				lbls.append(StellarClasses.DSCT)
-				lbls.append(StellarClasses.GDOR)
+				if level == 'L1':
+					lbls.append(StellarClasses.DSCT_BCEP)
+					lbls.append(StellarClasses.GDOR_SPB)				
+				elif level == 'L2':
+					lbls.append(StellarClasses.DSCT)
+					lbls.append(StellarClasses.GDOR)
 			elif lbl == 'bCep+SPB hybrid':
-				lbls.append(StellarClasses.BCEP)
-				lbls.append(StellarClasses.SPB)
+				if level == 'L1':
+					lbls.append(StellarClasses.DSCT_BCEP)
+					lbls.append(StellarClasses.GDOR_SPB)				
+				elif level == 'L2':
+					lbls.append(StellarClasses.BCEP)
+					lbls.append(StellarClasses.SPB)
 			else:
 				c = translate.get(lbl.strip())
 				if c is None:

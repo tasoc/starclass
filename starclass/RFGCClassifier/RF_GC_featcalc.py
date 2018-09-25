@@ -10,7 +10,8 @@ import numpy as np
 import os
 import glob
 import lightkurve
-
+import logging
+logger = logging.getLogger(__name__)
 
 def featcalc_single(features, som, 
 					providednfreqs=6, nfrequencies=6, forbiddenfreqs=[13.49/4.],
@@ -38,7 +39,7 @@ def featcalc_single(features, som,
     featout[nfrequencies+11] = features['Fphi']
     featout[nfrequencies+12] = features['Fplo']
     featout[nfrequencies+13:] = features['Fp07'], features['Fp7'], features['Fp20'], features['Fp50']
-    return featout
+    return featout.reshape(1,nfrequencies+17)
 
 def featcalc_set(features, som, 
 					providednfreqs=6, nfrequencies=6, forbiddenfreqs=[13.49/4.],
@@ -89,16 +90,19 @@ def prepLCs(lc,linflatten=False):
     return lc
 
 
-def trainSOM(features,outfile,cardinality=64,dimx=1,dimy=400,
+def makeSOM(features,outfile,overwrite=False,cardinality=64,dimx=1,dimy=400,
 				nsteps=300,learningrate=0.1):
 	"""
 	Top level function for training a SOM.
 	"""
+	logger.info('Preparing lightcurves for SOM')
 	SOMarray = SOM_alldataprep(features,cardinality=cardinality)
-	som = SOM_train(SOMarray,outfile,cardinality,dimx,dimy,nsteps,learningrate)
+	logger.info(str(SOMarray.shape[0])+' lightcurves prepared. Training SOM')
+	som = SOM_train(SOMarray,outfile,overwrite,cardinality,dimx,dimy,nsteps,learningrate)
+	logger.info('SOM trained.')
 	return som
 
-def loadSOM(somfile, dimx=1, dimy=400, cardinality=64):
+def loadSOM(somfile):
     """
     Loads a previously trained SOM.
         
@@ -107,20 +111,16 @@ def loadSOM(somfile, dimx=1, dimy=400, cardinality=64):
     somfile: 		str
     	Filepath to saved SOM (saved using self.kohonenSave)
         	
-    cardinality: 	int, default 64
-        Number of bins in each SOM pixel
-        	
-    dimx:			int, default 1
-        size of SOM x dimension
-        
-    dimy:			int, default 400
-        size of SOM y dimension
-        	
     Returns
     -----------------
     som:	 object
          Trained som object
     """
+    with open(somfile,'r') as f:
+        lines = f.readlines()
+    newshape = lines[0].strip('\n').split(',')
+    dimx,dimy,cardinality = int(newshape[0]),int(newshape[1]),int(newshape[2])
+           
     def Init(sample):
         '''
         Initialisation function for SOM.
@@ -183,7 +183,6 @@ def kohonenSave(layer,outfile):  #basically a 3d >> 2d saver
                 f.write('\n')
 
 
-
 def SOM_alldataprep(features, outfile=None, cardinality=64):
     ''' Function to create an array of normalised lightcurves to train a SOM
         
@@ -206,20 +205,21 @@ def SOM_alldataprep(features, outfile=None, cardinality=64):
         lc = prepLCs(lc,linflatten=True)
         
         freq = obj['freq1']
+        if np.isfinite(freq):
 
-        time, flux = lc.time.copy(), lc.flux.copy()
+            time, flux = lc.time.copy(), lc.flux.copy()
 
-        #check double period
-        per = 1./(freq*1e-6)/86400. #convert to days    
-        EBper = EBperiod(time, flux, per)  
-        if EBper > 0: #ignores others
-            binlc,range = prepFilePhasefold(time, flux, EBper,cardinality)
-            SOMarray = np.vstack((SOMarray,binlc))
+            #check double period
+            per = 1./(freq*1e-6)/86400. #convert to days    
+            EBper = EBperiod(time, flux, per)  
+            if EBper > 0: #ignores others
+                binlc,range = prepFilePhasefold(time, flux, EBper,cardinality)
+                SOMarray = np.vstack((SOMarray,binlc))
     if outfile is not None:
         np.savetxt(outfile,SOMarray[1:,:])
     return SOMarray[1:,:] #drop first line as this is just ones
     
-def SOM_train(SOMarray, outfile=None, cardinality=64, dimx=1, dimy=400, 
+def SOM_train(SOMarray, outfile=None, overwrite=False, cardinality=64, dimx=1, dimy=400, 
 				nsteps=300, learningrate=0.1):
     ''' Function to train a SOM
         
@@ -230,6 +230,7 @@ def SOM_train(SOMarray, outfile=None, cardinality=64, dimx=1, dimy=400,
 
 	outfile:		str, optional
 		Filepath to save array to. If not populated, just returns array
+	overwrite
 	dimx
 	dimy         
     nsteps:			int, optional
@@ -254,7 +255,8 @@ def SOM_train(SOMarray, outfile=None, cardinality=64, dimx=1, dimy=400,
         							learning_rate=learningrate)
     som.train(SOMarray)
     if outfile:
-        kohonenSave(som.K,outfile)
+        if not os.path.exists(outfile) or overwrite:
+            kohonenSave(som.K,outfile)
     return som
 
 def EBperiod(time, flux, per, cut_outliers=0, linflatten=True):
@@ -338,13 +340,12 @@ def binPhaseLC(phase, flux, nbins, cut_outliers=0):
     #fixes phase of all bins - means ignoring locations of points in bin
     binnedlc[:,0] = 1./nbins * 0.5 +bin_edges  
     for bin in range(nbins):
-        inbin = np.where(bin_indices==bin)[0]
-        if cut_outliers:
-            mad = np.median(np.abs(flux[inbin]-np.median(flux[inbin])))
-            outliers = np.abs((flux[inbin] - np.median(flux[inbin])))/mad <= cut_outliers
-            inbin = inbin[outliers]
         if np.sum(bin_indices==bin) > 0:
-            #doesn't make use of sorted phase array, could probably be faster?
+            inbin = np.where(bin_indices==bin)[0]
+            if cut_outliers and np.sum(bin_indices==bin)>2:
+                mad = np.median(np.abs(flux[inbin]-np.median(flux[inbin])))
+                outliers = np.abs((flux[inbin] - np.median(flux[inbin])))/mad <= cut_outliers
+                inbin = inbin[outliers]
             binnedlc[bin,1] = np.mean(flux[inbin])  
         else:
             #bit awkward this, but only alternative is to interpolate?

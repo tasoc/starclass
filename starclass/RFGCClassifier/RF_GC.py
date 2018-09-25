@@ -12,12 +12,14 @@ import os.path
 import numpy as np
 import os
 import pickle
+import itertools
+import copy
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from sklearn.metrics import confusion_matrix
 from . import RF_GC_featcalc as fc
 from .. import BaseClassifier, StellarClasses
-
+from .. import utilities
 
 class Classifier_obj(RandomForestClassifier):
 	"""
@@ -37,14 +39,17 @@ class RFGCClassifier(BaseClassifier):
 
 	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 	"""
-	def __init__(self, saved_rf=None, somfile='som.txt', dimx=1, dimy=400, cardinality=64,
-		n_estimators=1000, max_features=3, min_samples_split=2, *args, **kwargs):
+	def __init__(self, clfile='rfgc_classifier_v01.pickle', somfile='som.txt', 
+					featfile='rfgc_classifier_feat.txt',
+					dimx=1, dimy=400, cardinality=64, n_estimators=1000, 
+					max_features=3, min_samples_split=2, *args, **kwargs):
 		"""
 		Initialize the classifier object.
 
 		Parameters:
-			saved_rf (str): Filepath to previously pickled Classifier_obj.
+			clfile (str): Filepath to previously pickled Classifier_obj.
 			somfile (str): Filepath to trained SOM saved using fc.kohonenSave
+			featfile (str):	Filepath to pre-calculated features, if available.
 			dimx (int): dimension 1 of SOM in somfile, if given
 			dimy (int): dimension 2 of SOM in somfile, if given
 			cardinality (int): N bins per SOM pixel in somfile, if given
@@ -54,35 +59,78 @@ class RFGCClassifier(BaseClassifier):
 		"""
 		# Initialise parent
 		super(self.__class__, self).__init__(*args, **kwargs)
-
-		if saved_rf is not None and os.path.exists(saved_rf):
-			#load pre-trained classifier
-			saved_rf = os.path.join(self.data_dir, saved_rf)
-			self.load(saved_rf)
+		
+		self.classifier = None
+		
+		if somfile is not None:
+			self.somfile = os.path.join(self.data_dir, somfile)
 		else:
-			self.classifier = Classifier_obj(n_estimators=n_estimators, max_features=max_features, min_samples_split=min_samples_split)
-
-		if self.classifier.som is None and somfile is not None:
-			#load som
-			somfile = os.path.join(self.data_dir, somfile)
-			if os.path.exists(somfile):
-				self.classifier.som = fc.loadSOM(somfile, dimx, dimy, cardinality)
+			self.somfile = None
 			
-		#if saved_rf is None:
-	#		self.save(os.path.join(self.data_dir, 'rfgc_classifier_v01.pickle'))
+		if clfile is not None:
+			self.clfile = os.path.join(self.data_dir, clfile)
+		else:
+			self.clfile = None
 
-	def save(self, outfile):
+		if featfile is not None:
+			self.featfile = os.path.join(self.data_dir, featfile)
+		else:
+			self.featfile = None
+			
+		if self.clfile is not None:
+			if os.path.exists(self.clfile):
+				#load pre-trained classifier
+				self.load(self.clfile, self.somfile)
+				
+		if self.classifier is None:
+			self.classifier = Classifier_obj(n_estimators=n_estimators, max_features=max_features, min_samples_split=min_samples_split)
+			if self.classifier.som is None and self.somfile is not None:
+				#load som
+				if os.path.exists(self.somfile):
+					self.classifier.som = fc.loadSOM(self.somfile)		
+		
+		self.class_keys = {}
+		self.class_keys['RRLyr/Ceph'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['transit/eclipse'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['solar'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['dSct/bCep'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['gDor/spB'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['transient'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['contactEB/spots'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['aperiodic'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['constant'] = StellarClasses.RRLYR_CEPHEID
+		self.class_keys['rapid'] = StellarClasses.RRLYR_CEPHEID			
+			
+			
+	def save(self, outfile, somoutfile='som.txt'):
 		"""
 		Saves the classifier object with pickle.
+		
+		som object saved as this MUST be the one used to train the classifier.
 		"""
-		with open(outfile, 'wb') as fid:
-			pickle.dump(self.classifier, fid)
+		fc.kohonenSave(self.classifier.som.K,os.path.join(self.data_dir,somoutfile)) #overwrites
+		tempsom = copy.deepcopy(self.classifier.som)
+		self.classifier.som = None
+		utilities.savePickle(outfile,self.classifier)
+		self.classifier.som = tempsom
+	
 
-	def load(self, infile):
+	def load(self, infile, somfile=None):
 		"""
 		Loads classifier object.
+		
+		somfile MUST match the som used to train the classifier.
 		"""
-		self.classifier = pickle.load(infile)
+		self.classifier = utilities.loadPickle(infile)
+
+		if somfile is not None:
+			if os.path.exists(somfile):
+				self.classifier.som = fc.loadSOM(somfile)
+
+		if self.classifier.som is None:
+		    self.classifier.trained = False
+		
+
 
 	def do_classify(self, features):
 		"""
@@ -119,15 +167,16 @@ class RFGCClassifier(BaseClassifier):
 
 		# Do the magic:
 		logger.info("We are starting the magic...")
-		classprobs = self.classifier.predict_proba(featarray)
+		classprobs = self.classifier.predict_proba(featarray)[0]
 		logger.info("Classification complete")
-
+		
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):
-			result[cla] = classprobs[c]
+			key = self.class_keys[cla]
+			result[key] = classprobs[c]		
 		return result
 
-	def train(self, features, labels, featuredat=None, savecl=False, savefeat=False):
+	def train(self, features, labels, savecl=True, savefeat=True, overwrite=False):
 		"""
 		Train the classifier.
 		Assumes lightcurve time is in days
@@ -136,40 +185,48 @@ class RFGCClassifier(BaseClassifier):
 									(amplitudes not amplitude ratios)
 		Assumes featdict contains ['phase1'],['phase2'],['phase3']
 									(phases not phase differences)
+									
+		NEED TO MAKE SURE PRELOADED FEATURES ALIGN WITH LABELS..
 
 		Parameters:
 			labels (ndarray, [n_objects]): labels for training set lightcurves.
 			features (iterable of dict): features, inc lightcurves
-			featuredat (str): filepath of pre-calculated features, if available.
+	
 		"""
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
 
 		# Check for pre-calculated features
-		if featuredat is None:
-			logger.info('No feature file given. Calculating.')
-
-			# Check for pre-calculated som
-			if self.classifier.som is None:
-				logger.info('No SOM loaded. Creating new SOM, saving to ''./som.txt''.')
-				#dataprep and train SOM. Save to default loc.
-				self.classifier.som = fc.trainSOM(features, outfile='som.txt')
-
-			featarray = fc.featcalc_set(features, self.classifier.som)
-		else:
-			featarray = np.genfromtxt(featuredat)
-        
-		#for col in np.arange(featarray.shape[1]):
-		#    print('Column: '+str(col))
-		#    print(np.isfinite(featarray[:,col]).sum(axis=0))
-		#print('Total complete rows:')
-		#print(np.sum(np.isfinite(featarray).sum(axis=1)==featarray.shape[1]))
+		precalc = False
+		if self.featfile is not None:
+			if os.path.exists(self.featfile):
+				logger.info('Loading features from pre-calculated file.')
+				featarray = np.genfromtxt(self.featfile)
+				precalc = True
 		
 		fitlabels = self.parse_labels(labels)
-		
-		if savefeat:
-			np.savetxt(os.path.join(self.data_dir, 'rfgc_classifier_feat.txt'),featarray)
-            
+
+		if not precalc:
+			logger.info('No feature file given. Calculating.')
+			
+			# Check for pre-calculated som
+			if self.classifier.som is None:
+				logger.info('No SOM loaded. Creating new SOM, saving to ''som.txt''.')
+				#make copy of features iterator
+				features1,features2 = itertools.tee(features,2)
+				self.classifier.som = fc.makeSOM(features1, outfile=os.path.join(self.data_dir, 'som.txt'), overwrite=overwrite)
+				logger.info('SOM created and saved.')
+				featarray = fc.featcalc_set(features2, self.classifier.som)
+			else:	
+				featarray = fc.featcalc_set(features, self.classifier.som)
+			
+			#save features
+			if savefeat:
+				if self.featfile is not None:
+					if not os.path.exists(self.featfile) or overwrite:
+						logger.info('Saving calculated features to rfgc_classifier_feat.txt')
+						np.savetxt(self.featfile,featarray)
+
 		try:
 			self.classifier.oob_score = True
 			self.classifier.fit(featarray, fitlabels)
@@ -179,10 +236,13 @@ class RFGCClassifier(BaseClassifier):
 		except:
 			logger.exception('Training Error') # add more details...
 
-		if savecl:
-			self.save(os.path.join(self.data_dir, 'rfgc_classifier_v01.pickle'))
-        
-
+		if savecl and self.classifier.trained:
+			if self.clfile is not None:
+				if not os.path.exists(self.clfile) or overwrite:
+					logger.info('Saving pickled classifier instance to rfgc_classifier_v01.pickle')
+					logger.info('Saving SOM to som.txt (will overwrite)')
+					self.save(self.clfile,self.somfile)
+					
 
 	def parse_labels(self,labels):
 		"""
@@ -193,21 +253,21 @@ class RFGCClassifier(BaseClassifier):
 			#or duplicate it once for each label      
 			if len(lbl)>1:#Priority order loosely based on signal clarity
 				if StellarClasses.ECLIPSE in lbl: 
-					fitlabels.append('ECLIPSE')
+					fitlabels.append('transit/eclipse')
 				elif StellarClasses.RRLYR_CEPHEID in lbl:
-					fitlabels.append('RRLYR_CEPHEID')
+					fitlabels.append('RRLyr/Ceph')
 				elif StellarClasses.CONTACT_ROT in lbl:
-					fitlabels.append('CONTACT_ROT')
+					fitlabels.append('contactEB/spots')
 				elif StellarClasses.DSCT_BCEP in lbl:
-					fitlabels.append('DSCT_BCEP')
+					fitlabels.append('dSct/bCep')
 				elif StellarClasses.GDOR_SPB in lbl:
-					fitlabels.append('GDOR_SPB')
+					fitlabels.append('gDor/spB')
 				elif StellarClasses.SOLARLIKE in lbl:
-					fitlabels.append('SOLARLIKE')
+					fitlabels.append('solar')
 				else:
 					fitlabels.append(lbl[0].value)
 			else:
-				#then convert to integer
+				#then convert to str
 				fitlabels.append(lbl[0].value)
 		return np.array(fitlabels)
         

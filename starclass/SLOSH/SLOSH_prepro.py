@@ -16,7 +16,7 @@ from astropy.io import fits
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PIL import Image as pil_image
-from keras.layers import Input, Dropout, MaxPooling2D, Flatten, Conv2D, LeakyReLU
+from keras.layers import Input, Dropout, MaxPooling2D, Flatten, Conv2D, LeakyReLU, concatenate
 from keras.models import Model
 from keras.layers.core import Dense
 from keras.regularizers import l2
@@ -140,7 +140,7 @@ def img_to_array(im_path, normalize=True):
 def default_classifier_model():
     '''
     Default classifier model architecture
-    :return: model: untrained model
+    :return: model: untrained classifier model
     '''
     reg = l2(7.5E-4)
     adam = Adam(clipnorm=1.)
@@ -162,21 +162,141 @@ def default_classifier_model():
     flat = Flatten()(pool3)
     drop1 = Dropout(0.5)(flat)
     dense1 = Dense(128, kernel_initializer='glorot_uniform', activation='relu', kernel_regularizer=reg)(drop1)
-    output = Dense(2, kernel_initializer='glorot_uniform', activation='sigmoid')(dense1)
+    output = Dense(2, kernel_initializer='glorot_uniform', activation='softmax')(dense1)
     model = Model(input1, output)
 
     model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['accuracy'])
     return model
 
 
+def default_regressor_model():
+    '''
+    Default regressor model architecture.
+    :return: model: untrained regressor model
+    '''
+    reg = l2(7.5E-4)
+    input1 = Input(shape=(128, 128, 1))
+    drop0 = Dropout(0.25)(input1)
+    conv1 = Conv2D(4, kernel_size=(5, 5), padding='same', kernel_initializer='glorot_uniform',
+                   kernel_regularizer=reg)(drop0)
+    lrelu1 = LeakyReLU(0.1)(conv1)
+    pool1 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu1)
+    conv2 = Conv2D(8, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform',
+                   kernel_regularizer=reg)(pool1)
+    lrelu2 = LeakyReLU(0.1)(conv2)
+    pool2 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu2)
+    conv3 = Conv2D(16, kernel_size=(2, 2), padding='same', kernel_initializer='glorot_uniform',
+                   kernel_regularizer=reg)(pool2)
+    lrelu3 = LeakyReLU(0.1)(conv3)
+    pool3 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu3)
+    flat = Flatten()(pool3)
+    drop1 = Dropout(0.5)(flat)
+
+    dense1 = Dense(1024, kernel_initializer='glorot_uniform', activation='relu', kernel_regularizer=reg)(drop1)
+    dense2 = Dense(128, kernel_regularizer=reg, kernel_initializer='glorot_uniform', activation='relu')(dense1)
+    output = Dense(1, kernel_initializer='glorot_uniform')(dense2)
+    model = Model(input1, output)
+    # 1024-128-1 has 5 mse
+    # 1024-1 had 7 mse
+    model.compile(optimizer='Nadam', loss=weighted_mean_squared_error, metrics=['mae'])
+    return model
+
+def default_regressor_model_aleatoric():
+    '''
+    Default prototype regressor model architecture that uses aleatoric loss.
+    :return: model: untrained regressor model
+    '''
+    reg = l2(7.5E-4)
+    input1 = Input(shape=(128, 128, 1))
+    # pad = ZeroPadding2D(8)(input1)
+    drop0 = Dropout(0.25)(input1)
+    conv1 = Conv2D(4, kernel_size=(5, 5), padding='same', kernel_initializer='glorot_uniform',
+                   kernel_regularizer=reg)(drop0)
+    lrelu1 = LeakyReLU(0.1)(conv1)
+    pool1 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu1)
+    conv2 = Conv2D(8, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform',
+                   kernel_regularizer=reg)(pool1)
+    lrelu2 = LeakyReLU(0.1)(conv2)
+    pool2 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu2)
+    conv3 = Conv2D(16, kernel_size=(2, 2), padding='same', kernel_initializer='glorot_uniform',
+                   kernel_regularizer=reg)(pool2)
+    lrelu3 = LeakyReLU(0.1)(conv3)
+    pool3 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu3)
+    flat = Flatten()(pool3)
+    drop1 = Dropout(0.5)(flat)
+
+    dense1 = Dense(1024, kernel_initializer='glorot_uniform', activation='relu', kernel_regularizer=reg)(drop1)
+    dense2 = Dense(128, kernel_regularizer=reg, kernel_initializer='glorot_uniform', activation='relu')(dense1)
+    output = Dense(1, kernel_initializer='glorot_uniform', name='prediction')(dense2)
+    output_var = Dense(1, kernel_initializer='glorot_uniform', name='variance')(dense2)
+    pred_var = concatenate([output, output_var], name='pred_var')
+
+    model = Model(input1, [output, pred_var])
+    # 1024-128-1 has 5 mse
+    # 1024-1 had 7 mse
+    model.compile(optimizer='Nadam', loss={'prediction': weighted_mean_squared_error,
+                                           'pred_var': aleatoric_loss}, metrics={'prediction': 'mae'},
+                  loss_weights={'prediction': 1., 'pred_var': .2})
+    return model
+
+def numax_generator(generator):
+    '''
+    Converts a flow_from_directory generator to a generator that takes values from the filenames and outputs numax
+    :param generator:
+    :return:
+    '''
+    conversion_a = 3  # constants for conversion from pixel coordinate to frequency in uHz
+    conversion_b = (1. / 128.) * np.log(283. / 3.)
+    for x in generator:
+        idx = (generator.batch_index - 1) * generator.batch_size
+        names = generator.filenames[idx:idx + generator.batch_size]
+        if len(names) == 0:
+            continue
+        numaxes = np.zeros(len(names))
+        for i in range(len(names)):
+            numaxes[i] = (float(names[i].split("-", 1)[1][:-4]))
+        numaxes = (1 / conversion_b) * np.log(numaxes / conversion_a)  # convert to pixel coordinates
+        yield x, np.array(numaxes).reshape((np.array(numaxes).shape[0], 1))
+
+def numax_generator_aleatoric(generator):
+    '''
+    Converts a flow_from_directory generator to a generator that takes values from the filenames and outputs numax for
+    aleatoric models
+    :param generator:
+    :return:
+    '''
+    conversion_a = 3  # constants for conversion from pixel coordinate to frequency in uHz
+    conversion_b = (1. / 128.) * np.log(283. / 3.)
+    for x in generator:
+        idx = (generator.batch_index - 1) * generator.batch_size
+        names = generator.filenames[idx:idx + generator.batch_size]
+        if len(names) == 0:
+            continue
+        numaxes = np.zeros(len(names))
+        for i in range(len(names)):
+            numaxes[i] = (float(names[i].split("-", 1)[1][:-4]))  # get numax from filename
+        numaxes = (1 / conversion_b) * np.log(numaxes / conversion_a)  # convert to pixel coordinates
+        numaxes = np.array(numaxes).reshape((np.array(numaxes).shape[0], 1))
+        yield x, [numaxes, numaxes]
+
+
 def aleatoric_loss(y_true, pred_var):
     '''
     Aleatoric loss function for heteroscedatic noise estimation in deep learning models. Needed for model imports.
     :param y_true: Ground truth
-    :param pred_var: Model predicted value
+    :param pred_var: Prediction appended with variance
     :return: Aleatoric Loss
     '''
     y_pred = pred_var[:, 0] # here pred_var should be [prediction, variance], y_true is true numax
     log_var = pred_var[:, 1]
     loss = (K.abs(y_true - y_pred)) * (K.exp(-log_var)) + log_var
     return K.mean(loss)
+
+def weighted_mean_squared_error(y_true, y_pred):
+    '''
+    Custom loss function for training the regressor. Prioritizes getting low/high numax predictions correct.
+    :param y_true: Ground truth
+    :param y_pred: Model predicted value
+    :return: Weighted MSE loss
+    '''
+    return K.mean((K.square(y_pred - y_true))*K.square(y_true-64), axis=-1)

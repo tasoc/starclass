@@ -91,15 +91,15 @@ class RFGCClassifier(BaseClassifier):
 		
 		self.class_keys = {}
 		self.class_keys['RRLyr/Ceph'] = StellarClasses.RRLYR_CEPHEID
-		self.class_keys['transit/eclipse'] = StellarClasses.RRLYR_CEPHEID
-		self.class_keys['solar'] = StellarClasses.RRLYR_CEPHEID
-		self.class_keys['dSct/bCep'] = StellarClasses.RRLYR_CEPHEID
-		self.class_keys['gDor/spB'] = StellarClasses.RRLYR_CEPHEID
-		self.class_keys['transient'] = StellarClasses.RRLYR_CEPHEID
-		self.class_keys['contactEB/spots'] = StellarClasses.RRLYR_CEPHEID
-		self.class_keys['aperiodic'] = StellarClasses.RRLYR_CEPHEID
-		self.class_keys['constant'] = StellarClasses.RRLYR_CEPHEID
-		self.class_keys['rapid'] = StellarClasses.RRLYR_CEPHEID			
+		self.class_keys['transit/eclipse'] = StellarClasses.ECLIPSE
+		self.class_keys['solar'] = StellarClasses.SOLARLIKE
+		self.class_keys['dSct/bCep'] = StellarClasses.DSCT_BCEP
+		self.class_keys['gDor/spB'] = StellarClasses.GDOR_SPB
+		self.class_keys['transient'] = StellarClasses.TRANSIENT
+		self.class_keys['contactEB/spots'] = StellarClasses.CONTACT_ROT
+		self.class_keys['aperiodic'] = StellarClasses.APERIODIC
+		self.class_keys['constant'] = StellarClasses.CONSTANT
+		self.class_keys['rapid'] = StellarClasses.RAPID			
 			
 			
 	def save(self, outfile, somoutfile='som.txt'):
@@ -176,7 +176,7 @@ class RFGCClassifier(BaseClassifier):
 			result[key] = classprobs[c]		
 		return result
 
-	def train(self, features, labels, savecl=True, savefeat=True, overwrite=True):
+	def train(self, features, labels, savecl=True, savefeat=True, overwrite=False):
 		"""
 		Train the classifier.
 		Assumes lightcurve time is in days

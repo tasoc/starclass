@@ -29,13 +29,14 @@ class SLOSH_Classify(BaseClassifier):
 
         # Initialise parent
         super(self.__class__, self).__init__(*args, **kwargs)
+        self.classifier_list = []
 
         if saved_models is not None:
             if not isinstance(saved_models, list):
                 raise ValueError('Saved model input is not in the form of a list!')
 
             self.predictable = True
-            self.classifier_list = []
+            K.set_learning_phase(1)
             for model in saved_models:
                 if os.path.exists(os.path.join(self.data_dir,model)):
                     self.classifier_list.append(load_model(os.path.join(self.data_dir,model)))
@@ -43,13 +44,13 @@ class SLOSH_Classify(BaseClassifier):
             warnings.warn('No saved models provided. Predict functions are disabled.')
             self.predictable = False
 
-    def predict(self, batch, target_path, im_array=None, mc_iterations=10):
+    def predict(self, batch, target_path=None, im_array=None, mc_iterations=10):
         '''
         Prediction for a star, producing output determining if it is a solar-like oscillator
         :param batch: String, 'single' - Prediction on a single image from path, or an image array
         ; 'folder' - Multiple predictions where the images should be placed in a folder.
-        :param target_path: String, for batch = 'single' this should be an image path; for batch = 'folder' this should
-         be a folder path.
+        :param target_path: String, for batch = 'single' and im_array is not specified this should be an image path;
+         for batch = 'folder' this should be a folder path.
         :param im_array: For 'single' batch only. Instead of loading a single image from path, you can predict directly
         from an array of grayscale 2D pixel values
         :param mc_iterations: Number of repetitions for Monte Carlo Dropout.
@@ -58,26 +59,34 @@ class SLOSH_Classify(BaseClassifier):
          of input stars.
         '''
         assert self.predictable == True, 'No saved models provided. Predict functions are disabled.'
-        assert batch in ('single', 'folder'), "batch parameter should be either 'single' or 'folder"
-        K.set_learning_phase(1)
+        assert batch in ('single', 'folder'), "batch parameter should be either 'single' or 'folder'"
+
 
         if batch == 'single':
             if im_array is not None:
                 assert im_array.shape == (128,128), 'Improper image array shape'
-                img_array = np.array(im_array, dtype=K.floatx())/255.
+                img_array = np.array(im_array, dtype=K.floatx())
+                target_path = '0' #placeholder
             else:
+                if target_path is None:
+                    raise FileNotFoundError("Either 'im_array' or 'target_path' needs to be specified!")
                 img_array = preprocessing.img_to_array(os.path.join(self.data_dir, target_path), normalize=True)
+
 
             pred_array = np.zeros((mc_iterations, len(self.classifier_list)))
             for i in range(mc_iterations):
                 for j in range(len(self.classifier_list)):
-                    pred_array[i,j] = self.classifier_list[j].predict(img_array.reshape(1,128,128,1))[:,1]
+                    prediction = self.classifier_list[j].predict(img_array.reshape(1,128,128,1))
+                    try: # some models have 2 output neurons instead of 1
+                        pred_array[i,j] = prediction[:,1]
+                    except:
+                        pred_array[i,j] = prediction[:]
             average_over_models = np.mean(pred_array, axis=1)
             std_over_models = np.std(pred_array,axis=1)
             average_over_mc_iterations = np.mean(average_over_models)
-            std_over_mc_iterations = np.zeros(len(average_over_mc_iterations))
+            std_over_mc_iterations = 0
 
-            for i in range(len(std_over_mc_iterations)):
+            for i in range(len(std_over_models)):
                 std_over_mc_iterations += std_over_models[i] ** 2
             std_over_mc_iterations = np.sqrt(std_over_mc_iterations)
 
@@ -87,11 +96,14 @@ class SLOSH_Classify(BaseClassifier):
             else:
                 label = 0
             pred_sigma = std_over_mc_iterations
+
             file_id = int(re.search(r'\d+', target_path).group())
 
         elif batch == 'folder':
+            if target_path is None:
+                raise FileNotFoundError('Target path does not exist!')
             if not os.path.isdir(os.path.join(self.data_dir, target_path)):
-                raise ValueError('Target path does not exist!')
+                raise FileNotFoundError('Target path does not exist!')
             nb_files = 0
             for cdirpath, cdirnames, pfilenames in os.walk(os.path.join(self.data_dir, target_path)):
                 for p in range(len(pfilenames)):
@@ -107,28 +119,33 @@ class SLOSH_Classify(BaseClassifier):
             pred_array = np.zeros(shape=(nb_files, mc_iterations, len(self.classifier_list)))
             for i in range(mc_iterations):
                 for j in range(len(self.classifier_list)):
-                    pred_array[:,i,j] = self.classifier_list[j].predict_generator(im_gen_flow, steps=nb_files / 32,
-                                                                                  pickle_safe=True, verbose=1)[:,1]
+                    prediction = self.classifier_list[j].predict_generator(im_gen_flow, steps=nb_files / 32,
+                                                                                  pickle_safe=True, verbose=0)
+                    try:
+                        pred_array[:,i,j] = prediction[:,1]
+                    except:
+                        pred_array[:,i,j] = np.squeeze(prediction[:])
             average_over_models = np.mean(pred_array, axis=1)
             std_over_models = np.std(pred_array,axis=1)
             average_over_mc_iterations = np.mean(average_over_models, axis=1)
-            std_over_mc_iterations = np.zeros(len(average_over_mc_iterations))
+            std_over_mc_iterations = np.zeros(pred_array.shape[0])
 
-            for i in range(std_over_mc_iterations.shape[1]):
-                std_over_mc_iterations += std_over_models[i] ** 2
+            for i in range(std_over_models.shape[1]):
+                std_over_mc_iterations += std_over_models[:,i] ** 2
             std_over_mc_iterations = np.sqrt(std_over_mc_iterations)
 
             pred = average_over_mc_iterations
-            if pred >= 0.5:
-                label = 1
-            else:
-                label = 0
+            label = np.zeros(len(pred))
+
+            for i in range(len(pred)):
+                if pred[i] >= 0.5:
+                    label[i] = 1
+                else:
+                    label[i] = 0
             pred_sigma = std_over_mc_iterations
             file_id = np.array(file_id)
         else:
             raise ValueError("batch parameter should be either 'single' or 'folder'")
-
-        pred = average_over_models
 
         return file_id,label,pred,pred_sigma
 
@@ -150,6 +167,7 @@ class SLOSH_Classify(BaseClassifier):
         :param infile: Path to trained model
         :return: None
         '''
+        K.set_learning_phase(1)
         self.classifier_list.append(load_model(infile))
         self.predictable = True
 
@@ -159,6 +177,7 @@ class SLOSH_Classify(BaseClassifier):
         :return: None
         '''
         del self.classifier_list[:]
+        self.predictable = False
 
     def create_single_image(self, freq, power,star_id, out_path, label=None, numax=None):
         '''
@@ -220,7 +239,7 @@ class SLOSH_Classify(BaseClassifier):
             datagen = ImageDataGenerator(rescale=1. / 255., height_shift_range=0.15)
             train_generator = datagen.flow_from_directory(train_folder, target_size=(128, 128),color_mode='grayscale',
                                         class_mode='categorical', batch_size=32)
-            model.fit_generator(train_generator, epochs=200, steps_per_epoch=math.ceil((1-validation_split)*nb_files / 32),
+            model.fit_generator(train_generator, epochs=200, steps_per_epoch=math.ceil(nb_files / 32),
                                 callbacks=[reduce_lr])
 
         return model
@@ -235,7 +254,7 @@ class SLOSH_Regressor(BaseClassifier):
         '''
         Initialization for the class. Currently the use of only one regressor is supported, with multiple to be
         supported in future!
-        :param saved_models: LIST of saved classifier filenames. Supports multi-classifier predictions.
+        :param saved_models: PATH to a saved model.
         :param aleatoric: Boolean flag. If true, uses prototype models for heteroscedatic noise estimates
         '''
 
@@ -258,7 +277,7 @@ class SLOSH_Regressor(BaseClassifier):
             warnings.warn('No saved models provided. Predict functions are disabled.')
             self.predictable = False
 
-    def predict(self, batch, target_path, im_array=None, mc_iterations=10):
+    def predict(self, batch, target_path=None, im_array=None, mc_iterations=10):
         '''
         Prediction for a star, producing numax estimate outputs
         :param batch: String, 'single' - Prediction on a single image from path, or an image array
@@ -280,8 +299,11 @@ class SLOSH_Regressor(BaseClassifier):
         if batch == 'single':
             if im_array is not None:
                 assert im_array.shape == (128, 128), 'Improper image array shape'
-                img_array = np.array(im_array, dtype=K.floatx()) / 255.
+                img_array = np.array(im_array, dtype=K.floatx())
+                target_path = '0' #placeholder
             else:
+                if target_path is None:
+                    raise FileNotFoundError("Either 'im_array' or 'target_path' needs to be specified!")
                 img_array = preprocessing.img_to_array(os.path.join(self.data_dir, target_path), normalize=True)
 
             if self.aleatoric:
@@ -325,16 +347,16 @@ class SLOSH_Regressor(BaseClassifier):
                 var_array = np.zeros(shape=(nb_files, mc_iterations))
                 for i in range(mc_iterations):
                     _, pixel_var = self.regressor_model.predict_generator(im_gen_flow, steps=nb_files / 32,
-                                                                                        pickle_safe=True, verbose=1)
+                                                                                        pickle_safe=True, verbose=0)
                     pred_array[:,i] = pixel_var[:,0]
                     var_array[:,i] = np.log10(pixel_var[:,1])
-                pred = np.mean(pred_array)
-                var = np.var(pred_array) + np.mean(var_array) # heteroscedatic noise
+                pred = np.mean(pred_array, axis=1)
+                var = np.var(pred_array, axis=1) + np.mean(var_array, axis=1) # heteroscedatic noise
             else:
                 pred_array = np.zeros(shape=(nb_files, mc_iterations))
                 for i in range(mc_iterations):
-                    pred_array[:, i] = self.regressor_model.predict_generator(im_gen_flow, steps=nb_files / 32,
-                                                                                        pickle_safe=True, verbose=1)
+                    pred_array[:, i] = np.squeeze(self.regressor_model.predict_generator(im_gen_flow, steps=nb_files / 32,
+                                                                                        pickle_safe=True, verbose=0))
                 pred = np.mean(pred_array, axis=1)
                 var = np.var(pred_array, axis=1)
                 var += 1.33 # homoscedatic noise, assuming a prior length scale of l=5
@@ -359,12 +381,14 @@ class SLOSH_Regressor(BaseClassifier):
         else:
             self.regressor_model.save(outfile + '-%s.h5')
 
-    def load(self, infile):
+    def load(self, infile, aleatoric=False):
         '''
         Loads a regressor model.
         :param infile: Path to trained model
+        :param aleatoric: Boolean. Whether to load an aleatoric noise model or not.
         :return: None
         '''
+        self.aleatoric = aleatoric
         if self.aleatoric:
             self.regressor_model = load_model(infile, custom_objects={'weighted_mean_squared_error'
                                                                       :preprocessing.weighted_mean_squared_error,
@@ -424,7 +448,6 @@ class SLOSH_Regressor(BaseClassifier):
         for dirpath, dirnames, filenames in os.walk(train_folder):
             for i in range(len(filenames)):
                 nb_files += 1
-
         if validation_split is not None:
             datagen = ImageDataGenerator(rescale=1. / 255., height_shift_range=0.15, validation_split=validation_split)
             train_generator = datagen.flow_from_directory(train_folder, target_size=(128, 128), color_mode='grayscale',
@@ -443,7 +466,6 @@ class SLOSH_Regressor(BaseClassifier):
                                 validation_data=validation_numax_generator,
                                 validation_steps=math.ceil(validation_split * nb_files / 32),
                                 callbacks=[reduce_lr])
-
         else:
             datagen = ImageDataGenerator(rescale=1. / 255., height_shift_range=0.15)
             train_generator = datagen.flow_from_directory(train_folder, target_size=(128, 128), color_mode='grayscale',
@@ -453,7 +475,7 @@ class SLOSH_Regressor(BaseClassifier):
             else:
                 train_numax_generator = preprocessing.numax_generator(train_generator)
             model.fit_generator(train_numax_generator, epochs=200,
-                                steps_per_epoch=math.ceil((1 - validation_split) * nb_files / 32),
+                                steps_per_epoch=nb_files / 32,
                                 callbacks=[reduce_lr])
 
         return model

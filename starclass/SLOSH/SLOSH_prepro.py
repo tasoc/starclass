@@ -34,12 +34,12 @@ def print_images(freq, power, star_id, output_folder_path, designation=None, num
     '''
     if designation is None and numax is None:
         output_folder = output_folder_path + '/%s.png' %star_id
-    elif numax is not None:
+    elif numax is not None and designation is None:
         output_folder = output_folder_path + '/1/%s-%.2f.png' %(star_id, numax)
-    elif designation is not None:
+    elif designation is not None and numax is None:
         output_folder = output_folder_path + '/%s/%s.png' %(designation, star_id)
     else:
-        pass
+        output_folder = output_folder_path + '/%s/%s-%.2f.png' % (designation, star_id, numax)
 
     fig = Figure(figsize=(256 / 85, 256 / 85), dpi=96)
     canvas = FigureCanvas(fig)
@@ -71,12 +71,22 @@ def generate_single_image(freq, power, star_id, output_path, label, numax):
     '''
     if label is None and numax is None:
         print_images(freq, power, star_id, output_path)
-    elif label is not None:
+    elif label is not None and numax is None:
+        if not os.path.exists(output_path+'/1/'):
+            os.mkdir(output_path+'/1/')
+        if not os.path.exists(output_path+'/0/'):
+            os.mkdir(output_path+'/0/')
         print_images(freq, power, star_id, output_path, designation=label)
-    elif numax is not None:
+    elif numax is not None and label is None:
+        if not os.path.exists(output_path+'/1/'):
+            os.mkdir(output_path+'/1/')
         print_images(freq, power, star_id, output_path, numax=numax)
     else:
-        raise ValueError('Undetermined selection!')
+        if not os.path.exists(output_path+'/1/'):
+            os.mkdir(output_path+'/1/')
+        if not os.path.exists(output_path+'/0/'):
+            os.mkdir(output_path+'/0/')
+        print_images(freq, power, star_id, output_path, numax=numax, designation=label)
 
 
 def generate_images(input_folder_path, output_folder_path, star_list=None, label_list=None, numax_list=None):
@@ -95,25 +105,44 @@ def generate_images(input_folder_path, output_folder_path, star_list=None, label
         merge = os.path.join(input_folder_path, filename)
         if merge.endswith('.csv'):  # Read in file, change format and IO if required
             df = pd.read_csv(merge)
+            freq = df.iloc[:,0].values
+            power = df.iloc[:,1].values
         elif merge.endswith('.fits'):
-            with fits.open(merge) as data:
+            with fits.open(merge) as data: # Rafa fits files
                 df = pd.DataFrame(data[0].data)
+                freq = df.iloc[:, 0].values * 1E6
+                power = df.iloc[:, 1].values
         else:
             df = pd.read_table(merge, header=None, delim_whitespace=True)
+            freq = df.iloc[:,0].values
+            power = df.iloc[:,1].values
         star_id = int(re.search(r'\d+', filename).group()) # get ID from filename
 
-        df.columns = ['Frequency', 'Power']
-
-        freq = df['Frequency'].values
-        power = df['Power'].values
 
         if star_list is not None: # so we have a training set
-            if label_list is not None:
-                training_label = label_list[np.where(star_list == star_id)]
+            if label_list is not None and numax_list is None:
+                if not os.path.exists(output_folder_path + '/1/'):
+                    os.mkdir(output_folder_path + '/1/')
+                if not os.path.exists(output_folder_path + '/0/'):
+                    os.mkdir(output_folder_path + '/0/')
+
+                training_label = np.array(label_list)[np.where(np.array(star_list) == star_id)][0]
                 print_images(freq, power, star_id, output_folder_path, designation=training_label)
-            elif numax_list is not None:
-                train_numax = numax_list[np.where(star_list == star_id)]
+            elif numax_list is not None and label_list is None:
+                if not os.path.exists(output_folder_path + '/1/'):
+                    os.mkdir(output_folder_path + '/1/')
+
+                train_numax = np.array(numax_list)[np.where(np.array(star_list) == star_id)][0]
                 print_images(freq, power, star_id, output_folder_path, numax=train_numax)
+            elif numax_list is not None and label_list is not None:
+                if not os.path.exists(output_folder_path + '/1/'):
+                    os.mkdir(output_folder_path + '/1/')
+                if not os.path.exists(output_folder_path + '/0/'):
+                    os.mkdir(output_folder_path + '/0/')
+
+                training_label = np.array(label_list)[np.where(np.array(star_list) == star_id)][0]
+                train_numax = np.array(numax_list)[np.where(np.array(star_list) == star_id)][0]
+                print_images(freq, power, star_id, output_folder_path, numax=train_numax, designation=training_label)
             else:
                 raise FileNotFoundError('Please include training labels or numax!')
         else:
@@ -253,6 +282,7 @@ def numax_generator(generator):
         if len(names) == 0:
             continue
         numaxes = np.zeros(len(names))
+        print(numaxes)
         for i in range(len(names)):
             numaxes[i] = (float(names[i].split("-", 1)[1][:-4]))
         numaxes = (1 / conversion_b) * np.log(numaxes / conversion_a)  # convert to pixel coordinates

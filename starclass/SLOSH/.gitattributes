@@ -1,3 +1,2 @@
-sample_models/regressor filter=lfs diff=lfs merge=lfs -text
-sample_models/classifier filter=lfs diff=lfs merge=lfs -text
-sample_data/sample_image filter=lfs diff=lfs merge=lfs -text
+sample_data/** filter=lfs diff=lfs merge=lfs -text
+sample_models/** filter=lfs diff=lfs merge=lfs -text

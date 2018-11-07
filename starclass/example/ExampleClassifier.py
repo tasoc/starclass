@@ -33,13 +33,14 @@ class ExampleClassifier(BaseClassifier):
 		self.something = np.load('my_classifier.npy')
 
 
-	def do_classify(self, lightcurve, features):
+	def do_classify(self, features):
 		"""
 		My classification that will be run on each lightcurve
 
 		Parameters:
-			lightcurve (``lightkurve.TessLightCurve`` object): Lightcurve.
-			features (dict): Dictionary of other features.
+			features (dict): Dictionary of features.
+				Of particular interest should be the `lightcurve` (``lightkurve.TessLightCurve`` object) and
+				`powerspectum` which contains the lightcurve and power density spectrum respectively.
 
 		Returns:
 			dict: Dictionary of stellar classifications.
@@ -50,13 +51,13 @@ class ExampleClassifier(BaseClassifier):
 
 		# Do the magic:
 		logger.info("We are staring the magic...")
-		self.something.doit(lightcurve, features)
+		self.something.doit(features['lightcurve'], features)
 
 		# Dummy result where the target is 98% a solar-like
-		# and 2% classical pulsator:
+		# and 2% classical pulsator (delta Scuti/beta Cep):
 		result = {
 			StellarClasses.SOLARLIKE: 0.98,
-			StellarClasses.CLASSICAL: 0.02
+			StellarClasses.DSCT_BCEP: 0.02
 		}
 
 		# If something went wrong:
@@ -66,8 +67,15 @@ class ExampleClassifier(BaseClassifier):
 		return result
 
 
-	def train(self, lightcurves, labels):
+	def train(self, features, labels):
+		"""
+		Train the classifier.
+
+		Parameters:
+			features (iterator of dicts): Iterator of features-dictionaries similar to those in ``do_classify``.
+			labels (iterator of lists): For each feature, provides a list of the assigned known ``StellarClasses`` identifications.
+		"""
 		# Do all the stuff needed to train the classifier here
 
-		my_classifier = do_the_training(lightcurves, labels)
+		my_classifier = do_the_training(features, labels)
 		np.save('my_classifier.npy', my_classifier)

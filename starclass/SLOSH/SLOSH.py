@@ -44,7 +44,7 @@ class SLOSH_Classify(BaseClassifier):
             warnings.warn('No saved models provided. Predict functions are disabled.')
             self.predictable = False
 
-    def predict(self, batch, target_path=None, im_array=None, mc_iterations=10):
+    def do_classify(self, batch, target_path=None, im_array=None, mc_iterations=10):
         '''
         Prediction for a star, producing output determining if it is a solar-like oscillator
         :param batch: String, 'single' - Prediction on a single image from path, or an image array
@@ -208,7 +208,7 @@ class SLOSH_Classify(BaseClassifier):
         preprocessing.generate_images(input_folder_path, output_folder_path, star_list, label_list, numax_list)
 
 
-    def train_classifier(self, train_folder, validation_split=None):
+    def train(self, train_folder, validation_split=None):
         '''
         Trains a fresh classifier using a default NN architecture and parameters as of the Hon et al. (2018) paper.
         :param train_folder: The folder where training images are kept. These must be separated into subfolders by the
@@ -428,7 +428,7 @@ class SLOSH_Regressor(BaseClassifier):
         '''
         preprocessing.generate_images(input_folder_path, output_folder_path, star_list, label_list, numax_list)
 
-    def train_regressor(self, train_folder, validation_split=None):
+    def train(self, train_folder, validation_split=None):
         '''
         Trains a fresh regressor using a default NN architecture and parameters as of the Hon et al. (2018) paper.
         :param train_folder: The folder where training images are kept. These must be given an extra subfolder depth.

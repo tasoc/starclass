@@ -20,7 +20,7 @@ def featcalc_single(features, som,
     Calculates features for single lightcurve
     """
     lcurve = features['lightcurve']
-    featout = np.zeros(nfrequencies+17)
+    featout = np.zeros(nfrequencies+16)
     
     lc = prepLCs(lcurve,linflatten)
     
@@ -35,11 +35,11 @@ def featcalc_single(features, som,
         												cardinality)
     featout[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux, EBper)
     featout[nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
-    featout[nfrequencies+10] = median_crossings(lc.flux)
-    featout[nfrequencies+11] = features['Fphi']
-    featout[nfrequencies+12] = features['Fplo']
-    featout[nfrequencies+13:] = features['Fp07'], features['Fp7'], features['Fp20'], features['Fp50']
-    return featout.reshape(1,nfrequencies+17)
+    psi, zc = compute_hocs(lc.time, lc.flux, 5)
+    featout[nfrequencies+10] = psi
+    featout[nfrequencies+11] = zc[0]
+    featout[nfrequencies+12:] = features['Fp07'], features['Fp7'], features['Fp20'], features['Fp50']
+    return featout.reshape(1,nfrequencies+16)
 
 def featcalc_set(features, som, 
 					providednfreqs=6, nfrequencies=6, forbiddenfreqs=[13.49/4.],
@@ -47,10 +47,10 @@ def featcalc_set(features, som,
     """
     Calculates features for set of lightcurves
     """
-    featout = np.zeros([1,nfrequencies+17])
+    featout = np.zeros([1,nfrequencies+16])
     
     for obj in features:
-        objfeatures = np.zeros(nfrequencies+17)
+        objfeatures = np.zeros(nfrequencies+16)
         lc = prepLCs(obj['lightcurve'],linflatten)
     
         periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs,
@@ -64,10 +64,10 @@ def featcalc_set(features, som,
         													cardinality)
         objfeatures[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux,EBper)
         objfeatures[nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
-        objfeatures[nfrequencies+10] = median_crossings(lc.flux)
-        objfeatures[nfrequencies+11] = obj['Fphi']
-        objfeatures[nfrequencies+12] = obj['Fplo']
-        objfeatures[nfrequencies+13:] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
+        psi, zc = compute_hocs(lc.time, lc.flux, 5)
+        objfeatures[nfrequencies+10] = psi
+        objfeatures[nfrequencies+11] = zc[0]
+        objfeatures[nfrequencies+12:] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
         featout = np.vstack((featout,objfeatures))
     return featout[1:,:]
 
@@ -548,11 +548,58 @@ def p2p_features(flux):
     p2p = np.abs(np.diff(flux))
     return np.percentile(p2p,98),np.mean(p2p)
 
-def median_crossings(flux):
+def compute_fill(x):
+   cadence = np.median(np.diff(x))
+   full_npts = (x[-1] - x[0]) / cadence
+   return len(x[np.isfinite(x)]) / full_npts
+
+def compute_k_crossings(y, k):
+    y = np.diff(y, k)
+    window = y.copy()
+    window[window >= 0] = 1
+    window[window < 0] = 0
+    return np.sum(np.diff(window)**2)
+
+def sigmoid_(x, t):
+    # Normalisation factor functions
+    return (1 / (1 + np.exp(-t*x))) - 0.5
+
+def sig_single(x, t):
+    return sigmoid_(x, t) / sigmoid_(1,t)
+
+def correction_factor(x, t, k):
+    sig = sig_single(x, t)
+    return sig# * self.coeffs[k]
+
+
+def compute_hocs(x, y, k):
     """
-    Gets number of flux crossings of the median line.
+    Compute higher order crossings (HOC)
+    Parameters
+    -----------
+    k (int) : number of k crossings to compute (inclusive)
     """
-    fluxoffset = flux - np.median(flux)
-    signchanges = fluxoffset[1:] * fluxoffset[:-1]
-    return np.sum(signchanges<0)
-            
+    y_offset = y - np.median(y)
+    
+    sigmoid_coeffs = np.array([3.625418060200669,
+                           5.250836120401338,
+                           7.117056856187291,
+                           8.862876254180602,
+                           10.608695652173914,
+                           12.234113712374581])
+
+    zc_gauss = np.array([ 0.49912 ,  0.666367,  0.732079,  0.769869,  0.795083,  0.81284 ,
+    0.827098,  0.838291,  0.847576,  0.855565,  0.862341,  0.868062,
+    0.873031,  0.877556,  0.881678])
+    zc = np.zeros(k)
+    fill = compute_fill(x)
+    for i in range(k):
+        zc[i] = compute_k_crossings(y_offset, i) / (len(y_offset)-i)/correction_factor(fill, sigmoid_coeffs[i], i)
+    delta_k = zc[0]
+    delta_k_gauss = zc_gauss[0]
+    for i in range(k-1):
+        delta_k = np.append(delta_k, zc[i+1] - zc[i])
+        delta_k_gauss = np.append(delta_k_gauss, zc_gauss[i+1] - zc_gauss[i])
+    psi = np.sum((delta_k - delta_k_gauss[:len(delta_k)])**2 / delta_k_gauss[:len(delta_k)])
+    return psi, zc
+    

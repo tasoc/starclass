@@ -13,6 +13,7 @@ import os.path
 import logging
 from lightkurve import TessLightCurve
 from astropy.stats import mad_std
+from astropy.io import fits
 from .StellarClasses import StellarClasses
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
@@ -139,7 +140,7 @@ class BaseClassifier(object):
 				quality=np.asarray(data[:,3], dtype='int32'),
 				time_format='jd',
 				time_scale='tdb',
-				ticid=task['starid'],
+				targetid=task['starid'],
 				camera=task['camera'],
 				ccd=task['ccd'],
 				sector=2,
@@ -147,6 +148,29 @@ class BaseClassifier(object):
 				#dec=0,
 				quality_bitmask=2+8+256 # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK
 			)
+
+		elif fname.endswith('.fits') or fname.endswith('.fits.gz'):
+			with fits.open(fname, mode='readonly', memmap=True) as hdu:
+				lightcurve = TessLightCurve(
+					time=hdu['LIGHTCURVE'].data['TIME'],
+					flux=hdu['LIGHTCURVE'].data['FLUX_RAW'],
+					flux_err=hdu['LIGHTCURVE'].data['FLUX_RAW_ERR'],
+					centroid_col=hdu['LIGHTCURVE'].data['MOM_CENTR1'],
+					centroid_row=hdu['LIGHTCURVE'].data['MOM_CENTR2'],
+					quality=np.asarray(hdu['LIGHTCURVE'].data['QUALITY'], dtype='int32'),
+					cadenceno=np.asarray(hdu['LIGHTCURVE'].data['CADENCENO'], dtype='int32'),
+					time_format='btjd',
+					time_scale='tdb',
+					targetid=hdu[0].header.get('TICID'),
+					label=hdu[0].header.get('OBJECT'),
+					camera=hdu[0].header.get('CAMERA'),
+					ccd=hdu[0].header.get('CCD'),
+					sector=hdu[0].header.get('SECTOR'),
+					ra=hdu[0].header.get('RA_OBJ'),
+					dec=hdu[0].header.get('DEC_OBJ'),
+					quality_bitmask=2+8+256 # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK
+				)
+
 		else:
 			raise ValueError("Invalid file format")
 

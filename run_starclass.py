@@ -18,10 +18,10 @@ if __name__ == '__main__':
 
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Utility function for running stellar classifiers.')
-	parser.add_argument('-c', '--classifier', help='Classifier to use.', default='rfgc', choices=('rfgc', 'slosh', 'foptics', 'xbc'))
+	parser.add_argument('-c', '--classifier', help='Classifier to use.', default='rfgc', choices=('rfgc', 'slosh', 'foptics', 'xgb'))
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
-	parser.add_argument('-t', '--train', help='Train classifier using this training-set.', default=None, choices=('tdasim', 'keplerq9'))
+	parser.add_argument('-t', '--train', help='Train classifier using this training-set.', default=None, choices=('tdasim', 'keplerq9', 'keplerq9-linfit'))
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	#parser.add_argument('--starid', type=int, help='TIC identifier of target.', nargs='?', default=None)
@@ -50,14 +50,20 @@ if __name__ == '__main__':
 	# For now, there is only one...
 	current_classifier = args.classifier
 	classifier = {
-		'rfgc': RFGCClassifier
+		'rfgc': RFGCClassifier,
+		#'slosh': SLOSHClassifier,
+		#'foptics': FOPTICSClassifier,
+		#'xgb': XGBClassifier
 	}[current_classifier]
 
 	# Training:
 	# If we want to run the training, do the following:
 	if args.train:
 		# Pick the training set:
-		tset = training_sets.tda_simulations(datalevel=args.datalevel)
+		if args.train == 'tdasim':
+			tset = training_sets.tda_simulations(datalevel=args.datalevel)
+		elif args.train in ('keplerq9', 'keplerq9-linfit'):
+			raise NotImplementedError("Kepler Q9 data not implemented yet")
 
 		# Do the training:
 		with classifier(level=args.level, features_cache=tset.features_cache) as stcl:

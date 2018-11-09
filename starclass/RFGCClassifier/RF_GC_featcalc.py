@@ -13,63 +13,47 @@ import lightkurve
 import logging
 logger = logging.getLogger(__name__)
 
-def featcalc_single(features, som, 
+def featcalc(features, som, 
 					providednfreqs=6, nfrequencies=6, forbiddenfreqs=[13.49/4.],
-					cardinality=64, linflatten=True):
-    """
-    Calculates features for single lightcurve
-    """
-    lcurve = features['lightcurve']
-    featout = np.zeros(nfrequencies+16)
-    
-    lc = prepLCs(lcurve,linflatten)
-    
-    periods, usedfreqs = checkfrequencies(features, nfrequencies, providednfreqs,
-        									forbiddenfreqs, lc.time)
-    featout[:nfrequencies] = periods
-    featout[nfrequencies:nfrequencies+2] = freq_ampratios(features,usedfreqs)
-    featout[nfrequencies+2:nfrequencies+4] = freq_phasediffs(features,usedfreqs)
-    EBper = EBperiod(lc.time, lc.flux, periods[0],linflatten=linflatten-1)
-    featout[0] = EBper #overwrites top period
-    featout[nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, 
-        												cardinality)
-    featout[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux, EBper)
-    featout[nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
-    psi, zc = compute_hocs(lc.time, lc.flux, 5)
-    featout[nfrequencies+10] = psi
-    featout[nfrequencies+11] = zc[0]
-    featout[nfrequencies+12:] = features['Fp07'], features['Fp7'], features['Fp20'], features['Fp50']
-    return featout.reshape(1,nfrequencies+16)
-
-def featcalc_set(features, som, 
-					providednfreqs=6, nfrequencies=6, forbiddenfreqs=[13.49/4.],
-					cardinality=64, linflatten=True):
-    """
-    Calculates features for set of lightcurves
-    """
-    featout = np.zeros([1,nfrequencies+16])
-    
-    for obj in features:
-        objfeatures = np.zeros(nfrequencies+16)
-        lc = prepLCs(obj['lightcurve'],linflatten)
-    
-        periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs,
+					cardinality=64, linflatten=True, savefeat=None, recalc=False):
+	"""
+	Calculates features for set of lightcurves
+	"""
+	featout = np.zeros([1,nfrequencies+16])
+	if isinstance(features,dict): #trick for single features
+		features = [features]
+        
+	for obj in features:   
+		precalc = False
+		if savefeat is not None:
+			featfile = os.path.join(savefeat,str(obj['id'])+'.txt')
+			if os.path.exists(featfile) and not recalc:
+				logger.info(str(obj['id'])+": Loading precalculated features...")
+				objfeatures = np.loadtxt(featfile,delimiter=',')
+				precalc = True
+		
+		if not precalc:	
+			objfeatures = np.zeros(nfrequencies+16)
+			lc = prepLCs(obj['lightcurve'],linflatten)
+			periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs,
         									 forbiddenfreqs, lc.time)
-        objfeatures[:nfrequencies] = periods
-        objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj,usedfreqs)
-        objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj,usedfreqs)
-        EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)
-        objfeatures[0] = EBper #overwrites top period
-        objfeatures[nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, 
+			objfeatures[:nfrequencies] = periods
+			objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj,usedfreqs)
+			objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj,usedfreqs)
+			EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)
+			objfeatures[0] = EBper #overwrites top period
+			objfeatures[nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, 
         													cardinality)
-        objfeatures[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux,EBper)
-        objfeatures[nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
-        psi, zc = compute_hocs(lc.time, lc.flux, 5)
-        objfeatures[nfrequencies+10] = psi
-        objfeatures[nfrequencies+11] = zc[0]
-        objfeatures[nfrequencies+12:] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
-        featout = np.vstack((featout,objfeatures))
-    return featout[1:,:]
+			objfeatures[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux,EBper)
+			objfeatures[nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
+			psi, zc = compute_hocs(lc.time, lc.flux, 5)
+			objfeatures[nfrequencies+10] = psi
+			objfeatures[nfrequencies+11] = zc[0]
+			objfeatures[nfrequencies+12:] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
+			featout = np.vstack((featout,objfeatures))
+			if savefeat is not None:
+				np.savetxt(featfile,objfeatures,delimiter=',')
+	return featout[1:,:]
 
 def prepLCs(lc,linflatten=False):
     """

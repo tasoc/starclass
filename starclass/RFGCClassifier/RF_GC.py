@@ -40,7 +40,7 @@ class RFGCClassifier(BaseClassifier):
 	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 	"""
 	def __init__(self, clfile='rfgc_classifier_v01.pickle', somfile='som.txt', 
-					featfile='rfgc_classifier_feat.txt',
+					featdir='features',
 					dimx=1, dimy=400, cardinality=64, n_estimators=1000, 
 					max_features=3, min_samples_split=2, *args, **kwargs):
 		"""
@@ -72,10 +72,12 @@ class RFGCClassifier(BaseClassifier):
 		else:
 			self.clfile = None
 
-		if featfile is not None:
-			self.featfile = os.path.join(self.data_dir, featfile)
+		if featdir is not None:
+			self.featdir = os.path.join(self.data_dir, featdir)
+			if not os.path.exists(featdir):
+			    os.makedirs(featdir)
 		else:
-			self.featfile = None
+			self.featdir = None
 			
 		if self.clfile is not None:
 			if os.path.exists(self.clfile):
@@ -132,7 +134,7 @@ class RFGCClassifier(BaseClassifier):
 		
 
 
-	def do_classify(self, features):
+	def do_classify(self, features, recalc=False):
 		"""
 		Classify a single lightcurve.
 		Assumes lightcurve time is in days
@@ -161,8 +163,9 @@ class RFGCClassifier(BaseClassifier):
 
 		# Assumes that if self.classifier.trained=True,
 		# ...then self.classifier.som is not None
+
 		logger.info("Calculating features...")
-		featarray = fc.featcalc_single(features, self.classifier.som)
+		featarray = fc.featcalc(features, self.classifier.som, savefeat=self.featdir, recalc=recalc)
 		logger.info("Features calculated.")
 
 		# Do the magic:
@@ -176,7 +179,7 @@ class RFGCClassifier(BaseClassifier):
 			result[key] = classprobs[c]		
 		return result
 
-	def train(self, features, labels, savecl=True, savefeat=True, overwrite=False):
+	def train(self, features, labels, savecl=True, recalc=False):
 		"""
 		Train the classifier.
 		Assumes lightcurve time is in days
@@ -197,36 +200,23 @@ class RFGCClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		# Check for pre-calculated features
-		precalc = False
-		if self.featfile is not None:
-			if os.path.exists(self.featfile):
-				logger.info('Loading features from pre-calculated file.')
-				featarray = np.genfromtxt(self.featfile)
-				precalc = True
 		
 		fitlabels = self.parse_labels(labels)
 		
-		if not precalc:
-			logger.info('No feature file given. Calculating.')
+		logger.info('Calculating features...')
 			
-			# Check for pre-calculated som
-			if self.classifier.som is None:
-				logger.info('No SOM loaded. Creating new SOM, saving to ''som.txt''.')
-				#make copy of features iterator
-				features1,features2 = itertools.tee(features,2)
-				self.classifier.som = fc.makeSOM(features1, outfile=os.path.join(self.data_dir, 'som.txt'), overwrite=overwrite)
-				logger.info('SOM created and saved.')
-				featarray = fc.featcalc_set(features2, self.classifier.som)
-			else:	
-				featarray = fc.featcalc_set(features, self.classifier.som)
-			
-			#save features
-			if savefeat:
-				if self.featfile is not None:
-					if not os.path.exists(self.featfile) or overwrite:
-						logger.info('Saving calculated features to rfgc_classifier_feat.txt')
-						np.savetxt(self.featfile,featarray)
-
+		# Check for pre-calculated som
+		if self.classifier.som is None:
+			logger.info('No SOM loaded. Creating new SOM, saving to ''som.txt''.')
+			#make copy of features iterator
+			features1,features2 = itertools.tee(features,2)
+			self.classifier.som = fc.makeSOM(features1, outfile=os.path.join(self.data_dir, 'som.txt'), overwrite=overwrite)
+			logger.info('SOM created and saved.')
+			featarray = fc.featcalc(features2, self.classifier.som, savefeat=self.featdir, recalc=recalc)
+		else:	
+			featarray = fc.featcalc(features, self.classifier.som, savefeat=self.featdir, recalc=recalc)
+		logger.info('Features calculated/loaded.')
+		
 		try:
 			self.classifier.oob_score = True
 			self.classifier.fit(featarray, fitlabels)

@@ -40,7 +40,7 @@ class RFGCClassifier(BaseClassifier):
 	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 	"""
 	def __init__(self, clfile='rfgc_classifier_v01.pickle', somfile='som.txt', 
-					featdir='features',
+					featdir='rfgc_features',
 					dimx=1, dimy=400, cardinality=64, n_estimators=1000, 
 					max_features=3, min_samples_split=2, *args, **kwargs):
 		"""
@@ -189,8 +189,6 @@ class RFGCClassifier(BaseClassifier):
 		Assumes featdict contains ['phase1'],['phase2'],['phase3']
 									(phases not phase differences)
 									
-		NEED TO MAKE SURE PRELOADED FEATURES ALIGN WITH LABELS..
-
 		Parameters:
 			labels (ndarray, [n_objects]): labels for training set lightcurves.
 			features (iterable of dict): features, inc lightcurves

@@ -18,7 +18,7 @@ from .. import StellarClasses, BaseClassifier
 # Point this to the directory where the TDA simulations are stored
 # URL: https://tasoc.dk/wg0/SimData
 # The directories "sysnoise", "noisy" and "clean" should exist in this directory
-INPUT_DIR = r'/Users/davidarmstrong/Data/TESS/WG0/TDA4/'
+INPUT_DIR = r'/Users/fingeza/Documents/tda_simulated_data/'
 
 #----------------------------------------------------------------------------------------------
 class tda_simulations(object):
@@ -101,9 +101,9 @@ class tda_simulations(object):
 				starid = int(starname[4:])
 
 
-				data_sysnoise = np.loadtxt(os.path.join(INPUT_DIR, 'sysnoise', 'Star%d.sysnoise' % starid))
+				#data_sysnoise = np.loadtxt(os.path.join(INPUT_DIR, 'sysnoise', 'Star%d.sysnoise' % starid))
 				#data_noisy = np.loadtxt(os.path.join(INPUT_DIR, 'noisy', 'Star%d.noisy' % starid))
-				#data_clean = np.loadtxt(os.path.join(INPUT_DIR, 'clean', 'Star%d.clean' % starid))
+				data_clean = np.loadtxt(os.path.join(INPUT_DIR, 'clean', 'Star%d.clean' % starid))
 
 				# Just because Mikkel can not be trusted:
 				#if star[2] == 1800:

@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import os.path
 import argparse
 import logging
-from starclass import TaskManager, RFGCClassifier, training_sets
+from starclass import TaskManager, RFGCClassifier, XGBClassifier, training_sets
 
 #----------------------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -53,8 +53,10 @@ if __name__ == '__main__':
 		'rfgc': RFGCClassifier,
 		#'slosh': SLOSHClassifier,
 		#'foptics': FOPTICSClassifier,
-		#'xgb': XGBClassifier
+		'xgb': XGBClassifier
 	}[current_classifier]
+	
+	print(classifier)
 
 	# Training:
 	# If we want to run the training, do the following:

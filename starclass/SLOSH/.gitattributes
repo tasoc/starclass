@@ -1,0 +1,7 @@
+sample_data/sample_psd/** filter=lfs diff=lfs merge=lfs -text
+sample_data/sample_image/** filter=lfs diff=lfs merge=lfs -text
+sample_models/classifier/LC/** filter=lfs diff=lfs merge=lfs -text
+sample_models/classifier/SC/** filter=lfs diff=lfs merge=lfs -text
+sample_models/regressor/LC/** filter=lfs diff=lfs merge=lfs -text
+sample_models/regressor/SC/** filter=lfs diff=lfs merge=lfs -text
+

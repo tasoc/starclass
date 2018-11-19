@@ -102,3 +102,7 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+starclass/data/L1/rfgc_classifier_v01\.pickle
+
+starclass/XGBClassifier/xgbClassifier_1\.py

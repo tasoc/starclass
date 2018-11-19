@@ -6,4 +6,5 @@ from .StellarClasses import StellarClasses
 from .BaseClassifier import BaseClassifier
 from .taskmanager import TaskManager
 from .RFGCClassifier import RFGCClassifier
+from .XGBClassifier import XGBClassifier
 from .utilities import PICKLE_DEFAULT_PROTOCOL

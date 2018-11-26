@@ -63,9 +63,9 @@ if __name__ == '__main__':
 		if args.train == 'tdasim':
 			tset = training_sets.tda_simulations(datalevel=args.datalevel)
 		elif args.train == 'keplerq9':
-			tset = training_sets.keplerq9()
+			tset = training_sets.keplerq9(datalevel=args.datalevel)
 		elif args.train == 'keplerq9-linfit':
-			raise NotImplementedError("Kepler Q9 data not implemented yet")
+			tset = training_sets.keplerq9linfit(datalevel=args.datalevel)
 
 		# Do the training:
 		with classifier(level=args.level, tset=args.train, features_cache=tset.features_cache) as stcl:

@@ -18,16 +18,17 @@ from tqdm import tqdm
 class TrainingSet(object):
 
 	def __init__(self, datalevel='corr'):
+	
 		self.datalevel = datalevel
 
-		#self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % datalevel)
+		self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)
 
-		#if not os.path.exists(self.features_cache):
-		#	os.makedirs(self.features_cache)
+		if not os.path.exists(self.features_cache):
+			os.makedirs(self.features_cache)
 
-		#sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
-		#if not os.path.exists(sqlite_file):
-		#	self.generate_todolist()
+		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
+		if not os.path.exists(sqlite_file):
+			self.generate_todolist()
 
 
 	def tset_datadir(self, tset, url):
@@ -71,6 +72,9 @@ class TrainingSet(object):
 					os.remove(zip_tmp)
 
 		return input_folder
+
+	def generate_todolist(self):
+		raise NotImplementedError()
 
 	def training_set_features(self):
 		raise NotImplementedError()

@@ -220,8 +220,8 @@ class BaseClassifier(object):
 		features['lightcurve'] = lightcurve
 
 		# Prepare lightcurve for power spectrum calculation:
+		# NOTE: Lightcurves are now in relative flux (ppm) with zero mean!
 		lc = lightcurve.remove_nans()
-
 		#lc = lc.remove_outliers(5.0, stdfunc=mad_std) # Sigma clipping
 
 		# Calculate power spectrum:

@@ -19,24 +19,17 @@ from . import TrainingSet
 #----------------------------------------------------------------------------------------------
 class keplerq9(TrainingSet):
 
-	def __init__(self, datalevel='corr'):
+	def __init__(self, *args, **kwargs):
 
-		if datalevel != 'corr':
+		if kwargs.get('datalevel') != 'corr':
 			raise Exception("The KeplerQ9 training set only as corrected data. Please specify datalevel='corr'.")
 
 		# Point this to the directory where the TDA simulations are stored
 		self.input_folder = self.tset_datadir('keplerq9', 'https://tasoc.dk/starclass_tsets/keplerq9.zip')
-		self.datalevel = datalevel
 
-		self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % datalevel)
-
-		if not os.path.exists(self.features_cache):
-			os.makedirs(self.features_cache)
-
-		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
-		if not os.path.exists(sqlite_file):
-			self.generate_todolist()
-
+		# Initialize parent
+		# NOTE: We do this after setting the input_folder, as it depends on that being set:
+		super(self.__class__, self).__init__(*args, **kwargs)
 
 	def generate_todolist(self):
 

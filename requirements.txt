@@ -6,3 +6,4 @@ scikit-learn
 Bottleneck
 enum-compat
 backports.tempfile
+requests

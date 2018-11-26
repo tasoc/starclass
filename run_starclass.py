@@ -62,11 +62,13 @@ if __name__ == '__main__':
 		# Pick the training set:
 		if args.train == 'tdasim':
 			tset = training_sets.tda_simulations(datalevel=args.datalevel)
-		elif args.train in ('keplerq9', 'keplerq9-linfit'):
+		elif args.train == 'keplerq9':
+			tset = training_sets.keplerq9()
+		elif args.train == 'keplerq9-linfit':
 			raise NotImplementedError("Kepler Q9 data not implemented yet")
 
 		# Do the training:
-		with classifier(level=args.level, features_cache=tset.features_cache) as stcl:
+		with classifier(level=args.level, tset=args.train, features_cache=tset.features_cache) as stcl:
 			labels = tset.training_set_labels(level=args.level)
 			features = tset.training_set_features()
 			stcl.train(features, labels)
@@ -128,3 +130,6 @@ if __name__ == '__main__':
 						'status': 1
 					})
 					tm.save_result(res)
+
+	else:
+		parser.error("Please either provide an input directory to run classification (input_folder) or specify --train.")

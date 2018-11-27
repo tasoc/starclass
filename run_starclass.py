@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import os.path
 import argparse
 import logging
-from starclass import TaskManager, RFGCClassifier, training_sets
+from starclass import TaskManager, training_sets, RFGCClassifier, SLOSHClassifier
 
 #----------------------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -51,7 +51,7 @@ if __name__ == '__main__':
 	current_classifier = args.classifier
 	classifier = {
 		'rfgc': RFGCClassifier,
-		#'slosh': SLOSHClassifier,
+		'slosh': SLOSHClassifier,
 		#'foptics': FOPTICSClassifier,
 		#'xgb': XGBClassifier
 	}[current_classifier]

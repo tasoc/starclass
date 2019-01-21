@@ -61,7 +61,10 @@ class RFGCClassifier(BaseClassifier):
 		super(self.__class__, self).__init__(*args, **kwargs)
 		
 		self.classifier = None
-		
+
+		if not os.path.exists(self.data_dir):
+			os.makedirs(self.data_dir)
+			    		
 		if somfile is not None:
 			self.somfile = os.path.join(self.data_dir, somfile)
 		else:
@@ -74,8 +77,8 @@ class RFGCClassifier(BaseClassifier):
 
 		if featdir is not None:
 			self.featdir = os.path.join(self.data_dir, featdir)
-			if not os.path.exists(featdir):
-			    os.makedirs(featdir)
+			if not os.path.exists(self.featdir):
+			    os.makedirs(self.featdir)
 		else:
 			self.featdir = None
 			
@@ -179,7 +182,7 @@ class RFGCClassifier(BaseClassifier):
 			result[key] = classprobs[c]		
 		return result
 
-	def train(self, features, labels, savecl=True, recalc=False):
+	def train(self, features, labels, savecl=True, recalc=False, overwrite=False):
 		"""
 		Train the classifier.
 		Assumes lightcurve time is in days
@@ -192,6 +195,9 @@ class RFGCClassifier(BaseClassifier):
 		Parameters:
 			labels (ndarray, [n_objects]): labels for training set lightcurves.
 			features (iterable of dict): features, inc lightcurves
+			savecl - save classifier? (overwrite or recalc must be true for an old classifier to be overwritten)
+			overwrite reruns SOM
+			recalc recalculates features
 	
 		"""
 		# Start a logger that should be used to output e.g. debug information:
@@ -210,8 +216,10 @@ class RFGCClassifier(BaseClassifier):
 			features1,features2 = itertools.tee(features,2)
 			self.classifier.som = fc.makeSOM(features1, outfile=os.path.join(self.data_dir, 'som.txt'), overwrite=overwrite)
 			logger.info('SOM created and saved.')
+			logger.info('Calculating/Loading Features.')
 			featarray = fc.featcalc(features2, self.classifier.som, savefeat=self.featdir, recalc=recalc)
 		else:	
+			logger.info('Calculating/Loading Features.')
 			featarray = fc.featcalc(features, self.classifier.som, savefeat=self.featdir, recalc=recalc)
 		logger.info('Features calculated/loaded.')
 		
@@ -226,7 +234,7 @@ class RFGCClassifier(BaseClassifier):
 
 		if savecl and self.classifier.trained:
 			if self.clfile is not None:
-				if not os.path.exists(self.clfile) or overwrite:
+				if not os.path.exists(self.clfile) or overwrite or recalc:
 					logger.info('Saving pickled classifier instance to rfgc_classifier_v01.pickle')
 					logger.info('Saving SOM to som.txt (will overwrite)')
 					self.save(self.clfile,self.somfile)

@@ -26,9 +26,9 @@ def featcalc(features, som,
 	for obj in features:   
 		precalc = False
 		if savefeat is not None:
-			featfile = os.path.join(savefeat,str(obj['id'])+'.txt')
+			featfile = os.path.join(savefeat,str(obj['priority'])+'.txt')
 			if os.path.exists(featfile) and not recalc:
-				logger.info(str(obj['id'])+": Loading precalculated features...")
+				logger.info(str(obj['priority'])+": Loading precalculated features...")
 				objfeatures = np.loadtxt(featfile,delimiter=',')
 				precalc = True
 		
@@ -50,24 +50,31 @@ def featcalc(features, som,
 			objfeatures[nfrequencies+10] = psi
 			objfeatures[nfrequencies+11] = zc[0]
 			objfeatures[nfrequencies+12:] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
-			featout = np.vstack((featout,objfeatures))
 			if savefeat is not None:
 				np.savetxt(featfile,objfeatures,delimiter=',')
+		featout = np.vstack((featout,objfeatures))
 	return featout[1:,:]
 
 def prepLCs(lc,linflatten=False):
     """
-    Nancut and normalises lightcurve. Optionally removes linear trend.
+    Nancut lightcurve, converts from ppm to relative flux and centres around 1. 
+    Optionally removes linear trend.
+    Assumes LCs come in in normalised ppm with median zero.
     """
     nancut = (lc.flux==0) | np.isnan(lc.flux)
-    norm = np.median(lc.flux[~nancut])
-    lc.flux /= norm
-    lc.flux_err /= norm
+    
+    #norm = np.median(lc.flux[~nancut])
+    #lc.flux /= norm
+    #lc.flux_err /= norm
         
     lc.time = lc.time[~nancut]
     lc.flux = lc.flux[~nancut]
     lc.flux_err = lc.flux_err[~nancut]
-        
+    
+    lc.flux *= 1e-6
+    lc.flux_err *= 1e-6
+    lc.flux += 1
+    
     if linflatten:
         lc.flux = lc.flux - np.polyval(np.polyfit(lc.time,lc.flux,1),lc.time) + 1
             

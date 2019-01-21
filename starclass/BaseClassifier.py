@@ -56,6 +56,8 @@ class BaseClassifier(object):
 		self.features_cache = features_cache
 		self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level, tset))
 		logger.debug("Data Directory: %s", self.data_dir)
+		if not os.path.exists(self.data_dir):
+			os.makedirs(self.data_dir)
 
 		if self.features_cache is not None and not os.path.exists(self.features_cache):
 			raise ValueError("features_cache directory does not exists")

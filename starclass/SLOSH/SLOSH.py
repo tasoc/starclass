@@ -102,6 +102,19 @@ class SLOSHClassifier(BaseClassifier):
 
 		result = {StellarClasses.SOLARLIKE: pred}
 
+		# Remaining probability
+		remainder = (1. - pred) / 9.
+		remaining_classes = [StellarClasses.RRLYR_CEPHEID,
+							 StellarClasses.ECLIPSE,
+							 StellarClasses.DSCT_BCEP,
+							 StellarClasses.GDOR_SPB,
+							 StellarClasses.TRANSIENT,
+							 StellarClasses.CONTACT_ROT,
+							 StellarClasses.APERIODIC,
+							 StellarClasses.CONSTANT,
+							 StellarClasses.RAPID]
+		for i in remaining_classes:
+			results[i] = remainder
 		return result
 
 	def train(self, features, labels):

@@ -110,7 +110,7 @@ if __name__ == '__main__':
 
 					print(features)
 					lc = features['lightcurve']
-					lc.properties()
+					lc.show_properties()
 
 					plt.close('all')
 					lc.plot()

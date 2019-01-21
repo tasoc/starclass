@@ -6,3 +6,7 @@ scikit-learn
 Bottleneck
 enum-compat
 backports.tempfile
+requests
+keras
+tensorflow
+Pillow

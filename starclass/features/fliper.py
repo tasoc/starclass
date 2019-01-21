@@ -13,15 +13,15 @@ from 0.2 ,0.7, 7, 20 and 50 muHz.
 from __future__ import division, print_function, with_statement, absolute_import
 import numpy as np
 
-def _APODIZATION(star_tab_psd):
-	"""
-	Function that corrects the spectra from apodization
-	"""
-	freq = star_tab_psd[0]
-	nq = np.max(freq)
-	nu = np.sinc(2.*freq/nq)
-	star_tab_psd[1] /= nu**2
-	return star_tab_psd
+# def _APODIZATION(star_tab_psd):
+# 	"""
+# 	Function that corrects the spectra from apodization
+# 	"""
+# 	freq = star_tab_psd[0]
+# 	nq = np.max(freq)
+# 	nu = np.sinc(2.*freq/nq)
+# 	star_tab_psd[1] /= nu**2
+# 	return star_tab_psd
 
 def _region(star_tab_psd, inic, end):
 	"""
@@ -50,7 +50,7 @@ def FliPer(psd):
 	end = 277 # muHz
 
 	# Function that computes photon noise from last 100 bins of the spectra
-	noise = np.mean(star_tab_psd[1][-100:])
+	noise = np.median(star_tab_psd[1][-100:])/((1-2./18.)**3)
 
 	return {
 		'Fp07': _region(star_tab_psd, 0.7, end) - noise,

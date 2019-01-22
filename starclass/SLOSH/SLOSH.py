@@ -114,7 +114,7 @@ class SLOSHClassifier(BaseClassifier):
 							 StellarClasses.CONSTANT,
 							 StellarClasses.RAPID]
 		for i in remaining_classes:
-			results[i] = remainder
+			result[i] = remainder
 		return result
 
 	def train(self, features, labels):

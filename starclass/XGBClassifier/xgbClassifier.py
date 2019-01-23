@@ -50,7 +50,7 @@ class XGBClassifier(BaseClassifier):
 	.. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
 
     """
-    def __init__(self,classifier_file='xgb_classifier_1.pickle',
+    def __init__(self,clfile='xgb_classifier_1.pickle',
                  features_file="feets_features.csv",n_estimators=750,
                  max_depth=13,learning_rate = 0.1,reg_alpha=1e-5,
                  objective ='multi:softmax',
@@ -61,7 +61,7 @@ class XGBClassifier(BaseClassifier):
 		Initialize the classifier object with optimised parameters.
 
 		Parameters:
-			classifier_file (str): svaed classifier file.
+			clfile (str): svaed classifier file.
 			#xgbclassifier_features (str):	Features
 			n_estimators (int): number of boosted trees in the ensemble
 			max_depth (int): maximum depth of each tree in the ensemble
@@ -79,8 +79,8 @@ class XGBClassifier(BaseClassifier):
         self.classifier = None
         #self.trained = False
 
-        if classifier_file is not None:
-            self.classifier_file = os.path.join(self.data_dir,classifier_file)
+        if clfile is not None:
+            self.classifier_file = os.path.join(self.data_dir,clfile)
         else:
             self.classifier_file = None
 
@@ -144,7 +144,7 @@ class XGBClassifier(BaseClassifier):
 
         self.classifier = utilities.loadPickle(infile)
 
-    def do_classify(self, lightcurve, features):
+    def do_classify(self, features):
 
         """
 
@@ -237,7 +237,7 @@ class XGBClassifier(BaseClassifier):
         if savecl and self.classifier.trained:
             if self.classifier_file is not None:
                 if not os.path.exists(self.classifier_file) or overwrite:
-                    logger.info('Saving pickled xgb classifier to xgb_classifier_1.pickle')
+                    logger.info('Saving pickled xgb classifier to '+self.classifier_file)
                     self.save(self.classifier_file)
                     #self.save_model(self.classifier_file)
 

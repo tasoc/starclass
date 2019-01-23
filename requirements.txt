@@ -10,3 +10,5 @@ requests
 keras
 tensorflow
 Pillow
+xgboost
+feets

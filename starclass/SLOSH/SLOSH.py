@@ -24,7 +24,7 @@ class SLOSHClassifier(BaseClassifier):
 	.. codeauthor::  Marc Hon <mtyh555@uowmail.edu.au>
 	"""
 
-	def __init__(self, saved_models=None, mc_iterations=10, *args, **kwargs):
+	def __init__(self, model_file='SLOSH_Classifier_Model.h5', mc_iterations=10, *args, **kwargs):
 		'''
 		Initialization for the class.
 
@@ -37,19 +37,24 @@ class SLOSHClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		self.classifier_list = []
+		#self.classifier = None
 		self.mc_iterations = mc_iterations
 
-		if saved_models is not None:
-			if not isinstance(saved_models, list):
-				raise ValueError('Saved model input is not in the form of a list!')
-
-			self.predictable = True
-			K.set_learning_phase(1)
-			for model in saved_models:
-				if os.path.exists(os.path.join(self.data_dir, model)):
-					self.classifier_list.append(load_model(os.path.join(self.data_dir, model)))
+		# Find model file
+		if model_file is not None:
+			self.model_file = os.path.join(self.data_dir, model_file)
 		else:
-			logger.warning('No saved models provided. Predict functions are disabled.')
+			self.model_file = None
+
+		if self.model_file is not None:
+			if os.path.exists(self.model_file):
+				# load pre-trained classifier
+				self.predictable = True
+				K.set_learning_phase(1)
+				if os.path.exists(os.path.join(self.data_dir, model)):
+					self.classifier_list.append(load_model(self.model_file))
+		else:
+			logger.info('No saved models provided. Predict functions are disabled.')
 			self.predictable = False
 
 	def do_classify(self, features):

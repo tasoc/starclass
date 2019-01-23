@@ -9,6 +9,7 @@ import logging
 #import os.path
 import os
 import copy
+import json
 import numpy as np
 import pandas as pd
 from xgboost import XGBClassifier as xgb
@@ -92,6 +93,7 @@ class XGBClassifier(BaseClassifier):
             self.features_file = os.path.join(self.data_dir, features_file)
         else:
             self.features_file = None
+
 
         if self.classifier is None:
             self.classifier = Classifier_obj(#base_score=base_score,
@@ -186,7 +188,8 @@ class XGBClassifier(BaseClassifier):
 
         return class_results
 
-    def train(self, features, labels, savecl=True, savefeat=True,overwrite=False):
+    def train(self, features, labels, savecl=True,
+              savefeat=True,overwrite=False, feat_import=True):
 
         """
 
@@ -219,7 +222,14 @@ class XGBClassifier(BaseClassifier):
                         feature_results.to_csv(self.features_file, index=False)
         try:
             logger.info('Training ...')
-            self.classifier.fit(feature_results, fit_labels)
+            model = self.classifier.fit(feature_results, fit_labels)
+            if feat_import == True:
+                importances = model.feature_importances_.astype(float)
+                feature_importances = zip(list(feature_results),
+                                          importances)
+                with open('xgbClassifier_feat_import.json', 'w') as outfile:
+                    json.dump(list(feature_importances), outfile)
+
             self.classifier.trained = True
         except:
             logger.exception('Training error ...')

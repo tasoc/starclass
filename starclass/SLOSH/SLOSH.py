@@ -48,11 +48,11 @@ class SLOSHClassifier(BaseClassifier):
 
 		if self.model_file is not None:
 			if os.path.exists(self.model_file):
+				logger.info("Loading pre-trained model...")
 				# load pre-trained classifier
 				self.predictable = True
 				K.set_learning_phase(1)
-				if os.path.exists(os.path.join(self.data_dir, model)):
-					self.classifier_list.append(load_model(self.model_file))
+				self.classifier_list.append(load_model(self.model_file))
 		else:
 			logger.info('No saved models provided. Predict functions are disabled.')
 			self.predictable = False
@@ -142,19 +142,21 @@ class SLOSHClassifier(BaseClassifier):
 		if not os.path.exists(train_folder):
 			os.makedirs(train_folder)
 
-		logger.info('Generating Train Images...')
-		for feat, lbl in zip(features, labels):
-			# Power density spectrum from pre-calculated features:
-			psd = feat['powerspectrum'].standard
+			logger.info('Generating Train Images...')
+			for feat, lbl in zip(features, labels):
+				# Power density spectrum from pre-calculated features:
+				psd = feat['powerspectrum'].standard
 
-			# Convert classifications to integer labels:
-			print(lbl)
-			label = 1 if StellarClasses.SOLARLIKE in lbl else 0
-			print(label)
+				# Convert classifications to integer labels:
+				print(lbl)
+				label = 1 if StellarClasses.SOLARLIKE in lbl else 0
+				print(label)
 
-			preprocessing.generate_single_image(psd[0], psd[1],
-												feat['priority'],
-												output_path=train_folder, label=label, numax=None)
+				preprocessing.generate_single_image(psd[0], psd[1],
+													feat['priority'],
+													output_path=train_folder, label=label, numax=None)
+		else:
+			logger.info('Train Images exists...')
 
 		reduce_lr = ReduceLROnPlateau(factor=0.5, patience=10, verbose=1)
 		model = preprocessing.default_classifier_model()

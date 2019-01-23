@@ -13,6 +13,7 @@ from bottleneck import nanmedian, nansum
 import sqlite3
 import logging
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 from .. import StellarClasses, BaseClassifier
 from . import TrainingSet
 

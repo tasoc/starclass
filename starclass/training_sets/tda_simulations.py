@@ -27,6 +27,13 @@ class tda_simulations(TrainingSet):
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
 		super(self.__class__, self).__init__(*args, **kwargs)
 
+		# Generate training/test indices
+		if self.testfraction > 0:
+			data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
+			nobjects = data.shape[0]
+			self.train_idx, self.test_idx = train_test_split(np.arange(nobjects), test_size=self.testfraction, random_state=42, stratify=data[:,1])
+
+
 	def generate_todolist(self):
 
 		logger = logging.getLogger(__name__)
@@ -226,7 +233,7 @@ class tda_simulations(TrainingSet):
 			cursor = conn.cursor()
 
 			with BaseClassifier(features_cache=os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)) as stcl:
-				for row in data:
+				for rowidx,row in enumerate(data):
 					starid = int(row[0][4:])
 
 					# Get task info from database:
@@ -241,7 +248,11 @@ class tda_simulations(TrainingSet):
 					elif self.datalevel == 'corr':
 						fname = os.path.join(self.input_folder, 'noisy', 'Star%d.noisy' % starid) # # These are the lightcurves WITHOUT SYSTEMATIC NOISE
 
-					yield stcl.load_star(task, fname)
+					if self.testfraction > 0:
+						if rowidx in self.train_idx:
+							yield stcl.load_star(task, fname)
+					else:
+						yield stcl.load_star(task, fname)
 
 	#----------------------------------------------------------------------------------------------
 	def training_set_labels(self, level='L1'):
@@ -319,7 +330,7 @@ class tda_simulations(TrainingSet):
 
 		# Create list of all the classes for each star:
 		lookup = []
-		for row in data:
+		for rowidx,row in enumerate(data):
 			#starid = int(row[0][4:])
 			labels = row[1].strip().split(';')
 			lbls = []
@@ -346,6 +357,153 @@ class tda_simulations(TrainingSet):
 					else:
 						lbls.append(c)
 
-			lookup.append(tuple(set(lbls)))
+			if self.testfraction > 0:
+				if rowidx in self.train_idx:
+					lookup.append(tuple(set(lbls)))
+			else:
+				lookup.append(tuple(set(lbls)))
+
+		return tuple(lookup)
+		
+	#----------------------------------------------------------------------------------------------
+	def training_set_features_test(self):
+		
+		if self.testfraction == 0:
+			raise ValueError('training_set_features_test requires testfraction>0')
+		else:
+			todo_file = os.path.join(self.input_folder, 'todo.sqlite')
+			data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
+
+			with sqlite3.connect(todo_file) as conn:
+				conn.row_factory = sqlite3.Row
+				cursor = conn.cursor()
+
+				with BaseClassifier(features_cache=os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)) as stcl:
+					for rowidx,row in enumerate(data):
+						starid = int(row[0][4:])
+
+						# Get task info from database:
+						cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE todolist.starid=?;", (starid, ))
+						task = dict(cursor.fetchone())
+
+						# Lightcurve file to load:
+						# We do not use the one from the database because in the simulations the
+						# raw and corrected light curves are stored in different files.
+						if self.datalevel == 'raw':
+							fname = os.path.join(self.input_folder, 'sysnoise', 'Star%d.sysnoise' % starid) # # These are the lightcurves INCLUDING SYSTEMATIC NOISE
+						elif self.datalevel == 'corr':
+							fname = os.path.join(self.input_folder, 'noisy', 'Star%d.noisy' % starid) # # These are the lightcurves WITHOUT SYSTEMATIC NOISE
+
+						if rowidx in self.train_idx:
+							yield stcl.load_star(task, fname)
+
+	#----------------------------------------------------------------------------------------------
+	def training_set_labels_test(self, level='L1'):
+
+		logger = logging.getLogger(__name__)
+
+		if self.testfraction == 0:
+			return []
+		else:
+			data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
+
+			# Translation of Mikkel's identifiers into the broader
+			# classes we have defined in StellarClasses:
+			if level == 'L1':
+				translate = {
+					'Solar-like': StellarClasses.SOLARLIKE,
+					'Transit': StellarClasses.ECLIPSE,
+					'Eclipse': StellarClasses.ECLIPSE, #short period EBs should be CONTACT_ROT, not ECLIPSE
+					'multi': StellarClasses.ECLIPSE,
+					'MMR': StellarClasses.ECLIPSE,
+					'RR Lyrae': StellarClasses.RRLYR_CEPHEID,
+					'RRab': StellarClasses.RRLYR_CEPHEID,
+					'RRc': StellarClasses.RRLYR_CEPHEID,
+					'RRd':  StellarClasses.RRLYR_CEPHEID,
+					'Cepheid': StellarClasses.RRLYR_CEPHEID,
+					'FM': StellarClasses.RRLYR_CEPHEID,
+					'1O': StellarClasses.RRLYR_CEPHEID,
+					'1O2O': StellarClasses.RRLYR_CEPHEID,
+					'FM1O': StellarClasses.RRLYR_CEPHEID,
+					'Type II': StellarClasses.RRLYR_CEPHEID,
+					'Anomaleous': StellarClasses.RRLYR_CEPHEID,
+					'SPB': StellarClasses.GDOR_SPB,
+					'dsct': StellarClasses.DSCT_BCEP,
+					'bumpy': StellarClasses.GDOR_SPB,
+					'gDor': StellarClasses.GDOR_SPB,
+					'bCep': StellarClasses.DSCT_BCEP,
+					'roAp': StellarClasses.RAPID,
+					'sdBV': StellarClasses.RAPID,
+					'Flare': StellarClasses.TRANSIENT,
+					'Spots': StellarClasses.CONTACT_ROT,
+					'LPV': StellarClasses.APERIODIC,
+					'MIRA': StellarClasses.APERIODIC,
+					'SR': StellarClasses.APERIODIC,
+					'Constant': StellarClasses.CONSTANT
+				}
+			elif level == 'L2':
+				translate = {
+					'Solar-like': StellarClasses.SOLARLIKE,
+					'Transit': StellarClasses.ECLIPSE,
+					'Eclipse': StellarClasses.ECLIPSE,
+					'multi': StellarClasses.ECLIPSE,
+					'MMR': StellarClasses.ECLIPSE,
+					'RR Lyrae': StellarClasses.RRLYR,
+					'RRab': StellarClasses.RRLYR,
+					'RRc': StellarClasses.RRLYR,
+					'RRd':  StellarClasses.RRLYR,
+					'Cepheid': StellarClasses.CEPHEID,
+					'FM': StellarClasses.CEPHEID,
+					'1O': StellarClasses.CEPHEID,
+					'1O2O': StellarClasses.CEPHEID,
+					'FM1O': StellarClasses.CEPHEID,
+					'Type II': StellarClasses.CEPHEID,
+					'Anomaleous': StellarClasses.CEPHEID,
+					'SPB': StellarClasses.SPB,
+					'dsct': StellarClasses.DSCT,
+					'bumpy': StellarClasses.DSCT, # This is not right - Should we make a specific class for these?
+					'gDor': StellarClasses.GDOR,
+					'bCep': StellarClasses.BCEP,
+					'roAp': StellarClasses.ROAP,
+					'sdBV': StellarClasses.SDB,
+					'Flare': StellarClasses.TRANSIENT,
+					'Spots': StellarClasses.SPOTS,
+					'LPV': StellarClasses.LPV,
+					'MIRA': StellarClasses.LPV,
+					'SR': StellarClasses.LPV,
+					'Constant': StellarClasses.CONSTANT
+				}
+
+			# Create list of all the classes for each star:
+			lookup = []
+			for rowidx,row in enumerate(data):
+				#starid = int(row[0][4:])
+				labels = row[1].strip().split(';')
+				lbls = []
+				for lbl in labels:
+					lbl = lbl.strip()
+					if lbl == 'gDor+dSct hybrid' or lbl == 'dSct+gDor hybrid':
+						if level == 'L1':
+							lbls.append(StellarClasses.DSCT_BCEP)
+							lbls.append(StellarClasses.GDOR_SPB)
+						elif level == 'L2':
+							lbls.append(StellarClasses.DSCT)
+							lbls.append(StellarClasses.GDOR)
+					elif lbl == 'bCep+SPB hybrid':
+						if level == 'L1':
+							lbls.append(StellarClasses.DSCT_BCEP)
+							lbls.append(StellarClasses.GDOR_SPB)
+						elif level == 'L2':
+							lbls.append(StellarClasses.BCEP)
+							lbls.append(StellarClasses.SPB)
+					else:
+						c = translate.get(lbl.strip())
+						if c is None:
+							logger.error("Unknown label: %s", lbl)
+						else:
+							lbls.append(c)
+
+				if rowidx in self.train_idx:
+					lookup.append(tuple(set(lbls)))
 
 		return tuple(lookup)

@@ -172,7 +172,7 @@ class RFGCClassifier(BaseClassifier):
 		logger.info("Features calculated.")
 
 		# Do the magic:
-		logger.info("We are starting the magic...")
+		#logger.info("We are starting the magic...")
 		classprobs = self.classifier.predict_proba(featarray)[0]
 		logger.info("Classification complete")
 		

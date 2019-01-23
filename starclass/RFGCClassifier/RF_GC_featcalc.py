@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def featcalc(features, som, 
 					providednfreqs=6, nfrequencies=6, forbiddenfreqs=[13.49/4.],
-					cardinality=64, linflatten=True, savefeat=None, recalc=False):
+					cardinality=64, linflatten=False, savefeat=None, recalc=False):
 	"""
 	Calculates features for set of lightcurves
 	"""
@@ -28,7 +28,7 @@ def featcalc(features, som,
 		if savefeat is not None:
 			featfile = os.path.join(savefeat,str(obj['priority'])+'.txt')
 			if os.path.exists(featfile) and not recalc:
-				logger.info(str(obj['priority'])+": Loading precalculated features...")
+				#logger.info(str(obj['priority'])+": Loading precalculated features...")
 				objfeatures = np.loadtxt(featfile,delimiter=',')
 				precalc = True
 		

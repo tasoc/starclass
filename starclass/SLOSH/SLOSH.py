@@ -24,7 +24,7 @@ class SLOSHClassifier(BaseClassifier):
 	.. codeauthor::  Marc Hon <mtyh555@uowmail.edu.au>
 	"""
 
-	def __init__(self, model_file='SLOSH_Classifier_Model.h5', mc_iterations=10, *args, **kwargs):
+	def __init__(self, clfile='SLOSH_Classifier_Model.h5', mc_iterations=10, *args, **kwargs):
 		'''
 		Initialization for the class.
 
@@ -41,8 +41,8 @@ class SLOSHClassifier(BaseClassifier):
 		self.mc_iterations = mc_iterations
 
 		# Find model file
-		if model_file is not None:
-			self.model_file = os.path.join(self.data_dir, model_file)
+		if clfile is not None:
+			self.model_file = os.path.join(self.data_dir, clfile)
 		else:
 			self.model_file = None
 
@@ -51,8 +51,7 @@ class SLOSHClassifier(BaseClassifier):
 				# load pre-trained classifier
 				self.predictable = True
 				K.set_learning_phase(1)
-				if os.path.exists(os.path.join(self.data_dir, model)):
-					self.classifier_list.append(load_model(self.model_file))
+				self.classifier_list.append(load_model(self.model_file))
 		else:
 			logger.info('No saved models provided. Predict functions are disabled.')
 			self.predictable = False

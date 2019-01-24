@@ -13,7 +13,7 @@ import argparse
 import logging
 import numpy as np
 from sklearn.metrics import accuracy_score, confusion_matrix
-from starclass import TaskManager, training_sets, RFGCClassifier, XGBClassifier, SLOSHClassifier
+from starclass import TaskManager, training_sets, RFGCClassifier, XGBClassifier#, SLOSHClassifier
 
 #----------------------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -58,7 +58,7 @@ if __name__ == '__main__':
 	current_classifier = args.classifier
 	classifier = {
 		'rfgc': RFGCClassifier,
-		'slosh': SLOSHClassifier,
+		#'slosh': SLOSHClassifier,
 		#'foptics': FOPTICSClassifier,
 		'xgb': XGBClassifier
 	}[current_classifier]
@@ -108,7 +108,8 @@ if __name__ == '__main__':
 				acc = accuracy_score(labels_test, y_pred)
 				logger.info('Accuracy: ',acc)
 				cf = confusion_matrix(labels_test, y_pred) #labels probably not in right format
-				logger.info('CF Matrix:',cf)
+				logger.info('CF Matrix:')
+				logger.info(cf)
 			
 	elif args.input_folder is not None:
 

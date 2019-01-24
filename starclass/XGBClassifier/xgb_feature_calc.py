@@ -50,7 +50,7 @@ def lc_norm(lc, linflatten = False):
         lc.flux = lc.flux - np.polyval(np.polyfit(lc.time,lc.flux ,1),lc.time) + 1
     return lc
 
-def feature_extract(features, linflatten=True):
+def feature_extract(features, linflatten=False):
     Features_all = pd.DataFrame()
     if not isinstance(features, types.GeneratorType):
         features = [features]

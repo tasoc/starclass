@@ -25,11 +25,11 @@ class Classifier_obj(RandomForestClassifier):
 	"""
 	Wrapper for sklearn RandomForestClassifier with attached SOM.
 	"""
-	def __init__(self, n_estimators=1000, max_features=3, min_samples_split=2):
+	def __init__(self, n_estimators=1000, max_features=4, min_samples_split=2):
 		super(self.__class__, self).__init__(n_estimators=n_estimators,
 										max_features=max_features,
 										min_samples_split=min_samples_split,
-										class_weight='balanced')
+										class_weight='balanced',max_depth=15)
 		self.trained = False
 		self.som = None
 
@@ -42,7 +42,7 @@ class RFGCClassifier(BaseClassifier):
 	def __init__(self, clfile='rfgc_classifier_v01.pickle', somfile='som.txt', 
 					featdir='rfgc_features',
 					dimx=1, dimy=400, cardinality=64, n_estimators=1000, 
-					max_features=3, min_samples_split=2, *args, **kwargs):
+					max_features=4, min_samples_split=2, *args, **kwargs):
 		"""
 		Initialize the classifier object.
 
@@ -169,10 +169,10 @@ class RFGCClassifier(BaseClassifier):
 
 		logger.info("Calculating features...")
 		featarray = fc.featcalc(features, self.classifier.som, savefeat=self.featdir, recalc=recalc)
-		logger.info("Features calculated.")
+		#logger.info("Features calculated.")
 
 		# Do the magic:
-		logger.info("We are starting the magic...")
+		#logger.info("We are starting the magic...")
 		classprobs = self.classifier.predict_proba(featarray)[0]
 		logger.info("Classification complete")
 		
@@ -227,6 +227,7 @@ class RFGCClassifier(BaseClassifier):
 			self.classifier.oob_score = True
 			self.classifier.fit(featarray, fitlabels)
 			logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
+			#logger.info([estimator.tree_.max_depth for estimator in self.classifier.estimators_])
 			self.classifier.oob_score = False
 			self.classifier.trained = True
 		except:

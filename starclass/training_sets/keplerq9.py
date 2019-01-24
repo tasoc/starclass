@@ -13,6 +13,7 @@ from bottleneck import nanmedian, nansum
 import sqlite3
 import logging
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 from .. import StellarClasses, BaseClassifier
 from . import TrainingSet
 
@@ -30,6 +31,12 @@ class keplerq9(TrainingSet):
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
 		super(self.__class__, self).__init__(*args, **kwargs)
+		
+		# Generate training/test indices
+		if self.testfraction > 0:
+			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
+			nobjects = data.shape[0]
+			self.train_idx, self.test_idx = train_test_split(np.arange(nobjects), test_size=self.testfraction, random_state=42, stratify=data[:,1])
 
 	def generate_todolist(self):
 
@@ -238,7 +245,7 @@ class keplerq9(TrainingSet):
 			cursor = conn.cursor()
 
 			with BaseClassifier(features_cache=os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)) as stcl:
-				for row in data:
+				for rowidx,row in enumerate(data):
 					starname = row[0]
 					starclass = row[1]
 
@@ -252,8 +259,12 @@ class keplerq9(TrainingSet):
 					# We do not use the one from the database because in the simulations the
 					# raw and corrected light curves are stored in different files.
 					fname = os.path.join(self.input_folder, path)
-
-					yield stcl.load_star(task, fname)
+					
+					if self.testfraction > 0:
+						if rowidx in self.train_idx:
+							yield stcl.load_star(task, fname)
+					else:
+						yield stcl.load_star(task, fname)
 
 	#----------------------------------------------------------------------------------------------
 	def training_set_labels(self, level='L1'):
@@ -276,7 +287,7 @@ class keplerq9(TrainingSet):
 
 		# Create list of all the classes for each star:
 		lookup = []
-		for row in data:
+		for rowidx,row in enumerate(data):
 			#starid = int(row[0][4:])
 			labels = row[1].strip().split(';')
 			lbls = []
@@ -288,6 +299,84 @@ class keplerq9(TrainingSet):
 				else:
 					lbls.append(c)
 
-			lookup.append(tuple(set(lbls)))
+			if self.testfraction > 0:
+				if rowidx in self.train_idx:
+					lookup.append(tuple(set(lbls)))
+			else:
+				lookup.append(tuple(set(lbls)))
 
 		return tuple(lookup)
+
+	#----------------------------------------------------------------------------------------------
+	def training_set_features_test(self):
+
+		if self.testfraction == 0:
+			raise ValueError('training_set_features_test requires testfraction>0')
+		else:
+			todo_file = os.path.join(self.input_folder, 'todo.sqlite')
+			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
+
+			with sqlite3.connect(todo_file) as conn:
+				conn.row_factory = sqlite3.Row
+				cursor = conn.cursor()
+
+				with BaseClassifier(features_cache=os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)) as stcl:
+					for rowidx,row in enumerate(data):
+						starname = row[0]
+						starclass = row[1]
+
+						path = starclass + '/' + starname + '.txt'
+
+						# Get task info from database:
+						cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE diagnostics.lightcurve=?;", (path, ))
+						task = dict(cursor.fetchone())
+
+						# Lightcurve file to load:
+						# We do not use the one from the database because in the simulations the
+						# raw and corrected light curves are stored in different files.
+						fname = os.path.join(self.input_folder, path)
+					
+						if rowidx in self.test_idx:
+							yield stcl.load_star(task, fname)
+
+
+	#----------------------------------------------------------------------------------------------
+	def training_set_labels_test(self, level='L1'):
+
+		logger = logging.getLogger(__name__)
+
+		if self.testfraction == 0:
+			return []
+		else:
+			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
+
+			# Translation of Mikkel's identifiers into the broader:
+			translate = {
+				'SOLARLIKE': StellarClasses.SOLARLIKE,
+				'ECLIPSE': StellarClasses.ECLIPSE,
+				'RRLYR_CEPHEID': StellarClasses.RRLYR_CEPHEID,
+				'GDOR_SPB': StellarClasses.GDOR_SPB,
+				'DSCT_BCEP': StellarClasses.DSCT_BCEP,
+				'CONTACT_ROT': StellarClasses.CONTACT_ROT,
+				'APERIODIC': StellarClasses.APERIODIC,
+				'CONSTANT': StellarClasses.CONSTANT
+			}
+
+			# Create list of all the classes for each star:
+			lookup = []
+			for rowidx,row in enumerate(data):
+				#starid = int(row[0][4:])
+				labels = row[1].strip().split(';')
+				lbls = []
+				for lbl in labels:
+					lbl = lbl.strip()
+					c = translate.get(lbl.strip())
+					if c is None:
+						logger.error("Unknown label: %s", lbl)
+					else:
+						lbls.append(c)
+
+				if rowidx in self.test_idx:
+					lookup.append(tuple(set(lbls)))
+
+			return tuple(lookup)

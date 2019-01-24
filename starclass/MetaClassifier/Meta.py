@@ -25,9 +25,8 @@ class Classifier_obj(RandomForestClassifier):
     """
     Wrapper for sklearn RandomForestClassifier
     """
-	def __init__(self, n_estimators=1000, max_features=3, min_samples_split=2):
+	def __init__(self, n_estimators=1000, min_samples_split=2):
 		super(self.__class__, self).__init__(n_estimators=n_estimators,
-										max_features=max_features,
 										min_samples_split=min_samples_split,
 										class_weight='balanced')
 		self.trained = False

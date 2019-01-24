@@ -108,7 +108,8 @@ if __name__ == '__main__':
 				acc = accuracy_score(labels_test, y_pred)
 				logger.info('Accuracy: ',acc)
 				cf = confusion_matrix(labels_test, y_pred) #labels probably not in right format
-				logger.info('CF Matrix:',cf)
+				logger.info('CF Matrix:')
+				logger.info(cf)
 			
 	elif args.input_folder is not None:
 

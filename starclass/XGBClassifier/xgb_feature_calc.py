@@ -50,87 +50,101 @@ def lc_norm(lc, linflatten = False):
         lc.flux = lc.flux - np.polyval(np.polyfit(lc.time,lc.flux ,1),lc.time) + 1
     return lc
 
-def feature_extract(features, linflatten=False):
-    Features_all = pd.DataFrame()
+def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
+    featout = pd.DataFrame()
     if not isinstance(features, types.GeneratorType):
         features = [features]
     for idx, obj in tqdm(enumerate(features)):
-        #logger.info(str(obj['priority'])+": Calculating features...")
-        lc = lc_norm(obj['lightcurve'], linflatten)
-        #print(lc)
 
+        precalc = False
+        if savefeat is not None:
+            featfile = os.path.join(savefeat, str(obj['priority'])+'.txt')
+            if os.path.exists(featfile) and not recalc:
+                objfeatures = pd.read_csv(featfile)
+                #print(np.shape(objfeatures))
+                #print(objfeatures)
+                precalc = True
+                featout = featout.append(objfeatures)
 
-        #Features_final = feature_extract_single(features,linflatten = True)
-        fs =feets.FeatureSpace(exclude=[#'Amplitude', 'Beyond1Std',
-                                        'Freq1_harmonics_amplitude_0',
-                                        'Freq1_harmonics_rel_phase_1', 'Freq1_harmonics_rel_phase_2',
-                                        'Freq1_harmonics_rel_phase_3', 'Freq2_harmonics_rel_phase_1',
-                                        'Freq2_harmonics_rel_phase_2', 'Freq2_harmonics_rel_phase_3',
-                                        'Freq3_harmonics_rel_phase_1', 'Freq3_harmonics_rel_phase_2',
-                                        'Freq3_harmonics_rel_phase_3',
-                                        #'LinearTrend', 'Meanvariance',
-                                        #'PairSlopeTrend',
-                                        'PeriodLS',
-                                        'Psi_CS', 'Rcs',
-                                        #'Skew',
-                                        'CAR_mean', 'CAR_sigma', 'CAR_tau',
-                                    'AndersonDarling','Color','Eta_color','Q31_color',
-                                    'StetsonK','StetsonJ','PercentDifferenceFluxPercentile',
-                                    'SlottedA_length','Autocor_length','Con','Mean','Eta_e',
-                                    'StructureFunction_index_21','StructureFunction_index_31',
-                                    'StructureFunction_index_32','Freq1_harmonics_rel_phase_0',
-                                    'FluxPercentileRatioMid20','FluxPercentileRatioMid35',
-                                    'FluxPercentileRatioMid50','FluxPercentileRatioMid65',
-                                    'FluxPercentileRatioMid80','Freq2_harmonics_rel_phase_0',
-                                    'Freq3_harmonics_rel_phase_0','Period_fit','StetsonK_AC','StetsonL',
-                                    'PercentAmplitude','Freq1_harmonics_amplitude_1','Freq1_harmonics_amplitude_2',
-                                    'Freq1_harmonics_amplitude_3','Freq2_harmonics_amplitude_0',
-                                    'Freq2_harmonics_amplitude_1','Freq2_harmonics_amplitude_2',
-                                    'Freq2_harmonics_amplitude_3','Freq3_harmonics_amplitude_0',
-                                    'Freq3_harmonics_amplitude_1','Freq3_harmonics_amplitude_2',
-                                    'Freq3_harmonics_amplitude_3','Gskew','MaxSlope',
-                                    'MedianAbsDev','MedianBRP','SmallKurtosis','Q31','Std','Psi_eta'])
+        if not precalc:
+            lc = lc_norm(obj['lightcurve'], linflatten)
 
 
 
-        Feature_ID, values = fs.extract(*np.array([lc.time, lc.flux, lc.flux_err]))
+            #Features_final = feature_extract_single(features,linflatten = True)
+            fs =feets.FeatureSpace(exclude=[#'Amplitude', 'Beyond1Std',
+                                            'Freq1_harmonics_amplitude_0',
+                                            'Freq1_harmonics_rel_phase_1', 'Freq1_harmonics_rel_phase_2',
+                                            'Freq1_harmonics_rel_phase_3', 'Freq2_harmonics_rel_phase_1',
+                                            'Freq2_harmonics_rel_phase_2', 'Freq2_harmonics_rel_phase_3',
+                                            'Freq3_harmonics_rel_phase_1', 'Freq3_harmonics_rel_phase_2',
+                                            'Freq3_harmonics_rel_phase_3',
+                                            #'LinearTrend', 'Meanvariance',
+                                            #'PairSlopeTrend',
+                                            'PeriodLS',
+                                            'Psi_CS', 'Rcs',
+                                            #'Skew',
+                                            'CAR_mean', 'CAR_sigma', 'CAR_tau',
+                                        'AndersonDarling','Color','Eta_color','Q31_color',
+                                        'StetsonK','StetsonJ','PercentDifferenceFluxPercentile',
+                                        'SlottedA_length','Autocor_length','Con','Mean','Eta_e',
+                                        'StructureFunction_index_21','StructureFunction_index_31',
+                                        'StructureFunction_index_32','Freq1_harmonics_rel_phase_0',
+                                        'FluxPercentileRatioMid20','FluxPercentileRatioMid35',
+                                        'FluxPercentileRatioMid50','FluxPercentileRatioMid65',
+                                        'FluxPercentileRatioMid80','Freq2_harmonics_rel_phase_0',
+                                        'Freq3_harmonics_rel_phase_0','Period_fit','StetsonK_AC','StetsonL',
+                                        'PercentAmplitude','Freq1_harmonics_amplitude_1','Freq1_harmonics_amplitude_2',
+                                        'Freq1_harmonics_amplitude_3','Freq2_harmonics_amplitude_0',
+                                        'Freq2_harmonics_amplitude_1','Freq2_harmonics_amplitude_2',
+                                        'Freq2_harmonics_amplitude_3','Freq3_harmonics_amplitude_0',
+                                        'Freq3_harmonics_amplitude_1','Freq3_harmonics_amplitude_2',
+                                        'Freq3_harmonics_amplitude_3','Gskew','MaxSlope',
+                                        'MedianAbsDev','MedianBRP','SmallKurtosis','Q31','Std','Psi_eta'])
 
-        features_dict = dict(zip(Feature_ID,values))
 
 
-        forbiddenfreqs=[13.49/4.]
-        periods, usedfreqs = checkfrequencies(obj, 6, 6,
-        									 forbiddenfreqs, lc.time)
-        amp21,amp31 = freq_ampratios(obj,usedfreqs)
-        pd21,pd31 = freq_phasediffs(obj,usedfreqs)
+            Feature_ID, values = fs.extract(*np.array([lc.time, lc.flux, lc.flux_err]))
 
-        features_dict['PeriodLS'] = periods[0]
-        if len(usedfreqs)>0:
-            features_dict['Freq_amp_0'] = obj['amp'+str(usedfreqs[0]+1)]
-        else:
-            features_dict['Freq_amp_0'] = 0.
+            features_dict = dict(zip(Feature_ID,values))
 
-        features_dict['Freq_ampratio_21'] = amp21
-        features_dict['Freq_ampratio_31'] = amp31
-        features_dict['Freq_phasediff_21'] = pd21
-        features_dict['Freq_phasediff_31'] = pd31
 
-        # phase-fold lightcurve on dominant period
-        folded_lc = phase_fold_lc(lc, periods[0])
-        # Compute phi_rcs and rcs features
-        rcs = Rcs(lc.flux)
-        psi_rcs = Rcs(folded_lc)
+            forbiddenfreqs=[13.49/4.]
+            periods, usedfreqs = checkfrequencies(obj, 6, 6,
+            									 forbiddenfreqs, lc.time)
+            amp21,amp31 = freq_ampratios(obj,usedfreqs)
+            pd21,pd31 = freq_phasediffs(obj,usedfreqs)
 
-        features_dict['Rcs'] = rcs
-        features_dict['psi_Rcs'] = psi_rcs
+            features_dict['PeriodLS'] = periods[0]
+            if len(usedfreqs)>0:
+                features_dict['Freq_amp_0'] = obj['amp'+str(usedfreqs[0]+1)]
+            else:
+                features_dict['Freq_amp_0'] = 0.
 
-        Features_final = pd.DataFrame(features_dict, index=[0])
-        Features_all = Features_all.append(Features_final)
+            features_dict['Freq_ampratio_21'] = amp21
+            features_dict['Freq_ampratio_31'] = amp31
+            features_dict['Freq_phasediff_21'] = pd21
+            features_dict['Freq_phasediff_31'] = pd31
 
-        #Features_all.to_csv(os.path.join(Features_file_path, 'feets_features.csv'), index=False)
-        #Features_all['ID'] = ID
-        #Features_all.set_index('ID', inplace=True)
-    return Features_all
+            # phase-fold lightcurve on dominant period
+            folded_lc = phase_fold_lc(lc, periods[0])
+            # Compute phi_rcs and rcs features
+            rcs = Rcs(lc.flux)
+            psi_rcs = Rcs(folded_lc)
+
+            features_dict['Rcs'] = rcs
+            features_dict['psi_Rcs'] = psi_rcs
+
+            objfeatures = pd.DataFrame(features_dict, index=[0])
+            if savefeat is not None:
+                objfeatures.to_csv(featfile, index=False)
+            featout = featout.append(objfeatures)
+
+            #Features_all.to_csv(os.path.join(Features_file_path, 'feets_features.csv'), index=False)
+            #Features_all['ID'] = ID
+            #Features_all.set_index('ID', inplace=True)
+        #featout = np.vstack((featout, objfeatures.values))
+    return featout
 
 def Rcs(flux):
     """

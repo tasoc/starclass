@@ -34,7 +34,7 @@ if __name__ == '__main__':
 	# Check args
 	if args.testfraction < 0.0 or args.testfraction > 1:
 		parser.error('Testfraction must be between 0 and 1')
-	
+
 	# Set logging level:
 	logging_level = logging.INFO
 	if args.quiet:
@@ -76,17 +76,17 @@ if __name__ == '__main__':
 
 		# Name output classifier file
 		clfile = current_classifier+'_'+str(np.round(args.testfraction,decimals=2))
-		
+
 		# Do the training:
 		with classifier(level=args.level, tset=args.train, features_cache=tset.features_cache, clfile=clfile) as stcl:
 			labels_train = tset.training_set_labels(level=args.level)
 			features_train = tset.training_set_features()
 			stcl.train(features_train, labels_train)
-	
+
 			if args.testfraction > 0.0:
 				features_test = tset.training_set_features_test()
 				labels_test = tset.training_set_labels_test(level=args.level)
-				
+
 				# Convert to values
 				labels_test_val = []
 				for lbl in labels_test:
@@ -103,14 +103,14 @@ if __name__ == '__main__':
 					logger.info(prediction)
 					y_pred.append(prediction)
 				y_pred = np.array(y_pred)
-				
+
 				# Compare to known labels - ADD SAVING PROCESS, JUST PRINTS TO LOG
 				acc = accuracy_score(labels_test, y_pred)
-				logger.info('Accuracy: ',acc)
+				logger.info('Accuracy: ', str(acc))
 				cf = confusion_matrix(labels_test, y_pred) #labels probably not in right format
 				logger.info('CF Matrix:')
 				logger.info(cf)
-			
+
 	elif args.input_folder is not None:
 
 		# Get input and output folder from environment variables:

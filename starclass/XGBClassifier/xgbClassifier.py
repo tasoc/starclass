@@ -51,7 +51,7 @@ class XGBClassifier(BaseClassifier):
 
     """
     def __init__(self,clfile='xgb_classifier_1.pickle',
-                 features_file="feets_features.csv",n_estimators=750,
+                 featdir="xgb_features",n_estimators=750,
                  max_depth=13,learning_rate = 0.1,reg_alpha=1e-5,
                  objective ='multi:softmax',
                  booster='gbtree',eval_metric='mlogloss', *args, **kwargs):
@@ -89,10 +89,12 @@ class XGBClassifier(BaseClassifier):
                 # Load pre-trained classifier
                 self.load(self.classifier_file)
 
-        if features_file is not None:
-            self.features_file = os.path.join(self.data_dir, features_file)
+        if featdir is not None:
+            self.featdir = os.path.join(self.data_dir, featdir)
+            if not os.path.exists(self.featdir):
+                os.makedirs(self.featdir)
         else:
-            self.features_file = None
+            self.featdir = None
 
 
         if self.classifier is None:
@@ -188,8 +190,7 @@ class XGBClassifier(BaseClassifier):
 
         return class_results
 
-    def train(self, features, labels, savecl=True,
-              savefeat=True,overwrite=False, feat_import=True):
+    def train(self, features, labels, savecl=True, recalc=False, overwrite=False, feat_import=True):
 
         """
 
@@ -200,32 +201,36 @@ class XGBClassifier(BaseClassifier):
         # Start a logger that should be used to output e.g. debug information:
         logger = logging.getLogger(__name__)
 
-        # Check for pre-calculated features
-        precalc = False
-        if self.features_file is not None:
-            if os.path.exists(self.features_file):
-                logger.info('Loading features from precalculated file.')
-                feature_results = pd.read_csv(self.features_file)
-                precalc = True
+        logger.info('Calculating/Loading Features.')
+        featarray = xgb_features.feature_extract(features, savefeat=self.featdir, recalc=recalc)
+        logger.info('Features calculated/loaded.')
+
+        #if self.feature is not None:
+        #    if os.path.exists(self.features_file):
+        #        logger.info('Loading features from precalculated file.')
+        #        feature_results = pd.read_csv(self.features_file)
+        #        precalc = True
 
         fit_labels = self.parse_labels(labels)
 
-        if not precalc:
-            logger.info('Extracting Features ...')
-            # Calculate features
-            feature_results = xgb_features.feature_extract(features) ## absolute_import ##
-            # Save calcualted features
-            if savefeat:
-                if self.features_file is not None:
-                    if not os.path.exists(self.features_file) or overwrite:
-                        logger.info('Saving extracted features to feets_features.txt')
-                        feature_results.to_csv(self.features_file, index=False)
+        #if not precalc:
+        #    logger.info('Extracting Features ...')
+        #    # Calculate features
+        #    feature_results = xgb_features.feature_extract(features) ## absolute_import ##
+        #    # Save calcualted features
+        #    if savefeat:
+        #        if self.features_file is not None:
+        #            if not os.path.exists(self.features_file) or overwrite:
+        #                logger.info('Saving extracted features to feets_features.txt')
+        #                feature_results.to_csv(self.features_file, index=False)
         try:
             logger.info('Training ...')
-            model = self.classifier.fit(feature_results, fit_labels)
+            #logger.info('SHAPES ', str(np.shape(featarray)))
+            #logger.info('SHAPES ', str(np.shape(fit_labels)))
+            self.classifier.fit(featarray, fit_labels)
             if feat_import == True:
-                importances = model.feature_importances_.astype(float)
-                feature_importances = zip(list(feature_results),
+                importances = self.classifier.feature_importances_.astype(float)
+                feature_importances = zip(list(featarray),
                                           importances)
                 with open('xgbClassifier_feat_import.json', 'w') as outfile:
                     json.dump(list(feature_importances), outfile)

@@ -170,7 +170,9 @@ class SLOSHClassifier(BaseClassifier):
 		train_generator = datagen.flow_from_directory(train_folder, target_size=(128, 128), color_mode='grayscale',
 													  class_mode='categorical', batch_size=32)
 		logger.info('Training Classifier...')
-		model.fit_generator(train_generator, epochs=200, steps_per_epoch=math.ceil(nb_files / 32),
+		#epochs = 200
+		epochs = 50
+		model.fit_generator(train_generator, epochs=epochs, steps_per_epoch=math.ceil(nb_files / 32),
 							callbacks=[reduce_lr], verbose=2)
 		model.save('SLOSH_Classifier_Model.h5')
 

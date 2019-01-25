@@ -14,7 +14,7 @@ import sqlite3
 import logging
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
-from .. import StellarClasses, BaseClassifier
+from .. import StellarClasses, BaseClassifier, TaskManager
 from . import TrainingSet
 
 #----------------------------------------------------------------------------------------------
@@ -31,13 +31,14 @@ class keplerq9(TrainingSet):
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
 		super(self.__class__, self).__init__(*args, **kwargs)
-		
+
 		# Generate training/test indices
 		if self.testfraction > 0:
 			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
 			nobjects = data.shape[0]
 			self.train_idx, self.test_idx = train_test_split(np.arange(nobjects), test_size=self.testfraction, random_state=42, stratify=data[:,1])
 
+	#----------------------------------------------------------------------------------------------
 	def generate_todolist(self):
 
 		logger = logging.getLogger(__name__)
@@ -237,29 +238,19 @@ class keplerq9(TrainingSet):
 	#----------------------------------------------------------------------------------------------
 	def training_set_features(self):
 
-		todo_file = os.path.join(self.input_folder, 'todo.sqlite')
-		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
-
-		with sqlite3.connect(todo_file) as conn:
-			conn.row_factory = sqlite3.Row
-			cursor = conn.cursor()
-
+		rowidx = -1
+		with TaskManager(self.input_folder, overwrite=True) as tm:
 			with BaseClassifier(features_cache=os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)) as stcl:
-				for rowidx,row in enumerate(data):
-					starname = row[0]
-					starclass = row[1]
-
-					path = starclass + '/' + starname + '.txt'
-
-					# Get task info from database:
-					cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE diagnostics.lightcurve=?;", (path, ))
-					task = dict(cursor.fetchone())
+				while True:
+					task = tm.get_task(classifier=self.classifier)
+					if task is None: break
+					rowidx += 1
 
 					# Lightcurve file to load:
 					# We do not use the one from the database because in the simulations the
 					# raw and corrected light curves are stored in different files.
-					fname = os.path.join(self.input_folder, path)
-					
+					fname = os.path.join(self.input_folder, task['lightcurve'])
+
 					if self.testfraction > 0:
 						if rowidx in self.train_idx:
 							yield stcl.load_star(task, fname)
@@ -313,32 +304,25 @@ class keplerq9(TrainingSet):
 		if self.testfraction == 0:
 			raise ValueError('training_set_features_test requires testfraction>0')
 		else:
-			todo_file = os.path.join(self.input_folder, 'todo.sqlite')
-			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
 
-			with sqlite3.connect(todo_file) as conn:
-				conn.row_factory = sqlite3.Row
-				cursor = conn.cursor()
-
+			rowidx = -1
+			with TaskManager(self.input_folder, overwrite=True) as tm:
 				with BaseClassifier(features_cache=os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)) as stcl:
-					for rowidx,row in enumerate(data):
-						starname = row[0]
-						starclass = row[1]
-
-						path = starclass + '/' + starname + '.txt'
-
-						# Get task info from database:
-						cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE diagnostics.lightcurve=?;", (path, ))
-						task = dict(cursor.fetchone())
+					while True:
+						task = tm.get_task(classifier=self.classifier)
+						if task is None: break
+						rowidx += 1
 
 						# Lightcurve file to load:
 						# We do not use the one from the database because in the simulations the
 						# raw and corrected light curves are stored in different files.
-						fname = os.path.join(self.input_folder, path)
-					
-						if rowidx in self.test_idx:
-							yield stcl.load_star(task, fname)
+						fname = os.path.join(self.input_folder, task['lightcurve'])
 
+						if self.testfraction > 0:
+							if rowidx in self.test_idx:
+								yield stcl.load_star(task, fname)
+						else:
+							yield stcl.load_star(task, fname)
 
 	#----------------------------------------------------------------------------------------------
 	def training_set_labels_test(self, level='L1'):

@@ -17,12 +17,12 @@ from tqdm import tqdm
 #----------------------------------------------------------------------------------------------
 class TrainingSet(object):
 
-	def __init__(self, datalevel='corr', tf=0.0):
-	
-		self.datalevel = datalevel
+	def __init__(self, classifier=None, datalevel='corr', tf=0.0):
 
+		self.classifier = classifier
+		self.datalevel = datalevel
 		self.testfraction = tf
-		
+
 		self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)
 
 		if not os.path.exists(self.features_cache):

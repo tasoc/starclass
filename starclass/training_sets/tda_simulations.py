@@ -11,6 +11,7 @@ import os.path
 import numpy as np
 from bottleneck import nanmedian, nansum
 import sqlite3
+from contextlib import closing
 import logging
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
@@ -45,7 +46,7 @@ class tda_simulations(TrainingSet):
 		#os.makedirs(os.path.join(self.input_folder, 'clean_by_sectors'), exist_ok=True)
 
 		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
-		with sqlite3.connect(sqlite_file) as conn:
+		with closing(sqlite3.connect(sqlite_file)) as conn:
 			conn.row_factory = sqlite3.Row
 			cursor = conn.cursor()
 
@@ -365,17 +366,17 @@ class tda_simulations(TrainingSet):
 				lookup.append(tuple(set(lbls)))
 
 		return tuple(lookup)
-		
+
 	#----------------------------------------------------------------------------------------------
 	def training_set_features_test(self):
-		
+
 		if self.testfraction == 0:
 			raise ValueError('training_set_features_test requires testfraction>0')
 		else:
 			todo_file = os.path.join(self.input_folder, 'todo.sqlite')
 			data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
 
-			with sqlite3.connect(todo_file) as conn:
+			with closing(sqlite3.connect(todo_file)) as conn:
 				conn.row_factory = sqlite3.Row
 				cursor = conn.cursor()
 

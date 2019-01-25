@@ -11,6 +11,7 @@ import numpy as np
 import os
 import sqlite3
 import logging
+from astropy.table import Table
 
 class TaskManager(object):
 	"""
@@ -128,6 +129,21 @@ class TaskManager(object):
 		if task:
 			task = dict(task)
 			task['classifier'] = cl
+
+			# If the classifier that is running is the meta-classifier,
+			# add the results from all other classifiers to the task dict:
+			if cl == 'meta':
+				self.cursor.execute("SELECT classifier,class,prob FROM starclass WHERE priority=? AND classifier != 'meta';", (task['priority'], ))
+
+				#for row in self.cursor.fetchall():
+
+
+				task['other_classifiers'] = Table(
+					rows=self.cursor.fetchall(),
+					names=('classifier', 'class', 'prob'),
+					dtype=('S256', 'S256', 'float32')
+				)
+
 			return task
 		return None
 

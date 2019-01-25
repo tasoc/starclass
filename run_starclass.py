@@ -69,11 +69,11 @@ if __name__ == '__main__':
 	if args.train:
 		# Pick the training set:
 		if args.train == 'tdasim':
-			tset = training_sets.tda_simulations(datalevel=args.datalevel, tf=args.testfraction)
+			tset = training_sets.tda_simulations(datalevel=args.datalevel, tf=args.testfraction, classifier=current_classifier)
 		elif args.train == 'keplerq9':
-			tset = training_sets.keplerq9(datalevel=args.datalevel, tf=args.testfraction)
+			tset = training_sets.keplerq9(datalevel=args.datalevel, tf=args.testfraction, classifier=current_classifier)
 		elif args.train == 'keplerq9-linfit':
-			tset = training_sets.keplerq9linfit(datalevel=args.datalevel, tf=args.testfraction)
+			tset = training_sets.keplerq9linfit(datalevel=args.datalevel, tf=args.testfraction, classifier=current_classifier)
 
 		# Name output classifier file
 		clfile = current_classifier+'_'+str(np.round(args.testfraction,decimals=2))

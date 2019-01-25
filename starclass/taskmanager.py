@@ -17,7 +17,7 @@ class TaskManager(object):
 	A TaskManager which keeps track of which targets to process.
 	"""
 
-	def __init__(self, todo_file, cleanup=False, overwrite=True):
+	def __init__(self, todo_file, cleanup=False, overwrite=False):
 		"""
 		Initialize the TaskManager which keeps track of which targets to process.
 
@@ -25,11 +25,7 @@ class TaskManager(object):
 			todo_file (string): Path to the TODO-file.
 			cleanup (boolean): Perform cleanup/optimization of TODO-file before
 			                   during initialization. Default=False.
-			overwrite (boolean): Overwrite any previously calculated results. Default=True.
-
-		Note:
-			Overwrite is currently enabled by default! This will be changed in the future,
-			but for testing-purposes it is currently enabled.
+			overwrite (boolean): Overwrite any previously calculated results. Default=False.
 
 		Raises:
 			IOError: If TODO-file could not be found.

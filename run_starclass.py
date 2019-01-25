@@ -25,6 +25,7 @@ if __name__ == '__main__':
 	parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-t', '--train', help='Train classifier using this training-set.', default=None, choices=('tdasim', 'keplerq9', 'keplerq9-linfit'))
 	parser.add_argument('-tf', '--testfraction', help='Test-set fraction (only relevant if --train activated)', type=float, default=0.0)
+	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	#parser.add_argument('--starid', type=int, help='TIC identifier of target.', nargs='?', default=None)
@@ -127,7 +128,7 @@ if __name__ == '__main__':
 
 		# Running:
 		# When simply running the classifier on new stars:
-		with TaskManager(todo_file) as tm:
+		with TaskManager(todo_file, overwrite=args.overwrite) as tm:
 
 			with classifier(level=args.level, features_cache=features_cache) as stcl:
 

@@ -244,6 +244,7 @@ class keplerq9(TrainingSet):
 				while True:
 					task = tm.get_task(classifier=self.classifier)
 					if task is None: break
+					tm.start_task(task)
 					rowidx += 1
 
 					# Lightcurve file to load:
@@ -311,6 +312,7 @@ class keplerq9(TrainingSet):
 					while True:
 						task = tm.get_task(classifier=self.classifier)
 						if task is None: break
+						tm.start_task(task)
 						rowidx += 1
 
 						# Lightcurve file to load:

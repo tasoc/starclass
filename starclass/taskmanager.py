@@ -17,7 +17,7 @@ class TaskManager(object):
 	A TaskManager which keeps track of which targets to process.
 	"""
 
-	def __init__(self, todo_file, cleanup=False):
+	def __init__(self, todo_file, cleanup=False, overwrite=True):
 		"""
 		Initialize the TaskManager which keeps track of which targets to process.
 
@@ -25,6 +25,11 @@ class TaskManager(object):
 			todo_file (string): Path to the TODO-file.
 			cleanup (boolean): Perform cleanup/optimization of TODO-file before
 			                   during initialization. Default=False.
+			overwrite (boolean): Overwrite any previously calculated results. Default=True.
+
+		Note:
+			Overwrite is currently enabled by default! This will be changed in the future,
+			but for testing-purposes it is currently enabled.
 
 		Raises:
 			IOError: If TODO-file could not be found.
@@ -38,7 +43,7 @@ class TaskManager(object):
 
 
 		# Keep a list of all the possible classifiers here:
-		self.all_classifiers = set(['rfgc'])
+		self.all_classifiers = set(['rfgc', 'slosh', 'foptics', 'xgb'])
 
 		# Setup logging:
 		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -55,8 +60,9 @@ class TaskManager(object):
 
 		# Reset the status of everything for a new run:
 		# TODO: This should obviously be removed once we start running for real
-		self.cursor.execute("DROP TABLE IF EXISTS starclass;")
-		self.conn.commit()
+		if overwrite:
+			self.cursor.execute("DROP TABLE IF EXISTS starclass;")
+			self.conn.commit()
 
 		# Create table for diagnostics:
 		self.cursor.execute("""CREATE TABLE IF NOT EXISTS starclass (
@@ -64,7 +70,8 @@ class TaskManager(object):
 			classifier TEXT NOT NULL,
 			status INT NOT NULL,
 			class TEXT,
-			prob REAL
+			prob REAL,
+			FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
 		);""")
 		self.cursor.execute("CREATE INDEX IF NOT EXISTS priority_classifier_idx ON starclass (priority, classifier);")
 		self.conn.commit()

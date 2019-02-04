@@ -3,7 +3,23 @@ python:
   - "2.7"
   - "3.5"
   - "3.6"
-# command to install dependencies
+  
+# Python 3.7 has to be done a different way
+# https://github.com/travis-ci/travis-ci/issues/9069
+jobs:
+  include:
+    - language: python
+      python: "3.7"
+      dist: xenial
+      sudo: required
+
+# Allow some versions of Python to fail:
+matrix:
+  fast_finish: true
+  allow_failures:
+    - python: "2.7"
+    
+# Command to install dependencies
 install:
   - pip install -r requirements.txt
 script:

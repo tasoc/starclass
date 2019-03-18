@@ -155,7 +155,8 @@ class BaseClassifier(object):
 				sector=2,
 				#ra=0,
 				#dec=0,
-				quality_bitmask=2+8+256 # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK
+				quality_bitmask=2+8+256, # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK,
+				meta={}
 			)
 
 		elif fname.endswith('.fits') or fname.endswith('.fits.gz'):
@@ -177,7 +178,8 @@ class BaseClassifier(object):
 					sector=hdu[0].header.get('SECTOR'),
 					ra=hdu[0].header.get('RA_OBJ'),
 					dec=hdu[0].header.get('DEC_OBJ'),
-					quality_bitmask=2+8+256 # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK
+					quality_bitmask=2+8+256, # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK
+					meta={}
 				)
 
 		else:

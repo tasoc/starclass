@@ -122,7 +122,7 @@ class SLOSHClassifier(BaseClassifier):
 			result[i] = remainder
 		return result
 
-	def train(self, features, labels):
+	def train(self, tset):
 		'''
 		Trains a fresh classifier using a default NN architecture and parameters as of the Hon et al. (2018) paper.
 
@@ -143,7 +143,7 @@ class SLOSHClassifier(BaseClassifier):
 			os.makedirs(train_folder)
 
 			logger.info('Generating Train Images...')
-			for feat, lbl in zip(features, labels):
+			for feat, lbl in zip(tset.features(), tset.labels()):
 				# Power density spectrum from pre-calculated features:
 				psd = feat['powerspectrum'].standard
 

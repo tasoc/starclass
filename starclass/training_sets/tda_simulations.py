@@ -14,8 +14,7 @@ import sqlite3
 from contextlib import closing
 import logging
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
-from .. import StellarClasses, BaseClassifier
+from .. import StellarClasses
 from . import TrainingSet
 
 #----------------------------------------------------------------------------------------------
@@ -25,25 +24,17 @@ class tda_simulations(TrainingSet):
 
 		self.input_folder = self.tset_datadir('tdasim', 'https://tasoc.dk/starclass_tsets/tdasim.zip')
 
+		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
+		self.nobjects = data.shape[0]
+
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
 		super(self.__class__, self).__init__(*args, **kwargs)
-
-		# Generate training/test indices
-		if self.testfraction > 0:
-			data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
-			nobjects = data.shape[0]
-			self.train_idx, self.test_idx = train_test_split(np.arange(nobjects), test_size=self.testfraction, random_state=42, stratify=data[:,1])
 
 
 	def generate_todolist(self):
 
 		logger = logging.getLogger(__name__)
-
-		# Make sure some directories exist:
-		#os.makedirs(os.path.join(self.input_folder, 'sysnoise_by_sectors'), exist_ok=True)
-		#os.makedirs(os.path.join(self.input_folder, 'noisy_by_sectors'), exist_ok=True)
-		#os.makedirs(os.path.join(self.input_folder, 'clean_by_sectors'), exist_ok=True)
 
 		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
 		with closing(sqlite3.connect(sqlite_file)) as conn:
@@ -225,39 +216,7 @@ class tda_simulations(TrainingSet):
 		logger.info("DONE.")
 
 	#----------------------------------------------------------------------------------------------
-	def training_set_features(self):
-
-		todo_file = os.path.join(self.input_folder, 'todo.sqlite')
-		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
-
-		with sqlite3.connect(todo_file) as conn:
-			conn.row_factory = sqlite3.Row
-			cursor = conn.cursor()
-
-			with BaseClassifier(features_cache=os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)) as stcl:
-				for rowidx,row in enumerate(data):
-					starid = int(row[0][4:])
-
-					# Get task info from database:
-					cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE todolist.starid=?;", (starid, ))
-					task = dict(cursor.fetchone())
-
-					# Lightcurve file to load:
-					# We do not use the one from the database because in the simulations the
-					# raw and corrected light curves are stored in different files.
-					if self.datalevel == 'raw':
-						fname = os.path.join(self.input_folder, 'sysnoise', 'Star%d.sysnoise' % starid) # # These are the lightcurves INCLUDING SYSTEMATIC NOISE
-					elif self.datalevel == 'corr':
-						fname = os.path.join(self.input_folder, 'noisy', 'Star%d.noisy' % starid) # # These are the lightcurves WITHOUT SYSTEMATIC NOISE
-
-					if self.testfraction > 0:
-						if rowidx in self.train_idx:
-							yield stcl.load_star(task, fname)
-					else:
-						yield stcl.load_star(task, fname)
-
-	#----------------------------------------------------------------------------------------------
-	def training_set_labels(self, level='L1'):
+	def labels(self, level='L1'):
 
 		logger = logging.getLogger(__name__)
 
@@ -368,39 +327,7 @@ class tda_simulations(TrainingSet):
 		return tuple(lookup)
 
 	#----------------------------------------------------------------------------------------------
-	def training_set_features_test(self):
-
-		if self.testfraction == 0:
-			raise ValueError('training_set_features_test requires testfraction>0')
-		else:
-			todo_file = os.path.join(self.input_folder, 'todo.sqlite')
-			data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
-
-			with closing(sqlite3.connect(todo_file)) as conn:
-				conn.row_factory = sqlite3.Row
-				cursor = conn.cursor()
-
-				with BaseClassifier(features_cache=os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)) as stcl:
-					for rowidx,row in enumerate(data):
-						starid = int(row[0][4:])
-
-						# Get task info from database:
-						cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE todolist.starid=?;", (starid, ))
-						task = dict(cursor.fetchone())
-
-						# Lightcurve file to load:
-						# We do not use the one from the database because in the simulations the
-						# raw and corrected light curves are stored in different files.
-						if self.datalevel == 'raw':
-							fname = os.path.join(self.input_folder, 'sysnoise', 'Star%d.sysnoise' % starid) # # These are the lightcurves INCLUDING SYSTEMATIC NOISE
-						elif self.datalevel == 'corr':
-							fname = os.path.join(self.input_folder, 'noisy', 'Star%d.noisy' % starid) # # These are the lightcurves WITHOUT SYSTEMATIC NOISE
-
-						if rowidx in self.train_idx:
-							yield stcl.load_star(task, fname)
-
-	#----------------------------------------------------------------------------------------------
-	def training_set_labels_test(self, level='L1'):
+	def labels_test(self, level='L1'):
 
 		logger = logging.getLogger(__name__)
 

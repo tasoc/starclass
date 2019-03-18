@@ -13,8 +13,7 @@ from bottleneck import nanmedian, nansum
 import sqlite3
 import logging
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
-from .. import StellarClasses, BaseClassifier
+from .. import StellarClasses
 from . import TrainingSet
 
 #----------------------------------------------------------------------------------------------
@@ -28,15 +27,12 @@ class keplerq9linfit(TrainingSet):
 		# Point this to the directory where the TDA simulations are stored
 		self.input_folder = self.tset_datadir('keplerq9-linfit', 'https://tasoc.dk/starclass_tsets/keplerq9-linfit.zip')
 
+		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
+		self.nobjects = data.shape[0]
+
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
 		super(self.__class__, self).__init__(*args, **kwargs)
-
-		# Generate training/test indices
-		if self.testfraction > 0:
-			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
-			nobjects = data.shape[0]
-			self.train_idx, self.test_idx = train_test_split(np.arange(nobjects), test_size=self.testfraction, random_state=42, stratify=data[:,1])
 
 
 	def generate_todolist(self):
@@ -103,14 +99,11 @@ class keplerq9linfit(TrainingSet):
 				if not isinstance(starname, six.string_types): starname = starname.decode("utf-8") # For Python 3
 				if not isinstance(starclass, six.string_types): starclass = starclass.decode("utf-8") # For Python 3
 				if starname.startswith('constant_'):
-
 					starid = -1
 				elif starname.startswith('fakerrlyr_'):
 					starid = -1
-
 				else:
 					starid = int(starname)
-
 
 				data = np.loadtxt(os.path.join(self.input_folder, starclass + '_linfit', '%s.txt' % starname))
 
@@ -236,39 +229,7 @@ class keplerq9linfit(TrainingSet):
 		logger.info("DONE.")
 
 	#----------------------------------------------------------------------------------------------
-	def training_set_features(self):
-
-		todo_file = os.path.join(self.input_folder, 'todo.sqlite')
-		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
-
-		with sqlite3.connect(todo_file) as conn:
-			conn.row_factory = sqlite3.Row
-			cursor = conn.cursor()
-
-			with BaseClassifier(features_cache=os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)) as stcl:
-				for rowidx,row in enumerate(data):
-					starname = row[0]
-					starclass = row[1]
-
-					path = starclass + '_linfit/' + starname + '.txt'
-
-					# Get task info from database:
-					cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE diagnostics.lightcurve=?;", (path, ))
-					task = dict(cursor.fetchone())
-
-					# Lightcurve file to load:
-					# We do not use the one from the database because in the simulations the
-					# raw and corrected light curves are stored in different files.
-					fname = os.path.join(self.input_folder, path)
-
-					if self.testfraction > 0:
-						if rowidx in self.train_idx:
-							yield stcl.load_star(task, fname)
-					else:
-						yield stcl.load_star(task, fname)
-
-	#----------------------------------------------------------------------------------------------
-	def training_set_labels(self, level='L1'):
+	def labels(self, level='L1'):
 
 		logger = logging.getLogger(__name__)
 
@@ -307,41 +268,9 @@ class keplerq9linfit(TrainingSet):
 				lookup.append(tuple(set(lbls)))
 
 		return tuple(lookup)
-		
-	#----------------------------------------------------------------------------------------------
-	def training_set_features_test(self):
-
-		if self.testfraction == 0:
-			raise ValueError('training_set_features_test requires testfraction>0')
-		else:
-			todo_file = os.path.join(self.input_folder, 'todo.sqlite')
-			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
-
-			with sqlite3.connect(todo_file) as conn:
-				conn.row_factory = sqlite3.Row
-				cursor = conn.cursor()
-
-				with BaseClassifier(features_cache=os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)) as stcl:
-					for rowidx,row in enumerate(data):
-						starname = row[0]
-						starclass = row[1]
-
-						path = starclass + '_linfit/' + starname + '.txt'
-
-						# Get task info from database:
-						cursor.execute("SELECT * FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority WHERE diagnostics.lightcurve=?;", (path, ))
-						task = dict(cursor.fetchone())
-
-						# Lightcurve file to load:
-						# We do not use the one from the database because in the simulations the
-						# raw and corrected light curves are stored in different files.
-						fname = os.path.join(self.input_folder, path)
-
-						if rowidx in self.test_idx:
-							yield stcl.load_star(task, fname)
 
 	#----------------------------------------------------------------------------------------------
-	def training_set_labels_test(self, level='L1'):
+	def labels_test(self, level='L1'):
 
 		logger = logging.getLogger(__name__)
 

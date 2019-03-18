@@ -61,7 +61,8 @@ if __name__ == '__main__':
 		'rfgc': RFGCClassifier,
 		'slosh': SLOSHClassifier,
 		#'foptics': FOPTICSClassifier,
-		'xgb': XGBClassifier
+		'xgb': XGBClassifier,
+		'meta': None
 	}[current_classifier]
 
 	# Training:
@@ -76,15 +77,21 @@ if __name__ == '__main__':
 			tset = training_sets.keplerq9linfit(datalevel=args.datalevel, tf=args.testfraction, classifier=current_classifier)
 
 		# Name output classifier file
-		clfile = current_classifier+'_'+str(np.round(args.testfraction,decimals=2))
+		clfile = current_classifier + '_' + str(np.round(args.testfraction,decimals=2))
 
 		# Do the training:
 		with classifier(level=args.level, tset=args.train, features_cache=tset.features_cache, clfile=clfile) as stcl:
-			labels_train = tset.training_set_labels(level=args.level)
-			features_train = tset.training_set_features()
-			stcl.train(features_train, labels_train)
+			logger.debug("Starting training...")
+
+			#labels_train = tset.training_set_labels(level=args.level)
+			#features_train = tset.training_set_features()
+			stcl.train(tset)
+
+			logger.debug("Training done...")
 
 			if args.testfraction > 0.0:
+				logger.debug("Starting testing...")
+
 				features_test = tset.training_set_features_test()
 				labels_test = tset.training_set_labels_test(level=args.level)
 

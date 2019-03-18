@@ -130,6 +130,11 @@ class TaskManager(object):
 			task = dict(task)
 			task['classifier'] = cl
 
+			# Add things from the catalog file:
+			#catalog_file = os.path.join(????, 'catalog_sector{sector:03d}_camera{camera:d}_ccd{ccd:d}.sqlite')
+			# cursor.execute("SELECT ra,decl as dec,teff FROM catalog WHERE starid=?;", (task['starid'], ))
+			#task.update()
+
 			# If the classifier that is running is the meta-classifier,
 			# add the results from all other classifiers to the task dict:
 			if cl == 'meta':
@@ -147,7 +152,7 @@ class TaskManager(object):
 			return task
 		return None
 
-	def get_task(self, classifier=None):
+	def get_task(self, classifier=None, change_classifier=True):
 		"""
 		Get next task to be processed.
 
@@ -166,7 +171,7 @@ class TaskManager(object):
 
 		# If no task is returned for the given classifier, find another
 		# classifier where tasks are available:
-		if task is None:
+		if task is None and change_classifier:
 			# Make a search on all the classifiers, and record the next
 			# task for all of them:
 			all_tasks = []

@@ -7,12 +7,15 @@
 
 from __future__ import division, with_statement, print_function, absolute_import
 from numpy import ceil
+import numpy as np
 import os
 import requests
 import zipfile
 import shutil
 import logging
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
+from .. import BaseClassifier, TaskManager
 
 #----------------------------------------------------------------------------------------------
 class TrainingSet(object):
@@ -23,16 +26,29 @@ class TrainingSet(object):
 		self.datalevel = datalevel
 		self.testfraction = tf
 
+		if self.testfraction < 0 or self.testfraction > 1:
+			raise ValueError("Invalid testfraction provided")
+
 		self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)
 
 		if not os.path.exists(self.features_cache):
 			os.makedirs(self.features_cache)
 
+		# Generate TODO file if it is needed:
 		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
 		if not os.path.exists(sqlite_file):
 			self.generate_todolist()
 
+		# Generate training/test indices
+		if self.testfraction > 0:
+			self.train_idx, self.test_idx = train_test_split(
+				np.arange(self.nobjects),
+				test_size=self.testfraction,
+				random_state=42,
+				stratify=self.training_set_labels()
+			)
 
+	#----------------------------------------------------------------------------------------------
 	def tset_datadir(self, tset, url):
 
 		logger = logging.getLogger(__name__)
@@ -75,8 +91,59 @@ class TrainingSet(object):
 
 		return input_folder
 
+	#----------------------------------------------------------------------------------------------
 	def generate_todolist(self):
 		raise NotImplementedError()
 
-	def training_set_features(self):
+	#----------------------------------------------------------------------------------------------
+	def features(self):
+
+		rowidx = -1
+		with TaskManager(self.input_folder, overwrite=True) as tm:
+			with BaseClassifier(features_cache=self.features_cache) as stcl:
+				while True:
+					task = tm.get_task(classifier=self.classifier, change_classifier=False)
+					if task is None: break
+					tm.start_task(task)
+					rowidx += 1
+
+					# Lightcurve file to load:
+					# We do not use the one from the database because in the simulations the
+					# raw and corrected light curves are stored in different files.
+					fname = os.path.join(self.input_folder, task['lightcurve'])
+
+					if self.testfraction > 0:
+						if rowidx in self.train_idx:
+							yield stcl.load_star(task, fname)
+					else:
+						yield stcl.load_star(task, fname)
+
+	#----------------------------------------------------------------------------------------------
+	def features_test(self):
+
+		if self.testfraction <= 0:
+			raise ValueError('features_test requires testfraction>0')
+		else:
+			rowidx = -1
+			with TaskManager(self.input_folder, overwrite=True) as tm:
+				with BaseClassifier(features_cache=self.features_cache) as stcl:
+					while True:
+						task = tm.get_task(classifier=self.classifier, change_classifier=False)
+						if task is None: break
+						tm.start_task(task)
+						rowidx += 1
+
+						if rowidx in self.test_idx:
+							# Lightcurve file to load:
+							# We do not use the one from the database because in the simulations the
+							# raw and corrected light curves are stored in different files.
+							fname = os.path.join(self.input_folder, task['lightcurve'])
+							yield stcl.load_star(task, fname)
+
+	#----------------------------------------------------------------------------------------------
+	def labels(self, level='L1'):
+		raise NotImplementedError()
+
+	#----------------------------------------------------------------------------------------------
+	def labels_test(self, level='L1'):
 		raise NotImplementedError()

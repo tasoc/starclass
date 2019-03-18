@@ -11,14 +11,10 @@ import os
 import copy
 import json
 import numpy as np
-import pandas as pd
 from xgboost import XGBClassifier as xgb
-from sklearn.metrics import confusion_matrix,accuracy_score
 from . import xgb_feature_calc as xgb_features
 from .. import BaseClassifier, StellarClasses
 from .. import utilities
-
-#nan = np.nan
 
 class Classifier_obj(xgb):
     """
@@ -134,7 +130,7 @@ class XGBClassifier(BaseClassifier):
 
         self.classifier = None
         temp_classifier = copy.deepcopy(self.classifier)
-        utilities.savePickle(outfile,self.classifier)
+        utilities.savePickle(outfile, self.classifier)
         self.classifier = temp_classifier
 
     def load(self, infile, classifier_file=None):
@@ -164,10 +160,6 @@ class XGBClassifier(BaseClassifier):
     	# Start a logger that should be used to output e.g. debug information:
         logger = logging.getLogger(__name__)
 
-        # Do the magic:
-        #logger.info("We are staring the magic...")
-        #self.something.doit(lightcurve, features)
-
         if not self.classifier.trained:
             logger.error('Please train classifer')
             raise ValueError("Untrained Classifier")
@@ -190,7 +182,7 @@ class XGBClassifier(BaseClassifier):
 
         return class_results
 
-    def train(self, features, labels, savecl=True, recalc=False, overwrite=False, feat_import=True):
+    def train(self, tset, savecl=True, recalc=False, overwrite=False, feat_import=True):
 
         """
 
@@ -202,7 +194,7 @@ class XGBClassifier(BaseClassifier):
         logger = logging.getLogger(__name__)
 
         logger.info('Calculating/Loading Features.')
-        featarray = xgb_features.feature_extract(features, savefeat=self.featdir, recalc=recalc)
+        featarray = xgb_features.feature_extract(tset.features(), savefeat=self.featdir, recalc=recalc)
         logger.info('Features calculated/loaded.')
 
         #if self.feature is not None:
@@ -211,7 +203,7 @@ class XGBClassifier(BaseClassifier):
         #        feature_results = pd.read_csv(self.features_file)
         #        precalc = True
 
-        fit_labels = self.parse_labels(labels)
+        fit_labels = self.parse_labels(tset.labels())
 
         #if not precalc:
         #    logger.info('Extracting Features ...')

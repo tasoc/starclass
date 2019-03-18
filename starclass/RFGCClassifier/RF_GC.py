@@ -182,7 +182,7 @@ class RFGCClassifier(BaseClassifier):
 			result[key] = classprobs[c]
 		return result
 
-	def train(self, features, labels, savecl=True, recalc=False, overwrite=False):
+	def train(self, tset, savecl=True, recalc=False, overwrite=False):
 		"""
 		Train the classifier.
 		Assumes lightcurve time is in days
@@ -205,7 +205,7 @@ class RFGCClassifier(BaseClassifier):
 
 		# Check for pre-calculated features
 
-		fitlabels = self.parse_labels(labels)
+		fitlabels = self.parse_labels(tset.labels())
 
 		logger.info('Calculating features...')
 
@@ -213,14 +213,13 @@ class RFGCClassifier(BaseClassifier):
 		if self.classifier.som is None:
 			logger.info('No SOM loaded. Creating new SOM, saving to ''som.txt''.')
 			#make copy of features iterator
-			features1,features2 = itertools.tee(features,2)
-			self.classifier.som = fc.makeSOM(features1, outfile=os.path.join(self.data_dir, 'som.txt'), overwrite=overwrite)
+			self.classifier.som = fc.makeSOM(tset.features(), outfile=os.path.join(self.data_dir, 'som.txt'), overwrite=overwrite)
 			logger.info('SOM created and saved.')
 			logger.info('Calculating/Loading Features.')
-			featarray = fc.featcalc(features2, self.classifier.som, savefeat=self.featdir, recalc=recalc)
+			featarray = fc.featcalc(tset.features(), self.classifier.som, savefeat=self.featdir, recalc=recalc)
 		else:
 			logger.info('Calculating/Loading Features.')
-			featarray = fc.featcalc(features, self.classifier.som, savefeat=self.featdir, recalc=recalc)
+			featarray = fc.featcalc(tset.features(), self.classifier.som, savefeat=self.featdir, recalc=recalc)
 		logger.info('Features calculated/loaded.')
 
 		try:
@@ -238,7 +237,7 @@ class RFGCClassifier(BaseClassifier):
 				if not os.path.exists(self.clfile) or overwrite or recalc:
 					logger.info('Saving pickled classifier instance to rfgc_classifier_v01.pickle')
 					logger.info('Saving SOM to som.txt (will overwrite)')
-					self.save(self.clfile,self.somfile)
+					self.save(self.clfile, self.somfile)
 
 
 	def parse_labels(self,labels,removeduplicates=False):

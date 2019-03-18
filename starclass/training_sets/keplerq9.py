@@ -13,8 +13,7 @@ from bottleneck import nanmedian, nansum
 import sqlite3
 import logging
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
-from .. import StellarClasses, BaseClassifier, TaskManager
+from .. import StellarClasses
 from . import TrainingSet
 
 #----------------------------------------------------------------------------------------------
@@ -28,25 +27,18 @@ class keplerq9(TrainingSet):
 		# Point this to the directory where the TDA simulations are stored
 		self.input_folder = self.tset_datadir('keplerq9', 'https://tasoc.dk/starclass_tsets/keplerq9.zip')
 
+		# Find the number of training sets:
+		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
+		self.nobjects = data.shape[0]
+
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
 		super(self.__class__, self).__init__(*args, **kwargs)
-
-		# Generate training/test indices
-		if self.testfraction > 0:
-			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
-			nobjects = data.shape[0]
-			self.train_idx, self.test_idx = train_test_split(np.arange(nobjects), test_size=self.testfraction, random_state=42, stratify=data[:,1])
 
 	#----------------------------------------------------------------------------------------------
 	def generate_todolist(self):
 
 		logger = logging.getLogger(__name__)
-
-		# Make sure some directories exist:
-		#os.makedirs(os.path.join(self.input_folder, 'sysnoise_by_sectors'), exist_ok=True)
-		#os.makedirs(os.path.join(self.input_folder, 'noisy_by_sectors'), exist_ok=True)
-		#os.makedirs(os.path.join(self.input_folder, 'clean_by_sectors'), exist_ok=True)
 
 		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
 		with sqlite3.connect(sqlite_file) as conn:
@@ -103,11 +95,9 @@ class keplerq9(TrainingSet):
 				if not isinstance(starname, six.string_types): starname = starname.decode("utf-8") # For Python 3
 				if not isinstance(starclass, six.string_types): starclass = starclass.decode("utf-8") # For Python 3
 				if starname.startswith('constant_'):
-
 					starid = -1
 				elif starname.startswith('fakerrlyr_'):
 					starid = -1
-
 				else:
 					starid = int(starname)
 
@@ -187,79 +177,13 @@ class keplerq9(TrainingSet):
 					ecllat
 				))
 
-			"""
-			logger.info("Step 2: Figuring out where targets are on CCDs...")
-			cursor.execute("SELECT MIN(eclon) AS min_eclon, MAX(eclon) AS max_eclon FROM diagnostics;")
-			row = cursor.fetchone()
-			eclon_min = row['min_eclon']
-			eclon_max = row['max_eclon']
-
-			cursor.execute("SELECT todolist.priority, camera, eclat, eclon FROM todolist INNER JOIN diagnostics ON todolist.priority=diagnostics.priority;")
-			results = cursor.fetchall()
-			for row in tqdm(results, total=len(results)):
-				frac_lon = (row['eclon']-eclon_min) / (eclon_max-eclon_min)
-				offset = (row['camera']-1)*24 + 6.0
-				frac_lat = (row['eclat']-offset) / 24.0
-				if frac_lon <= 0.5 and frac_lat <= 0.5:
-					ccd = 1
-				elif frac_lon > 0.5 and frac_lat <= 0.5:
-					ccd = 2
-				elif frac_lon <= 0.5 and frac_lat > 0.5:
-					ccd = 3
-				elif frac_lon > 0.5 and frac_lat > 0.5:
-					ccd = 4
-				else:
-					raise Exception("WHAT?")
-
-				pos_column = 4096 * frac_lon
-				if pos_column > 2048: pos_column -= 2048
-				pos_row = 4096 * frac_lat
-				if pos_row > 2048: pos_row -= 2048
-
-				cbv_area = 100*camera + 10*ccd
-				if pos_row > 1024 and pos_column > 1024:
-					cbv_area += 4
-				elif pos_row > 1024 and pos_column <= 1024:
-					cbv_area += 3
-				elif pos_row <= 1024 and pos_column > 1024:
-					cbv_area += 2
-				else:
-					cbv_area += 1
-
-				cursor.execute("UPDATE todolist SET ccd=?, cbv_area=? WHERE priority=?;", (ccd, cbv_area, row['priority']))
-				cursor.execute("UPDATE diagnostics SET pos_column=?, pos_row=? WHERE priority=?;", (pos_column, pos_row, row['priority']))
-			"""
-
 			conn.commit()
 			cursor.close()
 
 		logger.info("DONE.")
 
 	#----------------------------------------------------------------------------------------------
-	def training_set_features(self):
-
-		rowidx = -1
-		with TaskManager(self.input_folder, overwrite=True) as tm:
-			with BaseClassifier(features_cache=os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)) as stcl:
-				while True:
-					task = tm.get_task(classifier=self.classifier)
-					if task is None: break
-					tm.start_task(task)
-					rowidx += 1
-
-					# Lightcurve file to load:
-					# We do not use the one from the database because in the simulations the
-					# raw and corrected light curves are stored in different files.
-					fname = os.path.join(self.input_folder, task['lightcurve'])
-
-					if self.testfraction > 0:
-						if rowidx in self.train_idx:
-							yield stcl.load_star(task, fname)
-					else:
-						yield stcl.load_star(task, fname)
-
-	#----------------------------------------------------------------------------------------------
-	def training_set_labels(self, level='L1'):
+	def labels(self, level='L1'):
 
 		logger = logging.getLogger(__name__)
 
@@ -300,38 +224,11 @@ class keplerq9(TrainingSet):
 		return tuple(lookup)
 
 	#----------------------------------------------------------------------------------------------
-	def training_set_features_test(self):
-
-		if self.testfraction == 0:
-			raise ValueError('training_set_features_test requires testfraction>0')
-		else:
-
-			rowidx = -1
-			with TaskManager(self.input_folder, overwrite=True) as tm:
-				with BaseClassifier(features_cache=os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)) as stcl:
-					while True:
-						task = tm.get_task(classifier=self.classifier)
-						if task is None: break
-						tm.start_task(task)
-						rowidx += 1
-
-						# Lightcurve file to load:
-						# We do not use the one from the database because in the simulations the
-						# raw and corrected light curves are stored in different files.
-						fname = os.path.join(self.input_folder, task['lightcurve'])
-
-						if self.testfraction > 0:
-							if rowidx in self.test_idx:
-								yield stcl.load_star(task, fname)
-						else:
-							yield stcl.load_star(task, fname)
-
-	#----------------------------------------------------------------------------------------------
-	def training_set_labels_test(self, level='L1'):
+	def labels_test(self, level='L1'):
 
 		logger = logging.getLogger(__name__)
 
-		if self.testfraction == 0:
+		if self.testfraction <= 0:
 			return []
 		else:
 			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')

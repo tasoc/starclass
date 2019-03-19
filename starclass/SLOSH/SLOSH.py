@@ -11,7 +11,6 @@ import numpy as np
 import os, math, logging
 from keras import backend as K
 from keras.models import load_model
-from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import ReduceLROnPlateau
 from . import SLOSH_prepro as preprocessing
 from .. import BaseClassifier, StellarClasses
@@ -75,10 +74,8 @@ class SLOSHClassifier(BaseClassifier):
 		# Pre-calculated power density spectrum:
 		psd = features['powerspectrum'].standard
 
-		preprocessing.generate_single_image(psd[0], psd[1], features['priority'], output_path = os.getcwd(), label=None, numax=None)
-
 		logger.info('Generating Image...')
-		img_array = preprocessing.img_to_array(os.path.join(os.getcwd(), '/%s.png' %features['priority']), normalize=True)
+		img_array = preprocessing.generate_single_image(psd[0], psd[1])
 
 		logger.info('Making Predictions...')
 		pred_array = np.zeros((self.mc_iterations, len(self.classifier_list)))
@@ -152,25 +149,17 @@ class SLOSHClassifier(BaseClassifier):
 				label = 1 if StellarClasses.SOLARLIKE in lbl else 0
 				print(label)
 
-				preprocessing.generate_single_image(psd[0], psd[1],
+				preprocessing.generate_train_images(psd[0], psd[1],
 													feat['priority'],
-													output_path=train_folder, label=label, numax=None)
+													output_path=train_folder, label=label)
 		else:
-			logger.info('Train Images exists...')
+			logger.info('Train Images exist...')
 
 		reduce_lr = ReduceLROnPlateau(factor=0.5, patience=10, verbose=1)
 		model = preprocessing.default_classifier_model()
 
-		nb_files = 0
-		for dirpath, dirnames, filenames in os.walk(train_folder):
-			for i in range(len(filenames)):
-				nb_files += 1
-
-		datagen = ImageDataGenerator(rescale=1. / 255., height_shift_range=0.15)
-		train_generator = datagen.flow_from_directory(train_folder, target_size=(128, 128), color_mode='grayscale',
-													  class_mode='categorical', batch_size=32)
+		train_generator = preprocessing.npy_generator(root=train_folder, batch_size=32,  dim=(128,128), extension='.npz')
 		logger.info('Training Classifier...')
-		#epochs = 200
 		epochs = 50
 		model.fit_generator(train_generator, epochs=epochs, steps_per_epoch=math.ceil(nb_files / 32),
 							callbacks=[reduce_lr], verbose=2)

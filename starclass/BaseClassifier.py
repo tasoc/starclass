@@ -8,11 +8,13 @@ All other specific stellar classification algorithms will inherit from BaseClass
 """
 
 from __future__ import division, print_function, with_statement, absolute_import
+import warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning, message='Using or importing the ABCs from \'collections\' instead of from \'collections.abc\' is deprecated')
 import numpy as np
 import os.path
 import logging
 from lightkurve import TessLightCurve
-from astropy.stats import mad_std
+from astropy.io import fits
 from .StellarClasses import StellarClasses
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
@@ -29,7 +31,7 @@ class BaseClassifier(object):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	def __init__(self, level='L1', features_cache=None, plot=False):
+	def __init__(self, level='L1', tset='keplerq9', features_cache=None, plot=False):
 		"""
 		Initialize the classifier object.
 
@@ -52,7 +54,10 @@ class BaseClassifier(object):
 		self.plot = plot
 		self.level = level
 		self.features_cache = features_cache
-		self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level))
+		self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level, tset))
+		logger.debug("Data Directory: %s", self.data_dir)
+		if not os.path.exists(self.data_dir):
+			os.makedirs(self.data_dir)
 
 		if self.features_cache is not None and not os.path.exists(self.features_cache):
 			raise ValueError("features_cache directory does not exists")
@@ -130,23 +135,53 @@ class BaseClassifier(object):
 		logger = logging.getLogger(__name__)
 
 		# Load lightcurve file and create a TessLightCurve object:
-		if fname.endswith('.noisy') or fname.endswith('.sysnoise'):
+		if fname.endswith('.noisy') or fname.endswith('.sysnoise') or fname.endswith('.txt'):
 			data = np.loadtxt(fname)
+			if data.shape[1] == 4:
+				quality = np.asarray(data[:,3], dtype='int32')
+			else:
+				quality = np.zeros(data.shape[0], dtype='int32')
+
 			lightcurve = TessLightCurve(
 				time=data[:,0],
 				flux=data[:,1],
 				flux_err=data[:,2],
-				quality=np.asarray(data[:,3], dtype='int32'),
+				quality=quality,
 				time_format='jd',
 				time_scale='tdb',
-				ticid=task['starid'],
+				targetid=task['starid'],
 				camera=task['camera'],
 				ccd=task['ccd'],
 				sector=2,
 				#ra=0,
 				#dec=0,
-				quality_bitmask=2+8+256 # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK
+				quality_bitmask=2+8+256, # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK,
+				meta={}
 			)
+
+		elif fname.endswith('.fits') or fname.endswith('.fits.gz'):
+			with fits.open(fname, mode='readonly', memmap=True) as hdu:
+				lightcurve = TessLightCurve(
+					time=hdu['LIGHTCURVE'].data['TIME'],
+					flux=hdu['LIGHTCURVE'].data['FLUX_CORR'],
+					flux_err=hdu['LIGHTCURVE'].data['FLUX_CORR_ERR'],
+					centroid_col=hdu['LIGHTCURVE'].data['MOM_CENTR1'],
+					centroid_row=hdu['LIGHTCURVE'].data['MOM_CENTR2'],
+					quality=np.asarray(hdu['LIGHTCURVE'].data['QUALITY'], dtype='int32'),
+					cadenceno=np.asarray(hdu['LIGHTCURVE'].data['CADENCENO'], dtype='int32'),
+					time_format='btjd',
+					time_scale='tdb',
+					targetid=hdu[0].header.get('TICID'),
+					label=hdu[0].header.get('OBJECT'),
+					camera=hdu[0].header.get('CAMERA'),
+					ccd=hdu[0].header.get('CCD'),
+					sector=hdu[0].header.get('SECTOR'),
+					ra=hdu[0].header.get('RA_OBJ'),
+					dec=hdu[0].header.get('DEC_OBJ'),
+					quality_bitmask=2+8+256, # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK
+					meta={}
+				)
+
 		else:
 			raise ValueError("Invalid file format")
 
@@ -189,7 +224,8 @@ class BaseClassifier(object):
 		features['lightcurve'] = lightcurve
 
 		# Prepare lightcurve for power spectrum calculation:
-		lc = (lightcurve.remove_nans().normalize() - 1.0) * 1e6
+		# NOTE: Lightcurves are now in relative flux (ppm) with zero mean!
+		lc = lightcurve.remove_nans()
 		#lc = lc.remove_outliers(5.0, stdfunc=mad_std) # Sigma clipping
 
 		# Calculate power spectrum:

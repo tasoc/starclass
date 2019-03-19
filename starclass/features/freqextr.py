@@ -34,7 +34,8 @@ def freqextr(lightcurve, numfreq=6, hifac=1, ofac=4):
 	logger = logging.getLogger(__name__)
 
 	# Normalize the lightcurve and convert to ppm:
-	lc = (lightcurve.remove_nans().normalize() - 1.0) * 1e6
+	#lc = (lightcurve.remove_nans().normalize() - 1.0) * 1e6
+	lc = lightcurve
 
 	# Create temp directory to hold the timeseries:
 	# We should really use tempfile.TemporaryDirectory instead, but it seems

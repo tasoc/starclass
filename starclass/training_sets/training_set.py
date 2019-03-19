@@ -40,12 +40,15 @@ class TrainingSet(object):
 			self.generate_todolist()
 
 		# Generate training/test indices
+		#print(self.testfraction)
 		if self.testfraction > 0:
+			print("SAFE!")
+
 			self.train_idx, self.test_idx = train_test_split(
 				np.arange(self.nobjects),
 				test_size=self.testfraction,
 				random_state=42,
-				stratify=self.training_set_labels()
+				stratify=self.labels(train_test_split=False)
 			)
 
 	#----------------------------------------------------------------------------------------------

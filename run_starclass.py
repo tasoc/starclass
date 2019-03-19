@@ -92,8 +92,8 @@ if __name__ == '__main__':
 			if args.testfraction > 0.0:
 				logger.debug("Starting testing...")
 
-				features_test = tset.training_set_features_test()
-				labels_test = tset.training_set_labels_test(level=args.level)
+				features_test = tset.features_test()
+				labels_test = tset.labels_test(level=args.level) #training_set_labels_test(level=args.level)
 
 				# Convert to values
 				labels_test_val = []

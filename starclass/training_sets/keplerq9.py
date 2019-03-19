@@ -183,7 +183,9 @@ class keplerq9(TrainingSet):
 		logger.info("DONE.")
 
 	#----------------------------------------------------------------------------------------------
-	def labels(self, level='L1'):
+	def labels(self, level='L1', train_test_split=True):
+		# Added a train_test_split flag, otherwise crashes when creating
+		# train/test sets as self.train_idx isn't defined the first time.
 
 		logger = logging.getLogger(__name__)
 
@@ -215,7 +217,7 @@ class keplerq9(TrainingSet):
 				else:
 					lbls.append(c)
 
-			if self.testfraction > 0:
+			if (self.testfraction > 0) and (train_test_split == True):
 				if rowidx in self.train_idx:
 					lookup.append(tuple(set(lbls)))
 			else:

@@ -24,147 +24,211 @@ from keras.optimizers import Adam
 
 mpl.rcParams['agg.path.chunksize'] = 10000
 
-def print_images(freq, power, star_id, output_folder_path, designation=None, numax=None):
-    '''
-    Plots the log-log PSD and saves a 2D image into an output folder
-    :param freq: Array of frequency values of the PSD
-    :param power: Array of power values from the PSD
-    :param designation: Integer value used to indicate classe labels if needed
-    :return: None
-    '''
-    if designation is None and numax is None:
-        output_folder = output_folder_path + '/%s.png' %star_id
-    elif numax is not None and designation is None:
-        output_folder = output_folder_path + '/1/%s-%.2f.png' %(star_id, numax)
-    elif designation is not None and numax is None:
-        output_folder = output_folder_path + '/%s/%s.png' %(designation, star_id)
-    else:
-        output_folder = output_folder_path + '/%s/%s-%.2f.png' % (designation, star_id, numax)
 
-    fig = Figure(figsize=(256 / 85, 256 / 85), dpi=96)
-    canvas = FigureCanvas(fig)
-    ax = fig.gca()
-    ax.loglog(freq, power, c='w')
-    ax.set_xlim([3., 283]) # Boundary ranges for plotting
-    ax.set_ylim([3, 3e7])
-    fig.tight_layout(pad=0.01)
-    ax.axis('off')
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
-    canvas.draw()  # draw the canvas, cache the renderer
-    canvas.print_figure(output_folder, bbox_inches='tight', pad_inches=0,facecolor='black')
-    plt.close()
+class npy_generator(keras.utils.Sequence):
+    """
+    Generator that loads numpy arrays from a folder for training a deep learning model. This version has been tailored
+    for a classifier, with the training labels taken from the subfolder. Indices of training/validation can be passed
+    to indicate which files to partition for each set.
+    Written by  Marc Hon (mtyh555@uowmail.edu.au)
+    """
+    def __init__(self, root, batch_size, dim, extension = '.npz', shuffle = True, indices=[]):
+        self.root = root # root folder containing subfolders
+        self.batch_size = batch_size
+        self.extension = extension # file extension
+        self.filenames = []
+        self.subfolder_labels = [] # for binary classification
+        self.shuffle = shuffle # shuffles data after every epoch
+        self.dim=dim # image/2D array dimensions
 
-    return None
+        for dirpath, dirnames, filenames in os.walk(root):
+            for file in filenames:
+                if file.endswith(extension) & dirpath[-1].isdigit(): # I infer the class label '0' or '1' according to subfolder names
+                    self.filenames.append(os.path.join(dirpath, file))
+                    self.subfolder_labels.append(int(dirpath[-1]))
+        if len(indices) == 0: # otherwise pass a list of training/validation indices
+            self.indexes = np.arange(len(self.filenames))
+        else:
+            self.indexes = np.array(indices)
 
-def generate_single_image(freq, power, star_id, output_path, label, numax):
+    def __len__(self):
+        return int(np.ceil(len(self.indexes) / float(self.batch_size)))
+    def __getitem__(self, index):
+        # Generate indexes of the batch
+        batch_indices = self.indexes[index*self.batch_size:(index+1)*self.batch_size]
+        # Get a list of filenames of the batch
+        batch_filenames = [self.filenames[k] for k in batch_indices]
+        batch_labels = [self.subfolder_labels[k] for k in batch_indices]
+        # Generate data
+        X, y = self.__data_generation(batch_filenames, batch_labels)
+        return X, keras.utils.to_categorical(y, num_classes=2)
+
+    def on_epoch_end(self):
+        # Shuffles indices after every epoch
+        self.indexes = np.arange(len(self.filenames))
+        if self.shuffle:
+            np.random.shuffle(self.indexes)
+
+    def __data_generation(self, batch_filenames, batch_labels):
+        # Generates data - this example is repurposed for .npy files
+        X = np.empty((len(batch_filenames), self.dim[0], self.dim[1]))
+        y = np.empty((len(batch_filenames)), dtype=int)
+
+        for i, ID in enumerate(batch_filenames):
+            X[i, :] = np.load(ID)['im']
+            y[i] = batch_labels[i]
+        return np.expand_dims(X,-1), y
+
+def local_maxima(grid, search_radius):
+    moving_max_vec = np.zeros(len(grid))
+
+    for i in range(len(grid)):
+        if i < 0.8*len(grid):
+            radius = search_radius
+            q = 95
+        else:
+            radius = int(search_radius/2)
+            q = 98
+
+        if (i + radius) > len(grid) - 1:
+            upper_bound = len(grid) - 1
+            lower_bound = (i - radius) - ((i + radius) - (len(grid) - 1))
+        elif (i - radius) < 0:
+            lower_bound = 0
+            upper_bound = (i + radius) + i
+        else:
+            upper_bound = i + radius
+            lower_bound = i - radius
+
+        moving_max_vec[i] = np.percentile(grid[lower_bound: upper_bound], q=q)
+
+    return moving_max_vec
+
+
+def squeeze(arr, minval, maxval, axis=0):
+    """
+    Returns version of 1D arr with values squeezed to range [minval,maxval]
+    """
+    #array is 1D
+    minvals = np.ones(arr.shape)*minval
+    maxvals = np.ones(arr.shape)*maxval
+
+    #assure above minval first
+    squeezed = np.max(np.vstack((arr,minvals)),axis=0)
+    squeezed = np.min(np.vstack((squeezed,maxvals)),axis=0)
+
+    return squeezed
+
+
+def ps_to_array(freq, power, nbins=128, supersample=1,
+                minfreq=3., maxfreq=283., minpow=3., maxpow=3e7):
+    """
+    Produce 2D array representation of power spectrum that is similar to Marc Hon's 2D images
+    Written by Keaton Bell (bell@mps.mpg.de)
+    This should be faster and more precise than writing plots to images
+    Returns nbin x nbins image-like representation of the data
+    freq and power are from power spectrum
+    min/max freqs/powers define the array edges in same units as input spectrum
+    if supersample == 1, result is strictly black and white (1s and 0s)
+    if supersample > 1, returns grayscale image represented spectrum "image" density
+    """
+    # make sure integer inputs are integers
+    nbins = int(nbins)
+    supersample = int(supersample)
+    # Set up array for output
+    output = np.zeros((nbins, nbins))
+    if supersample > 1:  # SUPERSAMPLE
+        # Call yourself and flip orientation again
+        supersampled =  ps_to_array(freq, power, nbins=nbins * supersample, supersample=1,
+                                        minfreq=minfreq, maxfreq=maxfreq, minpow=minpow, maxpow=maxpow)[::-1]
+        for i in range(supersample):
+            for j in range(supersample):
+                output += supersampled[i::supersample, j::supersample]
+        output = output / (supersample ** 2.)
+    else:  # don't supersample
+        # Do everything in log space
+        logfreq = np.log10(freq)
+        logpower = np.log10(power)
+        minlogfreq = np.log10(minfreq)
+        maxlogfreq = np.log10(maxfreq)
+        minlogpow = np.log10(minpow)
+        maxlogpow = np.log10(maxpow)
+
+        # Define bins
+
+        xbinedges = np.linspace(np.log10(minfreq), np.log10(maxfreq), nbins + 1)
+        xbinwidth = xbinedges[1] - xbinedges[0]
+        ybinedges = np.linspace(np.log10(minpow), np.log10(maxpow), nbins + 1)
+        ybinwidth = ybinedges[1] - ybinedges[0]
+
+        # resample at/near edges of bins and at original frequencies
+
+        smalloffset = xbinwidth / (10. * supersample)  # to get included in lower-freq bin
+        interpps = interp1d(logfreq, logpower, fill_value=(0,0), bounds_error=False)
+        poweratedges = interpps(xbinedges)
+        logfreqsamples = np.concatenate((logfreq, xbinedges, xbinedges - smalloffset))
+        powersamples = np.concatenate((logpower, poweratedges, poweratedges))
+
+        sort = np.argsort(logfreqsamples)
+        logfreqsamples = logfreqsamples[sort]
+        powersamples = powersamples[sort]
+
+        # Get maximum and minimum of power in each frequency bin
+        maxpow = binned_statistic(logfreqsamples, powersamples, statistic='max', bins=xbinedges)[0]
+        minpow = binned_statistic(logfreqsamples, powersamples, statistic='min', bins=xbinedges)[0]
+        # Convert to indices of binned power
+
+        # Fix to fall within power range
+        minpowinds = np.floor((minpow - minlogpow) / ybinwidth)
+        minpowinds = squeeze(minpowinds, 0, nbins).astype('int')
+        maxpowinds = np.ceil((maxpow - minlogpow) / ybinwidth)
+        maxpowinds = squeeze(maxpowinds, 0, nbins).astype('int')
+
+        # populate output array
+        for i in range(nbins):
+            output[minpowinds[i]:maxpowinds[i], i] = 1.
+            if maxpowinds[i] - minpowinds[i] != np.sum(output[minpowinds[i]:maxpowinds[i], i]):
+                print(i, "!!!!!!")
+                print(minpowinds[i])
+                print(maxpowinds[i])
+    # return result, flipped to match orientation of Marc's images
+    return output[::-1]
+
+
+def generate_single_image(freq, power):
     '''
     Generates an image from the PSD of a single star.
     :param freq: Array of frequency values for the PSD
     :param power: Array of power values for the PSD
-    :param star_id: The identifier of the star for file naming purposes
-    :param output_path: Image output path
-    :param label: Classification label for star for classifier training,
-     typically 0 for nondet and 1 for positive detection
-    :param numax: Numax value for star for regressor training
-    :return: None
+    :return: image: 2D binary array containing the PSD 'image'
     '''
-    if label is None and numax is None:
-        print_images(freq, power, star_id, output_path)
-    elif label is not None and numax is None:
-        if not os.path.exists(output_path+'/1/'):
-            os.mkdir(output_path+'/1/')
-        if not os.path.exists(output_path+'/0/'):
-            os.mkdir(output_path+'/0/')
-        print_images(freq, power, star_id, output_path, designation=label)
-    elif numax is not None and label is None:
-        if not os.path.exists(output_path+'/1/'):
-            os.mkdir(output_path+'/1/')
-        print_images(freq, power, star_id, output_path, numax=numax)
-    else:
-        if not os.path.exists(output_path+'/1/'):
-            os.mkdir(output_path+'/1/')
-        if not os.path.exists(output_path+'/0/'):
-            os.mkdir(output_path+'/0/')
-        print_images(freq, power, star_id, output_path, numax=numax, designation=label)
+    image = ps_to_array(freq, power)
+    return image
 
 
-def generate_images(input_folder_path, output_folder_path, star_list=None, label_list=None, numax_list=None):
+def generate_train_images(freq, power, star_id, output_path, label):
     '''
     Generates images from PSD in an input folder. Handles two column files with frequency as one column and power as the other.
     For ease of naming files, source files should be named with the Star ID.
-    :param input_folder_path: The folder containing all the PSD
-    :param output_folder_path: The folder containing all the PSD
+    :param freq: Frequency values for the PSD
+    :param power: Power values for the PSD
     :param star_list: For generating images for a training set, a list to cross-match with known parameters
-    :param label_list: List of ground truth detection values for classifier training set creation
-    :param numax_list: List of ground truth numax values for regressor training set creation
+    :param output_path: Image output path
+    :param label: Training label
+    :param numax: Numax value for star for regressor training (for later implementation)
     :return: None
     '''
 
-    for filename in os.listdir(input_folder_path):
-        merge = os.path.join(input_folder_path, filename)
-        if merge.endswith('.csv'):  # Read in file, change format and IO if required
-            df = pd.read_csv(merge)
-            freq = df.iloc[:,0].values
-            power = df.iloc[:,1].values
-        elif merge.endswith('.fits'):
-            with fits.open(merge) as data: # Rafa fits files
-                df = pd.DataFrame(data[0].data)
-                freq = df.iloc[:, 0].values * 1E6
-                power = df.iloc[:, 1].values
-        else:
-            df = pd.read_table(merge, header=None, delim_whitespace=True)
-            freq = df.iloc[:,0].values
-            power = df.iloc[:,1].values
-        star_id = int(re.search(r'\d+', filename).group()) # get ID from filename
+    if label is None:
+        image = generate_single_image(freq, power)
+        np.savez_compressed(file = output_path+'/%s' %star_id, im=image)
+    else:
+        if not os.path.exists(output_path + '/1/'):
+            os.mkdir(output_path + '/1/')
+        if not os.path.exists(output_path + '/0/'):
+            os.mkdir(output_path + '/0/')
+        np.savez_compressed(file=output_path+'/%s/%s'%(label, star_id))
 
-
-        if star_list is not None: # so we have a training set
-            if label_list is not None and numax_list is None:
-                if not os.path.exists(output_folder_path + '/1/'):
-                    os.mkdir(output_folder_path + '/1/')
-                if not os.path.exists(output_folder_path + '/0/'):
-                    os.mkdir(output_folder_path + '/0/')
-
-                training_label = np.array(label_list)[np.where(np.array(star_list) == star_id)][0]
-                print_images(freq, power, star_id, output_folder_path, designation=training_label)
-            elif numax_list is not None and label_list is None:
-                if not os.path.exists(output_folder_path + '/1/'):
-                    os.mkdir(output_folder_path + '/1/')
-
-                train_numax = np.array(numax_list)[np.where(np.array(star_list) == star_id)][0]
-                print_images(freq, power, star_id, output_folder_path, numax=train_numax)
-            elif numax_list is not None and label_list is not None:
-                if not os.path.exists(output_folder_path + '/1/'):
-                    os.mkdir(output_folder_path + '/1/')
-                if not os.path.exists(output_folder_path + '/0/'):
-                    os.mkdir(output_folder_path + '/0/')
-
-                training_label = np.array(label_list)[np.where(np.array(star_list) == star_id)][0]
-                train_numax = np.array(numax_list)[np.where(np.array(star_list) == star_id)][0]
-                print_images(freq, power, star_id, output_folder_path, numax=train_numax, designation=training_label)
-            else:
-                raise FileNotFoundError('Please include training labels or numax!')
-        else:
-            print_images(freq, power, star_id, output_folder_path)
-
-
-def img_to_array(im_path, normalize=True):
-    '''
-    Converts an image to a 128x128 2D grayscale pixel array
-    :param im_path: Path to image
-    :param normalize: If True, normalize values to lie between 0 and 1
-    :return: img_array: 2D grayscale pixel array
-    '''
-    if not os.path.exists(im_path):
-        raise ValueError('Target path does not exist!')
-    img = pil_image.open(im_path).convert('L')
-    img = img.resize((128, 128), pil_image.NEAREST)
-    img_array = np.array(img, dtype=K.floatx())
-    if normalize:
-        img_array *= 1 / 255.0
-
-    return img_array
 
 def default_classifier_model():
     '''
@@ -268,46 +332,6 @@ def default_regressor_model_aleatoric():
                   loss_weights={'prediction': 1., 'pred_var': .2})
     return model
 
-def numax_generator(generator):
-    '''
-    Converts a flow_from_directory generator to a generator that takes values from the filenames and outputs numax
-    :param generator:
-    :return:
-    '''
-    conversion_a = 3  # constants for conversion from pixel coordinate to frequency in uHz
-    conversion_b = (1. / 128.) * np.log(283. / 3.)
-    for x in generator:
-        idx = (generator.batch_index - 1) * generator.batch_size
-        names = generator.filenames[idx:idx + generator.batch_size]
-        if len(names) == 0:
-            continue
-        numaxes = np.zeros(len(names))
-        print(numaxes)
-        for i in range(len(names)):
-            numaxes[i] = (float(names[i].split("-", 1)[1][:-4]))
-        numaxes = (1 / conversion_b) * np.log(numaxes / conversion_a)  # convert to pixel coordinates
-        yield x, np.array(numaxes).reshape((np.array(numaxes).shape[0], 1))
-
-def numax_generator_aleatoric(generator):
-    '''
-    Converts a flow_from_directory generator to a generator that takes values from the filenames and outputs numax for
-    aleatoric models
-    :param generator:
-    :return:
-    '''
-    conversion_a = 3  # constants for conversion from pixel coordinate to frequency in uHz
-    conversion_b = (1. / 128.) * np.log(283. / 3.)
-    for x in generator:
-        idx = (generator.batch_index - 1) * generator.batch_size
-        names = generator.filenames[idx:idx + generator.batch_size]
-        if len(names) == 0:
-            continue
-        numaxes = np.zeros(len(names))
-        for i in range(len(names)):
-            numaxes[i] = (float(names[i].split("-", 1)[1][:-4]))  # get numax from filename
-        numaxes = (1 / conversion_b) * np.log(numaxes / conversion_a)  # convert to pixel coordinates
-        numaxes = np.array(numaxes).reshape((np.array(numaxes).shape[0], 1))
-        yield x, [numaxes, numaxes]
 
 
 def aleatoric_loss(y_true, pred_var):

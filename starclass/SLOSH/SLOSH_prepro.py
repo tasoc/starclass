@@ -6,29 +6,21 @@ Utilities for SLOSH (2D deep learning methods).
 .. codeauthor::  Marc Hon <mtyh555@uowmail.edu.au>
 """
 
-import matplotlib as mpl
-import keras.backend as K
-import os, re
+from __future__ import division, print_function, absolute_import
+import os
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from astropy.io import fits
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
-from PIL import Image as pil_image
+import keras.backend as K
+import keras.utils
 from keras.layers import Input, Dropout, MaxPooling2D, Flatten, Conv2D, LeakyReLU, concatenate
 from keras.models import Model
 from keras.layers.core import Dense
 from keras.regularizers import l2
 from keras.optimizers import Adam
 
-mpl.rcParams['agg.path.chunksize'] = 10000
-
-
 class npy_generator(keras.utils.Sequence):
     """
     Generator that loads numpy arrays from a folder for training a deep learning model. This version has been tailored
-    for a classifier, with the training labels taken from the subfolder. Indices of training/validation can be passed
+    for a classifier, with #the training labels taken from the subfolder. Indices of training/validation can be passed
     to indicate which files to partition for each set.
     Written by  Marc Hon (mtyh555@uowmail.edu.au)
     """

@@ -87,7 +87,6 @@ class keplerq9(TrainingSet):
 			pri = 0
 			starlist = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), delimiter=',', dtype=None, encoding='utf-8')
 			for k, star in tqdm(enumerate(starlist), total=len(starlist)):
-				#print(star)
 
 				# Get starid:
 				starname = star[0]
@@ -183,7 +182,7 @@ class keplerq9(TrainingSet):
 		logger.info("DONE.")
 
 	#----------------------------------------------------------------------------------------------
-	def labels(self, level='L1', train_test_split=True):
+	def labels(self, level='L1', train_test_split=True, cv_split=False):
 		# Added a train_test_split flag, otherwise crashes when creating
 		# train/test sets as self.train_idx isn't defined the first time.
 
@@ -217,9 +216,15 @@ class keplerq9(TrainingSet):
 				else:
 					lbls.append(c)
 
-			if (self.testfraction > 0) and (train_test_split == True):
+			if (self.testfraction > 0) and (train_test_split == True) and (cv_split == False):
 				if rowidx in self.train_idx:
 					lookup.append(tuple(set(lbls)))
+			elif (self.KFoldCV == True) and (self.testfraction > 0) and (cv_split == True):
+				if rowidx in self.cvtrain_idx:
+					lookup.append(tuple(set(lbls)))
+			#elif (self.KFoldCV == True):
+			#	if rowidx in self.cvtrain_idx:
+			#		lookup.append(tuple(set(lbls)))
 			else:
 				lookup.append(tuple(set(lbls)))
 
@@ -230,7 +235,8 @@ class keplerq9(TrainingSet):
 
 		logger = logging.getLogger(__name__)
 
-		if self.testfraction <= 0:
+		# Ignore this error if KFoldCV flag set since we set test_idx manually
+		if (self.testfraction <= 0) & (self.KFoldCV == False):
 			return []
 		else:
 			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
@@ -260,8 +266,11 @@ class keplerq9(TrainingSet):
 						logger.error("Unknown label: %s", lbl)
 					else:
 						lbls.append(c)
-
-				if rowidx in self.test_idx:
-					lookup.append(tuple(set(lbls)))
+				if self.KFoldCV == True:
+					if rowidx in self.cvtest_idx:
+						lookup.append(tuple(set(lbls)))
+				else:
+					if rowidx in self.test_idx:
+						lookup.append(tuple(set(lbls)))
 
 			return tuple(lookup)

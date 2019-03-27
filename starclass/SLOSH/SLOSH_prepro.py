@@ -7,6 +7,7 @@ Utilities for SLOSH (2D deep learning methods).
 """
 
 import matplotlib as mpl
+import keras
 import keras.backend as K
 import os, re
 import numpy as np

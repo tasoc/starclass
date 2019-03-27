@@ -14,17 +14,19 @@ import zipfile
 import shutil
 import logging
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.utils.multiclass import type_of_target
 from .. import BaseClassifier, TaskManager
 
 #----------------------------------------------------------------------------------------------
 class TrainingSet(object):
 
-	def __init__(self, classifier=None, datalevel='corr', tf=0.0):
+	def __init__(self, classifier=None, datalevel='corr', tf=0.0, KFoldCV=False):
 
 		self.classifier = classifier
 		self.datalevel = datalevel
 		self.testfraction = tf
+		self.KFoldCV = KFoldCV
 
 		if self.testfraction < 0 or self.testfraction > 1:
 			raise ValueError("Invalid testfraction provided")
@@ -41,13 +43,27 @@ class TrainingSet(object):
 
 		# Generate training/test indices
 		if self.testfraction > 0:
-
+			fitlabels = self.parse_labels(self.labels(train_test_split=False))
 			self.train_idx, self.test_idx = train_test_split(
 				np.arange(self.nobjects),
 				test_size=self.testfraction,
 				random_state=42,
-				stratify=self.labels(train_test_split=False)
+				stratify=fitlabels,
 			)
+
+		# Cross Validation
+		if self.KFoldCV == True:
+			# If keyword is true then split according to KFold cross-vadliation
+			skf = StratifiedKFold(n_splits=5, random_state=42)
+			if self.testfraction > 0:
+				# Have to pass labels back into original format so sklearn can
+				# properly interpret them to provide the indices
+				fitlabels = self.parse_labels(self.labels(train_test_split=True))
+				self.skf = skf.split(self.train_idx, fitlabels)
+			else:
+				fitlabels = self.parse_labels(self.labels(train_test_split=False))
+				self.skf = skf.split(np.arange(self.nobjects),
+									 fitlabels)
 
 	#----------------------------------------------------------------------------------------------
 	def tset_datadir(self, tset, url):
@@ -113,8 +129,14 @@ class TrainingSet(object):
 					# raw and corrected light curves are stored in different files.
 					fname = os.path.join(self.input_folder, task['lightcurve'])
 
-					if self.testfraction > 0:
+					if (self.testfraction > 0) and (self.KFoldCV == False):
 						if rowidx in self.train_idx:
+							yield stcl.load_star(task, fname)
+					elif (self.KFoldCV == True) and (self.testfraction > 0):
+						if rowidx in self.cvtrain_idx:
+							yield stcl.load_star(task, fname)
+					elif (self.KFoldCV == True):
+						if rowidx in self.cvtrain_idx:
 							yield stcl.load_star(task, fname)
 					else:
 						yield stcl.load_star(task, fname)
@@ -122,7 +144,8 @@ class TrainingSet(object):
 	#----------------------------------------------------------------------------------------------
 	def features_test(self):
 
-		if self.testfraction <= 0:
+		# Ignore this error if KFoldCV flag set since we set test_idx manually
+		if (self.testfraction <= 0) and (self.KFoldCV == False):
 			raise ValueError('features_test requires testfraction>0')
 		else:
 			rowidx = -1
@@ -134,12 +157,21 @@ class TrainingSet(object):
 						tm.start_task(task)
 						rowidx += 1
 
-						if rowidx in self.test_idx:
-							# Lightcurve file to load:
-							# We do not use the one from the database because in the simulations the
-							# raw and corrected light curves are stored in different files.
-							fname = os.path.join(self.input_folder, task['lightcurve'])
-							yield stcl.load_star(task, fname)
+						if (self.KFoldCV == True):
+							if rowidx in self.cvtest_idx:
+								# Lightcurve file to load:
+								# We do not use the one from the database because in the simulations the
+								# raw and corrected light curves are stored in different files.
+								fname = os.path.join(self.input_folder, task['lightcurve'])
+								yield stcl.load_star(task, fname)
+						else:
+							if rowidx in self.test_idx:
+								# Lightcurve file to load:
+								# We do not use the one from the database because in the simulations the
+								# raw and corrected light curves are stored in different files.
+								fname = os.path.join(self.input_folder, task['lightcurve'])
+								yield stcl.load_star(task, fname)
+
 
 	#----------------------------------------------------------------------------------------------
 	def labels(self, level='L1'):
@@ -148,3 +180,33 @@ class TrainingSet(object):
 	#----------------------------------------------------------------------------------------------
 	def labels_test(self, level='L1'):
 		raise NotImplementedError()
+
+	def parse_labels(self,labels,removeduplicates=False):
+		"""
+		"""
+		fitlabels = []
+		for lbl in labels:
+			if removeduplicates:
+				#is it multi-labelled? In which case, what takes priority?
+				#or duplicate it once for each label
+				if len(lbl)>1:#Priority order loosely based on signal clarity
+					if StellarClasses.ECLIPSE in lbl:
+						fitlabels.append('transit/eclipse')
+					elif StellarClasses.RRLYR_CEPHEID in lbl:
+						fitlabels.append('RRLyr/Ceph')
+					elif StellarClasses.CONTACT_ROT in lbl:
+						fitlabels.append('contactEB/spots')
+					elif StellarClasses.DSCT_BCEP in lbl:
+						fitlabels.append('dSct/bCep')
+					elif StellarClasses.GDOR_SPB in lbl:
+						fitlabels.append('gDor/spB')
+					elif StellarClasses.SOLARLIKE in lbl:
+						fitlabels.append('solar')
+					else:
+						fitlabels.append(lbl[0].value)
+				else:
+					#then convert to str
+					fitlabels.append(lbl[0].value)
+			else:
+				fitlabels.append(lbl[0].value)
+		return np.array(fitlabels)

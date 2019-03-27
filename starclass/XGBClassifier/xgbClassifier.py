@@ -15,6 +15,8 @@ from xgboost import XGBClassifier as xgb
 from . import xgb_feature_calc as xgb_features
 from .. import BaseClassifier, StellarClasses
 from .. import utilities
+from sklearn.utils import shuffle
+
 
 class Classifier_obj(xgb):
     """
@@ -165,20 +167,19 @@ class XGBClassifier(BaseClassifier):
             raise ValueError("Untrained Classifier")
 
         ## If classifer has been trained, calculate features
-        logger.info('Feature Extraction')
+        #logger.info('Feature Extraction')
         feature_results = xgb_features.feature_extract(features) ## Come back to this
-        logger.info('Feature Extraction done')
+        #logger.info('Feature Extraction done')
 
         # Do the magic:
-        logger.info("We are staring the magic...")
+        #logger.info("We are staring the magic...")
         xgb_classprobs = self.classifier.predict_proba(feature_results)[0]
-        logger.info('Done')
+        #logger.info('Done')
 
         class_results = {}
-
         for c, cla in enumerate(self.classifier.classes_):
             key = self.class_keys[cla]
-            class_results[key] = xgb_classprobs[c]
+            class_results[key] = float(xgb_classprobs[c])
 
         return class_results
 
@@ -193,17 +194,21 @@ class XGBClassifier(BaseClassifier):
         # Start a logger that should be used to output e.g. debug information:
         logger = logging.getLogger(__name__)
 
-        logger.info('Calculating/Loading Features.')
-        featarray = xgb_features.feature_extract(tset.features(), savefeat=self.featdir, recalc=recalc)
-        logger.info('Features calculated/loaded.')
+
 
         #if self.feature is not None:
         #    if os.path.exists(self.features_file):
         #        logger.info('Loading features from precalculated file.')
         #        feature_results = pd.read_csv(self.features_file)
+
         #        precalc = True
 
-        fit_labels = self.parse_labels(tset.labels())
+
+        fit_labels = self.parse_labels(tset.labels(cv_split=self.cv))
+
+        logger.info('Calculating/Loading Features.')
+        featarray = xgb_features.feature_extract(tset.features(), savefeat=self.featdir, recalc=recalc)
+        logger.info('Features calculated/loaded.')
 
         #if not precalc:
         #    logger.info('Extracting Features ...')
@@ -219,6 +224,7 @@ class XGBClassifier(BaseClassifier):
             logger.info('Training ...')
             #logger.info('SHAPES ', str(np.shape(featarray)))
             #logger.info('SHAPES ', str(np.shape(fit_labels)))
+            featarray, fit_labels = shuffle(featarray, fit_labels)
             self.classifier.fit(featarray, fit_labels)
             if feat_import == True:
                 importances = self.classifier.feature_importances_.astype(float)

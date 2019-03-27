@@ -54,7 +54,7 @@ def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
     featout = pd.DataFrame()
     if not isinstance(features, types.GeneratorType):
         features = [features]
-    for idx, obj in tqdm(enumerate(features)):
+    for idx, obj in enumerate(features):
 
         precalc = False
         if savefeat is not None:

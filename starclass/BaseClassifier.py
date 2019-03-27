@@ -31,12 +31,13 @@ class BaseClassifier(object):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	def __init__(self, level='L1', tset='keplerq9', features_cache=None, plot=False):
+	def __init__(self, level='L1', tset='keplerq9', features_cache=None, plot=False, cv=False):
 		"""
 		Initialize the classifier object.
 
 		Parameters:
 			plot (boolean, optional): Create plots as part of the output. Default is ``False``.
+			cv (boolean, optional): Whether cross-validation is being used or not. Default is ``False``.
 
 		Attributes:
 			plot (boolean): Indicates wheter plotting is enabled.
@@ -52,6 +53,7 @@ class BaseClassifier(object):
 
 		# Store the input:
 		self.plot = plot
+		self.cv = cv
 		self.level = level
 		self.features_cache = features_cache
 		self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level, tset))

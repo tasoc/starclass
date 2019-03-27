@@ -15,6 +15,7 @@ import pickle
 import itertools
 import copy
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.utils import shuffle
 from sklearn.model_selection import KFold
 from sklearn.metrics import confusion_matrix
 from . import RF_GC_featcalc as fc
@@ -106,6 +107,9 @@ class RFGCClassifier(BaseClassifier):
 		self.class_keys['constant'] = StellarClasses.CONSTANT
 		self.class_keys['rapid'] = StellarClasses.RAPID
 
+		# Define featarray for CV purposes
+		self.featarray = None
+		self.fitlabels = None
 
 	def save(self, outfile, somoutfile='som.txt'):
 		"""
@@ -167,14 +171,14 @@ class RFGCClassifier(BaseClassifier):
 		# Assumes that if self.classifier.trained=True,
 		# ...then self.classifier.som is not None
 
-		logger.info("Calculating features...")
+		#logger.info("Calculating features...")
 		featarray = fc.featcalc(features, self.classifier.som, savefeat=self.featdir, recalc=recalc)
 		#logger.info("Features calculated.")
 
 		# Do the magic:
 		#logger.info("We are starting the magic...")
 		classprobs = self.classifier.predict_proba(featarray)[0]
-		logger.info("Classification complete")
+		#logger.info("Classification complete")
 
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):
@@ -204,26 +208,35 @@ class RFGCClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		# Check for pre-calculated features
+		#if self.fitlabels is None:
 
-		fitlabels = self.parse_labels(tset.labels())
+		self.fitlabels = self.parse_labels(tset.labels(cv_split=self.cv))
+
 		logger.info('Calculating features...')
 
-		# Check for pre-calculated som
+		# If featarray already exists i.e. in second CV fold etc. don't reread
+		# in files
+		#if self.featarray is None:
+			# Check for pre-calculated som
 		if self.classifier.som is None:
 			logger.info('No SOM loaded. Creating new SOM, saving to ''som.txt''.')
 			#make copy of features iterator
 			self.classifier.som = fc.makeSOM(tset.features(), outfile=os.path.join(self.data_dir, 'som.txt'), overwrite=overwrite)
 			logger.info('SOM created and saved.')
 			logger.info('Calculating/Loading Features.')
-			featarray = fc.featcalc(tset.features(), self.classifier.som, savefeat=self.featdir, recalc=recalc)
+			self.featarray = fc.featcalc(tset.features(), self.classifier.som, savefeat=self.featdir, recalc=recalc)
 		else:
 			logger.info('Calculating/Loading Features.')
-			featarray = fc.featcalc(tset.features(), self.classifier.som, savefeat=self.featdir, recalc=recalc)
+			self.featarray = fc.featcalc(tset.features(), self.classifier.som, savefeat=self.featdir, recalc=recalc)
 		logger.info('Features calculated/loaded.')
+
 
 		try:
 			self.classifier.oob_score = True
-			self.classifier.fit(featarray, fitlabels)
+			# Need to shuffle data before hits classifier
+
+			self.featarray, self.fitlabels = shuffle(self.featarray, self.fitlabels)
+			self.classifier.fit(self.featarray, self.fitlabels)
 			logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
 			#logger.info([estimator.tree_.max_depth for estimator in self.classifier.estimators_])
 			self.classifier.oob_score = False

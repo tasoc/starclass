@@ -24,7 +24,7 @@ def featcalc(features, som,
 	if isinstance(features,dict): #trick for single features
 		features = [features]
 
-	for obj in tqdm(features, disable=not logger.isEnabledFor(logging.INFO)):
+	for obj in features:#, disable=not logger.isEnabledFor(logging.INFO)):
 		precalc = False
 		if savefeat is not None:
 			featfile = os.path.join(savefeat,str(obj['priority'])+'.txt')
@@ -594,4 +594,3 @@ def compute_hocs(x, y, k):
         delta_k_gauss = np.append(delta_k_gauss, zc_gauss[i+1] - zc_gauss[i])
     psi = np.sum((delta_k - delta_k_gauss[:len(delta_k)])**2 / delta_k_gauss[:len(delta_k)])
     return psi, zc
-

@@ -6,8 +6,15 @@ Utilities for SLOSH (2D deep learning methods).
 .. codeauthor::  Marc Hon <mtyh555@uowmail.edu.au>
 """
 
+<<<<<<< refs/remotes/upstream/devel
 from __future__ import division, print_function, absolute_import
 import os
+=======
+import matplotlib as mpl
+import keras
+import keras.backend as K
+import os, re
+>>>>>>> Cross-validation implemented in full
 import numpy as np
 import keras.backend as K
 import keras.utils

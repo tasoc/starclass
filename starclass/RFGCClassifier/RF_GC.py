@@ -208,8 +208,6 @@ class RFGCClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		# Check for pre-calculated features
-		#if self.fitlabels is None:
-
 		self.fitlabels = self.parse_labels(tset.labels(cv_split=self.cv))
 
 		logger.info('Calculating features...')

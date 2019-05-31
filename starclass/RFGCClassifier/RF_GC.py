@@ -6,7 +6,6 @@ The RF-GC classifier (general random forest).
 .. codeauthor::  David Armstrong <d.j.armstrong@warwick.ac.uk>
 """
 
-from __future__ import division, print_function, with_statement, absolute_import
 import logging
 import os.path
 import numpy as np
@@ -92,18 +91,6 @@ class RFGCClassifier(BaseClassifier):
 				if os.path.exists(self.somfile):
 					self.classifier.som = fc.loadSOM(self.somfile)
 
-		self.class_keys = {}
-		self.class_keys['RRLyr/Ceph'] = StellarClasses.RRLYR_CEPHEID
-		self.class_keys['transit/eclipse'] = StellarClasses.ECLIPSE
-		self.class_keys['solar'] = StellarClasses.SOLARLIKE
-		self.class_keys['dSct/bCep'] = StellarClasses.DSCT_BCEP
-		self.class_keys['gDor/spB'] = StellarClasses.GDOR_SPB
-		self.class_keys['transient'] = StellarClasses.TRANSIENT
-		self.class_keys['contactEB/spots'] = StellarClasses.CONTACT_ROT
-		self.class_keys['aperiodic'] = StellarClasses.APERIODIC
-		self.class_keys['constant'] = StellarClasses.CONSTANT
-		self.class_keys['rapid'] = StellarClasses.RAPID
-
 
 	def save(self, outfile, somoutfile='som.txt'):
 		"""
@@ -134,7 +121,6 @@ class RFGCClassifier(BaseClassifier):
 		    self.classifier.trained = False
 
 
-
 	def do_classify(self, features, recalc=False):
 		"""
 		Classify a single lightcurve.
@@ -155,9 +141,6 @@ class RFGCClassifier(BaseClassifier):
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
 
-		#update to access lightcurve id parameter, if exists
-		#logger.info("Object ID: "+str(lightcurve.id))
-
 		if not self.classifier.trained:
 			logger.error('Classifier has not been trained. Exiting.')
 			raise ValueError('Classifier has not been trained. Exiting.')
@@ -176,9 +159,10 @@ class RFGCClassifier(BaseClassifier):
 
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):
-			key = self.class_keys[cla]
+			key = StellarClasses(cla)
 			result[key] = classprobs[c]
 		return result
+
 
 	def train(self, tset, savecl=True, recalc=False, overwrite=False):
 		"""

@@ -63,6 +63,9 @@ if __name__ == '__main__':
 	if input_folder is None:
 		input_folder = os.environ.get('STARCLASS_INPUT')
 
+	if input_folder is None:
+		parser.error("No input folder specified")
+
 	# Path to TODO file and feature cache:
 	todo_file = os.path.join(input_folder, 'todo.sqlite')
 	features_cache = os.path.join(input_folder, 'features_cache_%s' % args.datalevel)
@@ -74,7 +77,7 @@ if __name__ == '__main__':
 	# When simply running the classifier on new stars:
 	with TaskManager(todo_file, overwrite=args.overwrite) as tm:
 
-		with classifier(level=args.level, features_cache=features_cache) as stcl:
+		with classifier(level=args.level, features_cache=features_cache, tset_key='keplerq9') as stcl:
 
 			while True:
 				task = tm.get_task(classifier=current_classifier)

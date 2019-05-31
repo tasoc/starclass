@@ -11,8 +11,6 @@ import logging
 import os.path
 import numpy as np
 import os
-import pickle
-import itertools
 import copy
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
@@ -29,7 +27,7 @@ class Classifier_obj(RandomForestClassifier):
 		super(self.__class__, self).__init__(n_estimators=n_estimators,
 										max_features=max_features,
 										min_samples_split=min_samples_split,
-										class_weight='balanced',max_depth=15)
+										class_weight='balanced', max_depth=15)
 		self.trained = False
 		self.som = None
 
@@ -116,7 +114,7 @@ class RFGCClassifier(BaseClassifier):
 		fc.kohonenSave(self.classifier.som.K,os.path.join(self.data_dir,somoutfile)) #overwrites
 		tempsom = copy.deepcopy(self.classifier.som)
 		self.classifier.som = None
-		utilities.savePickle(outfile,self.classifier)
+		utilities.savePickle(outfile, self.classifier)
 		self.classifier.som = tempsom
 
 

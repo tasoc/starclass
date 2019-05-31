@@ -7,8 +7,6 @@ Utility function for running classifiers.
 """
 
 from __future__ import division, with_statement, print_function, absolute_import
-import matplotlib.pyplot as plt
-import os.path
 import argparse
 import logging
 import numpy as np
@@ -24,7 +22,7 @@ if __name__ == '__main__':
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9', choices=('tdasim', 'keplerq9', 'keplerq9-linfit'))
-	parser.add_argument('-tf', '--testfraction', help='Test-set fraction (only relevant if --train activated)', type=float, default=0.0)
+	parser.add_argument('-tf', '--testfraction', help='Test-set fraction', type=float, default=0.0)
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
@@ -64,25 +62,22 @@ if __name__ == '__main__':
 	}[current_classifier]
 
 	# Pick the training set:
-	if args.train == 'tdasim':
+	if args.trainingset == 'tdasim':
 		tset = training_sets.tda_simulations(datalevel=args.datalevel, tf=args.testfraction, classifier=current_classifier)
-	elif args.train == 'keplerq9':
-		tset = training_sets.keplerq9(datalevel=args.datalevel, tf=args.testfraction, classifier=current_classifier)
-	elif args.train == 'keplerq9-linfit':
+	elif args.trainingset == 'keplerq9':
+		tset = training_sets.keplerq9(tf=args.testfraction, classifier=current_classifier)
+	elif args.trainingset == 'keplerq9-linfit':
 		tset = training_sets.keplerq9linfit(datalevel=args.datalevel, tf=args.testfraction, classifier=current_classifier)
 
-	# Name output classifier file
-	clfile = current_classifier + '_' + str(np.round(args.testfraction,decimals=2))
-
 	# Initialize the classifier:
-	with classifier(level=args.level, tset=args.train, features_cache=tset.features_cache, clfile=clfile) as stcl:
+	with classifier(level=args.level, features_cache=tset.features_cache, tset_key=tset.key) as stcl:
 		# Run the training of the classifier:
-		logger.debug("Starting training...")
+		logger.info("Starting training...")
 		stcl.train(tset)
-		logger.debug("Training done...")
+		logger.info("Training done...")
 
 		if args.testfraction > 0.0:
-			logger.debug("Starting testing...")
+			logger.info("Starting testing...")
 
 			# Convert to values
 			labels_test_val = []
@@ -106,5 +101,3 @@ if __name__ == '__main__':
 			cf = confusion_matrix(labels_test, y_pred) #labels probably not in right format
 			logger.info('CF Matrix:')
 			logger.info(cf)
-
-

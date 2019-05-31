@@ -3,9 +3,7 @@ numpy
 astropy
 lightkurve
 scikit-learn
-Bottleneck
-enum-compat
-backports.tempfile
+Bottleneck == 1.2.1
 requests
 keras
 tensorflow

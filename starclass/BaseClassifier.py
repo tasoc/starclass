@@ -31,11 +31,14 @@ class BaseClassifier(object):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	def __init__(self, level='L1', tset='keplerq9', features_cache=None, plot=False):
+	def __init__(self, tset_key=None, features_cache=None, level='L1', plot=False):
 		"""
 		Initialize the classifier object.
 
 		Parameters:
+			tset_key (string): From which training-set should the classifier be loaded?
+			level (string, optional): Classfication-level to load. Coices are ``'L1'`` and ``'L2'``. Default='L1'.
+			features_cache (string, optional): Path to director where calculated features will be saved/loaded as needed.
 			plot (boolean, optional): Create plots as part of the output. Default is ``False``.
 
 		Attributes:
@@ -51,10 +54,12 @@ class BaseClassifier(object):
 		logger = logging.getLogger(__name__)
 
 		# Store the input:
+		self.tset_key = tset_key
 		self.plot = plot
 		self.level = level
 		self.features_cache = features_cache
-		self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level, tset))
+
+		self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level, tset_key))
 		logger.debug("Data Directory: %s", self.data_dir)
 		if not os.path.exists(self.data_dir):
 			os.makedirs(self.data_dir)
@@ -118,11 +123,10 @@ class BaseClassifier(object):
 		"""
 		raise NotImplementedError()
 
-	def train(self, features, labels):
+	def train(self, tset):
 		"""
 		Parameters:
-			features (iterable of dict): Features of star, including the lightcurve itself.
-			labels (ndarray, [n_objects]): labels for training set lightcurves.
+			tset (``TrainingSet`` object): Training-set to train classifier on.
 
 		Raises:
 			NotImplementedError

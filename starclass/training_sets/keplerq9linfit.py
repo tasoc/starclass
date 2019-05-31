@@ -24,6 +24,9 @@ class keplerq9linfit(TrainingSet):
 		if kwargs.get('datalevel') != 'corr':
 			raise Exception("The KeplerQ9 training set only as corrected data. Please specify datalevel='corr'.")
 
+		# Key for this training-set:
+		self.key = 'keplerq9-linfit'
+
 		# Point this to the directory where the TDA simulations are stored
 		self.input_folder = self.tset_datadir('keplerq9-linfit', 'https://tasoc.dk/starclass_tsets/keplerq9-linfit.zip')
 

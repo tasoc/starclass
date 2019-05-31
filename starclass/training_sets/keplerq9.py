@@ -19,10 +19,13 @@ from . import TrainingSet
 #----------------------------------------------------------------------------------------------
 class keplerq9(TrainingSet):
 
-	def __init__(self, *args, **kwargs):
+	def __init__(self, *args, datalevel='corr', **kwargs):
 
-		if kwargs.get('datalevel') != 'corr':
+		if datalevel != 'corr':
 			raise Exception("The KeplerQ9 training set only as corrected data. Please specify datalevel='corr'.")
+
+		# Key for this training-set:
+		self.key = 'keplerq9'
 
 		# Point this to the directory where the TDA simulations are stored
 		self.input_folder = self.tset_datadir('keplerq9', 'https://tasoc.dk/starclass_tsets/keplerq9.zip')

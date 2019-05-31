@@ -22,6 +22,9 @@ class tda_simulations(TrainingSet):
 
 	def __init__(self, *args, **kwargs):
 
+		# Key for this training-set:
+		self.key = 'tdasim'
+
 		self.input_folder = self.tset_datadir('tdasim', 'https://tasoc.dk/starclass_tsets/tdasim.zip')
 
 		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')

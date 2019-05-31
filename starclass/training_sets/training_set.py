@@ -100,7 +100,7 @@ class TrainingSet(object):
 
 		rowidx = -1
 		with TaskManager(self.input_folder, overwrite=True) as tm:
-			with BaseClassifier(features_cache=self.features_cache) as stcl:
+			with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
 				while True:
 					task = tm.get_task(classifier=self.classifier, change_classifier=False)
 					if task is None: break
@@ -126,7 +126,7 @@ class TrainingSet(object):
 		else:
 			rowidx = -1
 			with TaskManager(self.input_folder, overwrite=True) as tm:
-				with BaseClassifier(features_cache=self.features_cache) as stcl:
+				with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
 					while True:
 						task = tm.get_task(classifier=self.classifier, change_classifier=False)
 						if task is None: break

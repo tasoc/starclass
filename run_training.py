@@ -76,14 +76,11 @@ if __name__ == '__main__':
 		stcl.train(tset)
 		logger.info("Training done...")
 
-		if args.testfraction > 0.0:
+		if tset.testfraction > 0:
 			logger.info("Starting testing...")
 
 			# Convert to values
-			labels_test_val = []
-			for lbl in tset.labels_test(level=args.level):
-				labels_test_val.append(lbl[0].value)
-			labels_test = np.array(labels_test_val)
+			labels_test = np.array([lbl[0].value for lbl in tset.labels_test(level=args.level)])
 
 			# Classify test set (has to be one by one unless we change classifiers)
 			# TODO: Run in paralllel

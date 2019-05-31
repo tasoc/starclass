@@ -13,7 +13,6 @@ import os
 import copy
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
-from sklearn.metrics import confusion_matrix
 from . import RF_GC_featcalc as fc
 from .. import BaseClassifier, StellarClasses
 from .. import utilities
@@ -37,7 +36,6 @@ class RFGCClassifier(BaseClassifier):
 	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 	"""
 	def __init__(self, clfile='rfgc_classifier_v01.pickle', somfile='som.txt',
-					featdir='rfgc_features',
 					dimx=1, dimy=400, cardinality=64, n_estimators=1000,
 					max_features=4, min_samples_split=2, *args, **kwargs):
 		"""
@@ -59,8 +57,7 @@ class RFGCClassifier(BaseClassifier):
 
 		self.classifier = None
 
-		if not os.path.exists(self.data_dir):
-			os.makedirs(self.data_dir)
+		os.makedirs(self.data_dir, exist_ok=True)
 
 		if somfile is not None:
 			self.somfile = os.path.join(self.data_dir, somfile)
@@ -72,10 +69,9 @@ class RFGCClassifier(BaseClassifier):
 		else:
 			self.clfile = None
 
-		if featdir is not None:
-			self.featdir = os.path.join(self.data_dir, featdir)
-			if not os.path.exists(self.featdir):
-			    os.makedirs(self.featdir)
+		if self.features_cache is not None:
+			self.featdir = os.path.join(self.features_cache, 'rfgc_features')
+			os.makedirs(self.featdir, exist_ok=True)
 		else:
 			self.featdir = None
 
@@ -260,47 +256,6 @@ class RFGCClassifier(BaseClassifier):
 		self.classifier.som = fc.loadSOM(somfile, dimx, dimy, cardinality)
 
 
-	def plotConfMatrix(self,confmatrix,ticklabels):
-		'''
-		Plot a confusion matrix. Axes size and labels are hardwired.
-
-		Parameters:
-			cfmatrix (ndarray, [nobj x n_classes]): Confusion matrix. Format - np.savetxt
-							on the output of self.makeConfMatrix()
-			ticklabels (array, [n_classes]): labels for plot axes.
-		'''
-		import pylab as p
-		p.ion()
-
-		norms = np.sum(confmatrix,axis=1)
-		for i in range(len(confmatrix[:,0])):
-			confmatrix[i,:] /= norms[i]
-		p.figure()
-		p.clf()
-		p.imshow(confmatrix,interpolation='nearest',origin='lower',cmap='YlOrRd')
-
-		for x in range(len(confmatrix[:,0])):
-			 for y in range(len(confmatrix[:,0])):
-				 if confmatrix[y,x] > 0:
-					 if confmatrix[y,x]>0.7:
-						 p.text(x,y,str(np.round(confmatrix[y,x],decimals=2)),
-						 		va='center',ha='center',color='w')
-					 else:
-						 p.text(x,y,str(np.round(confmatrix[y,x],decimals=2)),
-						 		va='center',ha='center')
-
-		for x in np.arange(confmatrix.shape[0]):
-			p.plot([x+0.5,x+0.5],[-0.5,confmatrix.shape[0]-0.5],'k--')
-		for y in np.arange(confmatrix.shape[0]):
-			p.plot([-0.5,confmatrix.shape[0]-0.5],[y+0.5,y+0.5],'k--')
-		p.xlim(-0.5,confmatrix.shape[0]-0.5)
-		p.ylim(-0.5,confmatrix.shape[0]-0.5)
-		p.xlabel('Predicted Class')
-		p.ylabel('True Class')
-		#class labels
-		p.xticks(np.arange(confmatrix.shape[0]),ticklabels,rotation='vertical')
-		p.yticks(np.arange(confmatrix.shape[0]),ticklabels)
-
 	def crossValidate(self, features, labels):
 		'''
 		Creates cross-validated class probabilities. Splits dataset into groups of 10.
@@ -330,18 +285,3 @@ class RFGCClassifier(BaseClassifier):
 		unshuffleidx = np.argsort(shuffleidx)
 		cvprobs = cvprobs[unshuffleidx]
 		return cvprobs,self.classifier.classes_[sortclasses]
-
-	def makeConfMatrix(self,classprobs,correct_labels):
-		'''
-		Generates a confusion matrix from a set of class probabilities.
-
-		Parameters:
-			classprobs (ndarray, [n_objects,n_classes]): Class probabilities
-			correct_labels (ndarray, [n_objects]): True labels.
-
-		Returns:
-			cfmatrix (ndarray, [nclasses, nclasses]): Confusion matrix.
-		'''
-		class_vals=np.argmax(classprobs,axis=1)+1
-		cfmatrix = confusion_matrix(correct_labels,class_vals)
-		return cfmatrix

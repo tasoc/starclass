@@ -60,8 +60,7 @@ class BaseClassifier(object):
 
 		self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level, tset_key))
 		logger.debug("Data Directory: %s", self.data_dir)
-		if not os.path.exists(self.data_dir):
-			os.makedirs(self.data_dir)
+		os.makedirs(self.data_dir, exist_ok=True)
 
 		if self.features_cache is not None and not os.path.exists(self.features_cache):
 			raise ValueError("features_cache directory does not exists")
@@ -99,7 +98,7 @@ class BaseClassifier(object):
 		# Check results
 		for key, value in res.items():
 			if key not in StellarClasses:
-				raise ValueError("Classifier returned unknown stellar class.")
+				raise ValueError("Classifier returned unknown stellar class: '%s'" % key)
 			if value < 0 or value > 1:
 				raise ValueError("Classifier should return probability between 0 and 1.")
 

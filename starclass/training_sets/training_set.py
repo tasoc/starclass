@@ -26,7 +26,7 @@ class TrainingSet(object):
 		self.datalevel = datalevel
 		self.testfraction = tf
 
-		if self.testfraction < 0 or self.testfraction > 1:
+		if self.testfraction < 0 or self.testfraction >= 1:
 			raise ValueError("Invalid testfraction provided")
 
 		self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)
@@ -41,11 +41,12 @@ class TrainingSet(object):
 
 		# Generate training/test indices
 		if self.testfraction > 0:
+			self.train_idx = np.arange(self.nobjects)
 			self.train_idx, self.test_idx = train_test_split(
 				np.arange(self.nobjects),
 				test_size=self.testfraction,
 				random_state=42,
-				stratify=self.training_set_labels()
+				stratify=self.labels()
 			)
 
 	#----------------------------------------------------------------------------------------------

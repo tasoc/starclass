@@ -6,7 +6,6 @@ Utility function for running classifiers.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, with_statement, print_function, absolute_import
 import argparse
 import logging
 import numpy as np
@@ -29,7 +28,7 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 
 	# Check args
-	if args.testfraction < 0.0 or args.testfraction > 1:
+	if args.testfraction < 0 or args.testfraction >= 1:
 		parser.error('Testfraction must be between 0 and 1')
 
 	# Set logging level:
@@ -79,9 +78,6 @@ if __name__ == '__main__':
 		if tset.testfraction > 0:
 			logger.info("Starting testing...")
 
-			# Convert to values
-			labels_test = np.array([lbl[0].value for lbl in tset.labels_test(level=args.level)])
-
 			# Classify test set (has to be one by one unless we change classifiers)
 			# TODO: Run in paralllel
 			# TODO: Use TaskManager for this?
@@ -97,6 +93,9 @@ if __name__ == '__main__':
 				logger.info(prediction)
 				y_pred.append(prediction)
 			y_pred = np.array(y_pred)
+
+			# Convert labels to ndarray:
+			labels_test = np.array([lbl[0].value for lbl in tset.labels_test(level=args.level)])
 
 			# Compare to known labels:
 			acc = accuracy_score(labels_test, y_pred)

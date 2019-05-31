@@ -6,12 +6,11 @@ Utility function for running classifiers.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, with_statement, print_function, absolute_import
 import matplotlib.pyplot as plt
 import os.path
 import argparse
 import logging
-from starclass import TaskManager, RFGCClassifier, XGBClassifier, SLOSHClassifier
+from starclass import TaskManager, RFGCClassifier, XGBClassifier, SLOSHClassifier, MetaClassifier
 
 #----------------------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -46,6 +45,14 @@ if __name__ == '__main__':
 	logger_parent.addHandler(console)
 	logger_parent.setLevel(logging_level)
 
+	# Get input and output folder from environment variables:
+	input_folder = args.input_folder
+	if input_folder is None:
+		input_folder = os.environ.get('STARCLASS_INPUT')
+
+	if input_folder is None:
+		parser.error("No input folder specified")
+
 	# Choose which classifier to use
 	# For now, there is only one...
 	current_classifier = args.classifier
@@ -54,17 +61,8 @@ if __name__ == '__main__':
 		'slosh': SLOSHClassifier,
 		#'foptics': FOPTICSClassifier,
 		'xgb': XGBClassifier,
-		'meta': None
+		'meta': MetaClassifier
 	}[current_classifier]
-
-
-	# Get input and output folder from environment variables:
-	input_folder = args.input_folder
-	if input_folder is None:
-		input_folder = os.environ.get('STARCLASS_INPUT')
-
-	if input_folder is None:
-		parser.error("No input folder specified")
 
 	# Path to TODO file and feature cache:
 	todo_file = os.path.join(input_folder, 'todo.sqlite')

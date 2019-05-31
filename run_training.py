@@ -86,9 +86,13 @@ if __name__ == '__main__':
 			labels_test = np.array(labels_test_val)
 
 			# Classify test set (has to be one by one unless we change classifiers)
+			# TODO: Run in paralllel
 			y_pred = []
-			for testobj in tset.features_test():
-				res = stcl.classify(testobj)
+			for features in tset.features_test():
+				res = stcl.classify(features)
+
+				# TODO: Save results for this classifier/trainingset in database
+
 				#logger.info(res)
 				prediction = max(res, key=lambda key: res[key]).value
 				logger.info(prediction)

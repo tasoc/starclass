@@ -139,10 +139,6 @@ class TaskManager(object):
 			# add the results from all other classifiers to the task dict:
 			if cl == 'meta':
 				self.cursor.execute("SELECT classifier,class,prob FROM starclass WHERE priority=? AND classifier != 'meta';", (task['priority'], ))
-
-				#for row in self.cursor.fetchall():
-
-
 				task['other_classifiers'] = Table(
 					rows=self.cursor.fetchall(),
 					names=('classifier', 'class', 'prob'),

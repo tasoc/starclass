@@ -208,7 +208,7 @@ class BaseClassifier(object):
 		# Add the fields from the task to the list of features:
 		features['priority'] = task['priority']
 		features['starid'] = task['starid']
-		for key in ('tmag', 'mean_flux', 'variance', 'variability'):
+		for key in ('tmag', 'mean_flux', 'variance', 'variability', 'other_classifiers'):
 			if key in task.keys():
 				features[key] = task[key]
 

@@ -6,14 +6,10 @@ The meta-classifier.
 .. codeauthor::  James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
 """
 
-from __future__ import division, print_function, with_statement, absolute_import
 import logging
 import os.path
 import numpy as np
 import os
-import pickle
-import itertools
-import copy
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from sklearn.metrics import confusion_matrix
@@ -22,9 +18,9 @@ from .. import BaseClassifier, StellarClasses
 from .. import utilities
 
 class Classifier_obj(RandomForestClassifier):
-    """
-    Wrapper for sklearn RandomForestClassifier
-    """
+	"""
+	Wrapper for sklearn RandomForestClassifier
+	"""
 	def __init__(self, n_estimators=1000, min_samples_split=2):
 		super(self.__class__, self).__init__(n_estimators=n_estimators,
 										min_samples_split=min_samples_split,
@@ -32,42 +28,45 @@ class Classifier_obj(RandomForestClassifier):
 		self.trained = False
 
 class xgb_Classifier_obj(XGBClassifier):
-    """
+	"""
 	Wrapper for sklearn XGBClassifier
 
-    """
+	"""
 
-    def __init__(self,base_score=0.5, booster='gbtree', colsample_bylevel=1,
-       colsample_bytree=1, eval_metric='mlogloss', gamma=0,
-       learning_rate=0.1, max_delta_step=0, max_depth=13,
-       min_child_weight=1, missing=None, n_estimators=550, n_jobs=1,
-       nthread=None, objective='multi:softmax', random_state=0,
-       reg_alpha=1e-05, reg_lambda=1, scale_pos_weight=1, seed=125,
-       silent=True, subsample=1):
+	def __init__(self,base_score=0.5, booster='gbtree', colsample_bylevel=1,
+	   colsample_bytree=1, eval_metric='mlogloss', gamma=0,
+	   learning_rate=0.1, max_delta_step=0, max_depth=13,
+	   min_child_weight=1, missing=None, n_estimators=550, n_jobs=1,
+	   nthread=None, objective='multi:softmax', random_state=0,
+	   reg_alpha=1e-05, reg_lambda=1, scale_pos_weight=1, seed=125,
+	   silent=True, subsample=1):
 
-        super(self.__class__, self).__init__(booster=booster,eval_metric=eval_metric,
-             learning_rate=learning_rate, max_depth=max_depth,n_estimators=n_estimators,
-             objective=objective,reg_alpha=reg_alpha)
+		super(self.__class__, self).__init__(booster=booster,eval_metric=eval_metric,
+			 learning_rate=learning_rate, max_depth=max_depth,n_estimators=n_estimators,
+			 objective=objective,reg_alpha=reg_alpha)
 
-        self.trained = False
+		self.trained = False
 
 class MetaClassifier(BaseClassifier):
-    """
-    The meta-classifier.
+	"""
+	The meta-classifier.
 
-    .. codeauthor::  James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
-    """
-    def __init__(self, clfile='meta_classifier.pickle', featdir='',
-                       *args, **kwargs):
-        """
-        Initialise the classifier object.
+	.. codeauthor::  James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
+	"""
+	def __init__(self, clfile='meta_classifier.pickle', featdir='',
+					   *args, **kwargs):
+		"""
+		Initialise the classifier object.
 
-        Parameters:
-            clfile (str): Filepath to previously pickled Classifier_obj
+		Parameters:
+			clfile (str): Filepath to previously pickled Classifier_obj
 			featfile (str):	Filepath to pre-calculated features, if available.
-        """
-        # Initialise parent
+		"""
+		# Initialise parent
 		super(self.__class__, self).__init__(*args, **kwargs)
+
+		# Start logger:
+		logger = logging.getLogger(__name__)
 
 		self.classifier = None
 
@@ -82,7 +81,7 @@ class MetaClassifier(BaseClassifier):
 			logger.warning("This needs to be edited when we know how the features will be parsed!")
 			self.featdir = os.path.join(self.data_dir, featdir)
 			if not os.path.exists(self.featdir):
-			    os.makedirs(self.featdir)
+				os.makedirs(self.featdir)
 		else:
 			logger.error("No features detected!")
 			raise ValueError("Exiting.")

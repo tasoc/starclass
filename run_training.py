@@ -11,7 +11,7 @@ import argparse
 import logging
 import numpy as np
 from sklearn.metrics import accuracy_score, confusion_matrix
-from starclass import training_sets, RFGCClassifier, XGBClassifier, SLOSHClassifier
+from starclass import training_sets, RFGCClassifier, XGBClassifier, SLOSHClassifier, MetaClassifier
 
 #----------------------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -58,7 +58,7 @@ if __name__ == '__main__':
 		'slosh': SLOSHClassifier,
 		#'foptics': FOPTICSClassifier,
 		'xgb': XGBClassifier,
-		'meta': None
+		'meta': MetaClassifier
 	}[current_classifier]
 
 	# Pick the training set:
@@ -87,8 +87,10 @@ if __name__ == '__main__':
 
 			# Classify test set (has to be one by one unless we change classifiers)
 			# TODO: Run in paralllel
+			# TODO: Use TaskManager for this?
 			y_pred = []
 			for features in tset.features_test():
+				# Classify this start from the test-set:
 				res = stcl.classify(features)
 
 				# TODO: Save results for this classifier/trainingset in database

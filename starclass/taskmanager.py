@@ -6,7 +6,6 @@ A TaskManager which keeps track of which targets to process.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, with_statement, print_function, absolute_import
 import numpy as np
 import os
 import sqlite3
@@ -36,8 +35,7 @@ class TaskManager(object):
 			todo_file = os.path.join(todo_file, 'todo.sqlite')
 
 		if not os.path.exists(todo_file):
-			raise IOError('Could not find TODO-file')
-
+			raise FileNotFoundError('Could not find TODO-file')
 
 		# Keep a list of all the possible classifiers here:
 		self.all_classifiers = set(['rfgc', 'slosh', 'foptics', 'xgb'])

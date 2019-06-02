@@ -6,7 +6,6 @@
 """
 
 from __future__ import division, print_function, with_statement, absolute_import
-from six.moves import range
 from tempfile import mkdtemp
 import numpy as np
 import subprocess

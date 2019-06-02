@@ -174,11 +174,12 @@ class BaseClassifier(object):
 		cf = confusion_matrix(labels_test, y_pred, labels=all_classes)
 
 		current_classifier = self.__class__.__name__
-		fig = plt.figure()
+
+		fig = plt.figure(figsize=(12,12))
 		plotConfMatrix(cf, all_classes)
 		plt.title(current_classifier + ' - ' + tset.key + ' - ' + self.level)
 		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_'  + tset.key + '_' + self.level + '_' + current_classifier + '.png'), bbox_inches='tight')
-		plt.show()
+		plt.close(fig)
 
 
 	def load_star(self, task, fname):

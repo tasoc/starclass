@@ -56,7 +56,7 @@ def plotConfMatrix(confmatrix, ticklabels, ax=None, cmap='Blues'):
 	ax.set_ylabel('True Class')
 
 	#class labels
-	plt.xticks(np.arange(N), ticklabels, rotation='45')
+	plt.xticks(np.arange(N), ticklabels, rotation='vertical')
 	plt.yticks(np.arange(N), ticklabels)
 
 if __name__ == '__main__':

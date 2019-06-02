@@ -135,7 +135,10 @@ class SLOSHClassifier(BaseClassifier):
 
 		logger = logging.getLogger(__name__)
 
-		train_folder = os.path.join(self.data_dir, 'SLOSH_Train_Images')
+		if self.predictable:
+			return
+
+		train_folder = os.path.join(self.features_cache, 'SLOSH_Train_Images')
 		if not os.path.exists(train_folder):
 			os.makedirs(train_folder)
 
@@ -163,7 +166,7 @@ class SLOSHClassifier(BaseClassifier):
 		epochs = 50
 		model.fit_generator(train_generator, epochs=epochs, steps_per_epoch=math.ceil(nb_files / 32),
 							callbacks=[reduce_lr], verbose=2)
-		model.save('SLOSH_Classifier_Model.h5')
+		model.save(self.model_file)
 
 
 	def save(self, outfile):

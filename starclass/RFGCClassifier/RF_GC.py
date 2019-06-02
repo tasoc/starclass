@@ -35,7 +35,7 @@ class RFGCClassifier(BaseClassifier):
 
 	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 	"""
-	def __init__(self, clfile='rfgc_classifier_v01.pickle', somfile='som.txt',
+	def __init__(self, clfile='rfgc_classifier_v01.pickle', somfile='rfgc_som.txt',
 					dimx=1, dimy=400, cardinality=64, n_estimators=1000,
 					max_features=4, min_samples_split=2, *args, **kwargs):
 		"""
@@ -56,8 +56,6 @@ class RFGCClassifier(BaseClassifier):
 		super(self.__class__, self).__init__(*args, **kwargs)
 
 		self.classifier = None
-
-		os.makedirs(self.data_dir, exist_ok=True)
 
 		if somfile is not None:
 			self.somfile = os.path.join(self.data_dir, somfile)
@@ -181,6 +179,9 @@ class RFGCClassifier(BaseClassifier):
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
 
+		if self.classifier.trained:
+			return
+
 		# Check for pre-calculated features
 
 		fitlabels = self.parse_labels(tset.labels())
@@ -189,9 +190,9 @@ class RFGCClassifier(BaseClassifier):
 
 		# Check for pre-calculated som
 		if self.classifier.som is None:
-			logger.info('No SOM loaded. Creating new SOM, saving to ''som.txt''.')
+			logger.info("No SOM loaded. Creating new SOM, saving to '%s'.", self.somfile)
 			#make copy of features iterator
-			self.classifier.som = fc.makeSOM(tset.features(), outfile=os.path.join(self.data_dir, 'som.txt'), overwrite=overwrite)
+			self.classifier.som = fc.makeSOM(tset.features(), outfile=self.somfile, overwrite=overwrite)
 			logger.info('SOM created and saved.')
 			logger.info('Calculating/Loading Features.')
 			featarray = fc.featcalc(tset.features(), self.classifier.som, savefeat=self.featdir, recalc=recalc)
@@ -203,7 +204,7 @@ class RFGCClassifier(BaseClassifier):
 		try:
 			self.classifier.oob_score = True
 			self.classifier.fit(featarray, fitlabels)
-			logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
+			logger.info('Trained. OOB Score = %f', self.classifier.oob_score_)
 			#logger.info([estimator.tree_.max_depth for estimator in self.classifier.estimators_])
 			self.classifier.oob_score = False
 			self.classifier.trained = True
@@ -213,8 +214,8 @@ class RFGCClassifier(BaseClassifier):
 		if savecl and self.classifier.trained:
 			if self.clfile is not None:
 				if not os.path.exists(self.clfile) or overwrite or recalc:
-					logger.info('Saving pickled classifier instance to rfgc_classifier_v01.pickle')
-					logger.info('Saving SOM to som.txt (will overwrite)')
+					logger.info("Saving pickled classifier instance to '%s'", self.clfile)
+					logger.info("Saving SOM to '%s'", self.somfile)
 					self.save(self.clfile, self.somfile)
 
 
@@ -254,34 +255,3 @@ class RFGCClassifier(BaseClassifier):
 		Loads a SOM, if not done at init.
 		"""
 		self.classifier.som = fc.loadSOM(somfile, dimx, dimy, cardinality)
-
-
-	def crossValidate(self, features, labels):
-		'''
-		Creates cross-validated class probabilities. Splits dataset into groups of 10.
-		May take some time.
-
-		Parameters:
-			features (ndarray, [n_objects x n_features]): Array of all features.
-			labels (ndarray, [n_objects]): labels for each row of features
-
-		Returns:
-			cvprobs: (ndarray, [nobjects, nclasses]: cross-validated class probabilities
-			classorder (ndarray, [n_classes]): classes corresponding to each column
-												of cvprobs
-		'''
-		shuffleidx = np.random.choice(len(labels),len(labels),replace=False)
-		cvfeatures = features[shuffleidx,:]
-		cvlabels = labels[shuffleidx]
-		kf = KFold(n_splits=int(cvfeatures.shape[0]/10))
-		probs = []
-		self.classifier.oob_score = False
-		for train_index,test_index in kf.split(cvfeatures,cvlabels):
-			self.classifier.fit(cvfeatures[train_index,:],cvlabels[train_index])
-			sortclasses = np.argsort(self.classifier.classes_)
-			tempprobs = self.classifier.predict_proba(cvfeatures[test_index,:])
-			probs.append(tempprobs[sortclasses])
-		cvprobs = np.vstack(probs)
-		unshuffleidx = np.argsort(shuffleidx)
-		cvprobs = cvprobs[unshuffleidx]
-		return cvprobs,self.classifier.classes_[sortclasses]

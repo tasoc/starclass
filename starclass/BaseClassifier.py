@@ -14,11 +14,13 @@ import os.path
 import logging
 from lightkurve import TessLightCurve
 from astropy.io import fits
+from sklearn.metrics import accuracy_score, confusion_matrix
 from .StellarClasses import StellarClasses
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import savePickle, loadPickle
+from .plots import plotConfMatrix, plt
 
 __docformat__ = 'restructuredtext'
 
@@ -130,6 +132,54 @@ class BaseClassifier(object):
 			NotImplementedError
 		"""
 		raise NotImplementedError()
+
+	def test(self, tset):
+		"""
+		Parameters:
+			tset (``TrainingSet`` object): Training-set to run testing on.
+		"""
+
+		if tset.testfraction == 0:
+			return
+
+		# Start logger:
+		logger = logging.getLogger(__name__)
+
+		# TODO: Only include classes from the current level
+		all_classes = [lbl.value for lbl in StellarClasses]
+
+		# Classify test set (has to be one by one unless we change classifiers)
+		# TODO: Use TaskManager for this?
+		y_pred = []
+		for features in tset.features_test():
+			# Classify this start from the test-set:
+			res = self.classify(features)
+
+			# TODO: Save results for this classifier/trainingset in database
+
+			#logger.info(res)
+			prediction = max(res, key=lambda key: res[key]).value
+			y_pred.append(prediction)
+		y_pred = np.array(y_pred)
+
+		# Convert labels to ndarray:
+		# FIXME: Only keeping the first label
+		labels_test = np.array([lbl[0].value for lbl in tset.labels_test(level=self.level)])
+
+		# Compare to known labels:
+		acc = accuracy_score(labels_test, y_pred)
+		logger.info('Accuracy: %.2f%%', acc*100)
+
+		# Confusion Matrix:
+		cf = confusion_matrix(labels_test, y_pred, labels=all_classes)
+
+		current_classifier = self.__class__.__name__
+		fig = plt.figure()
+		plotConfMatrix(cf, all_classes)
+		plt.title(current_classifier + ' - ' + tset.key + ' - ' + self.level)
+		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_'  + tset.key + '_' + self.level + '_' + current_classifier + '.png'), bbox_inches='tight')
+		plt.show()
+
 
 	def load_star(self, task, fname):
 		"""Recieve a task from the TaskManager and load the lightcurve."""

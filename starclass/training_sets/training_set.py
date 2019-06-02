@@ -14,7 +14,7 @@ import zipfile
 import shutil
 import logging
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold
 from .. import BaseClassifier, TaskManager
 
 #----------------------------------------------------------------------------------------------
@@ -29,10 +29,9 @@ class TrainingSet(object):
 		if self.testfraction < 0 or self.testfraction >= 1:
 			raise ValueError("Invalid testfraction provided")
 
+		# Define cache location where we will save common features:
 		self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)
-
-		if not os.path.exists(self.features_cache):
-			os.makedirs(self.features_cache)
+		os.makedirs(self.features_cache, exist_ok=True)
 
 		# Generate TODO file if it is needed:
 		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
@@ -40,14 +39,44 @@ class TrainingSet(object):
 			self.generate_todolist()
 
 		# Generate training/test indices
+		self.train_idx = np.arange(self.nobjects, dtype=int) # Define here because it is needed by self.labels() used below
 		if self.testfraction > 0:
-			self.train_idx = np.arange(self.nobjects)
 			self.train_idx, self.test_idx = train_test_split(
 				np.arange(self.nobjects),
 				test_size=self.testfraction,
 				random_state=42,
 				stratify=self.labels()
 			)
+
+		# Cross Validation
+		self.fold = 0
+		self.crossval_folds = 0
+
+	#----------------------------------------------------------------------------------------------
+	def folds(self, n_splits=5, tf=0.2):
+		"""
+
+		"""
+
+		self.crossval_folds = n_splits
+
+		labels_test = [lbl[0].value for lbl in self.labels()]
+
+		# If keyword is true then split according to KFold cross-vadliation
+		skf = StratifiedKFold(n_splits=n_splits, random_state=42)
+		skf_splits = skf.split(self.train_idx, labels_test)
+
+		# We are doing cross-validation, so we will return a copy
+		# of the training-set where we have redefined the training- and test-
+		# sets from the folding:
+		for fold, (train_idx, test_idx) in enumerate(skf_splits):
+			#newtset = deepcopy(self)
+			newtset = self.__class__(classifier=self.classifier, datalevel=self.datalevel, tf=tf)
+
+			newtset.train_idx = self.train_idx[train_idx]
+			newtset.test_idx = self.train_idx[test_idx]
+			newtset.fold = fold + 1
+			yield newtset
 
 	#----------------------------------------------------------------------------------------------
 	def tset_datadir(self, tset, url):

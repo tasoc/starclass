@@ -9,7 +9,7 @@ Utility function for running classifiers.
 import argparse
 import logging
 import numpy as np
-from sklearn.metrics import accuracy_score, confusion_matrix
+import os.path
 from starclass import training_sets, RFGCClassifier, XGBClassifier, SLOSHClassifier, MetaClassifier
 
 #----------------------------------------------------------------------------------------------
@@ -60,46 +60,42 @@ if __name__ == '__main__':
 		'meta': MetaClassifier
 	}[current_classifier]
 
+	# Settings to be passed onto the selected training set:
+	tset_settings = {
+		'classifier': current_classifier, # FIXME: Can we get rid of this?
+		'datalevel': args.datalevel,
+		'tf': args.testfraction,
+	}
+
 	# Pick the training set:
 	if args.trainingset == 'tdasim':
-		tset = training_sets.tda_simulations(datalevel=args.datalevel, tf=args.testfraction, classifier=current_classifier)
+		tset = training_sets.tda_simulations(**tset_settings)
 	elif args.trainingset == 'keplerq9':
-		tset = training_sets.keplerq9(tf=args.testfraction, classifier=current_classifier)
+		tset = training_sets.keplerq9(**tset_settings)
 	elif args.trainingset == 'keplerq9-linfit':
-		tset = training_sets.keplerq9linfit(datalevel=args.datalevel, tf=args.testfraction, classifier=current_classifier)
+		tset = training_sets.keplerq9linfit(**tset_settings)
+
+	# The Meta-classifier requires us to first tain all of the other classifiers
+	# using cross-validation
+	if current_classifier == 'meta':
+		# Loop through all the other classifiers and initialize them:
+		# TODO: Run in paralllel?
+		for cla in (RFGCClassifier, SLOSHClassifier, XGBClassifier):
+			with cla(level=args.level, features_cache=tset.features_cache, tset_key=tset.key) as stcl:
+				# Split the tset object into cross-validation folds.
+				# These are objects with exactly the same properties as the original one,
+				# except that they will run through diffent subsets of the training and test sets:
+				for tset_fold in tset.folds(tf=0.2):
+					logger.info('Training on Fold %d/%d...', tset_fold.fold, tset_fold.crossval_folds)
+
+					# TODO: Make sure this doesn't load a previous trained model!
+					stcl.train(tset_fold)
+					stcl.test(tset_fold, save=True)
 
 	# Initialize the classifier:
 	with classifier(level=args.level, features_cache=tset.features_cache, tset_key=tset.key) as stcl:
 		# Run the training of the classifier:
 		logger.info("Starting training...")
 		stcl.train(tset)
+		stcl.test(tset)
 		logger.info("Training done...")
-
-		if tset.testfraction > 0:
-			logger.info("Starting testing...")
-
-			# Classify test set (has to be one by one unless we change classifiers)
-			# TODO: Run in paralllel
-			# TODO: Use TaskManager for this?
-			y_pred = []
-			for features in tset.features_test():
-				# Classify this start from the test-set:
-				res = stcl.classify(features)
-
-				# TODO: Save results for this classifier/trainingset in database
-
-				#logger.info(res)
-				prediction = max(res, key=lambda key: res[key]).value
-				logger.info(prediction)
-				y_pred.append(prediction)
-			y_pred = np.array(y_pred)
-
-			# Convert labels to ndarray:
-			labels_test = np.array([lbl[0].value for lbl in tset.labels_test(level=args.level)])
-
-			# Compare to known labels:
-			acc = accuracy_score(labels_test, y_pred)
-			logger.info('Accuracy: ', str(acc))
-			cf = confusion_matrix(labels_test, y_pred) #labels probably not in right format
-			logger.info('CF Matrix:')
-			logger.info(cf)

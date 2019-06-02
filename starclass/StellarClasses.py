@@ -5,7 +5,6 @@ Enum of all the possible stellar classes.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, print_function, with_statement, absolute_import
 import enum
 
 __docformat__ = 'restructuredtext'

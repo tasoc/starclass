@@ -58,8 +58,6 @@ class TrainingSet(object):
 
 		"""
 
-		self.crossval_folds = n_splits
-
 		labels_test = [lbl[0].value for lbl in self.labels()]
 
 		# If keyword is true then split according to KFold cross-vadliation
@@ -75,6 +73,7 @@ class TrainingSet(object):
 
 			newtset.train_idx = self.train_idx[train_idx]
 			newtset.test_idx = self.train_idx[test_idx]
+			newtset.crossval_folds = n_splits
 			newtset.fold = fold + 1
 			yield newtset
 

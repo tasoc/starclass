@@ -81,16 +81,18 @@ if __name__ == '__main__':
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in paralllel?
 		for cla in (RFGCClassifier, SLOSHClassifier, XGBClassifier):
-			with cla(level=args.level, features_cache=tset.features_cache, tset_key=tset.key) as stcl:
 				# Split the tset object into cross-validation folds.
 				# These are objects with exactly the same properties as the original one,
 				# except that they will run through diffent subsets of the training and test sets:
 				for tset_fold in tset.folds(tf=0.2):
-					logger.info('Training on Fold %d/%d...', tset_fold.fold, tset_fold.crossval_folds)
+					tset_key = tset.key + '/meta_fold{0:02d}'.format(tset_fold.fold)
+					with cla(level=args.level, features_cache=tset.features_cache, tset_key=tset_key) as stcl:
 
-					# TODO: Make sure this doesn't load a previous trained model!
-					stcl.train(tset_fold)
-					stcl.test(tset_fold, save=True)
+						tset_fold.classifier = 'rfgc' # FIXME: Needs to be redefined!
+						logger.info('Training on Fold %d/%d...', tset_fold.fold, tset_fold.crossval_folds)
+
+						stcl.train(tset_fold)
+						stcl.test(tset_fold) # , save=True
 
 	# Initialize the classifier:
 	with classifier(level=args.level, features_cache=tset.features_cache, tset_key=tset.key) as stcl:

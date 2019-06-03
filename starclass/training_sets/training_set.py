@@ -20,9 +20,8 @@ from .. import BaseClassifier, TaskManager
 #----------------------------------------------------------------------------------------------
 class TrainingSet(object):
 
-	def __init__(self, classifier=None, datalevel='corr', tf=0.0):
+	def __init__(self, datalevel='corr', tf=0.0):
 
-		self.classifier = classifier
 		self.datalevel = datalevel
 		self.testfraction = tf
 
@@ -69,7 +68,7 @@ class TrainingSet(object):
 		# sets from the folding:
 		for fold, (train_idx, test_idx) in enumerate(skf_splits):
 			#newtset = deepcopy(self)
-			newtset = self.__class__(classifier=self.classifier, datalevel=self.datalevel, tf=tf)
+			newtset = self.__class__(datalevel=self.datalevel, tf=tf)
 
 			newtset.train_idx = self.train_idx[train_idx]
 			newtset.test_idx = self.train_idx[test_idx]
@@ -127,47 +126,38 @@ class TrainingSet(object):
 	#----------------------------------------------------------------------------------------------
 	def features(self):
 
-		rowidx = -1
-		with TaskManager(self.input_folder, overwrite=True) as tm:
+		with TaskManager(self.input_folder, readonly=True, overwrite=False) as tm:
 			with BaseClassifier(tset_key=self.key, features_cache=self.features_cache) as stcl:
-				while True:
-					task = tm.get_task(classifier=self.classifier, change_classifier=False)
+				for rowidx in self.train_idx:
+					task = tm.get_task(priority=rowidx+1, change_classifier=False)
 					if task is None: break
-					tm.start_task(task)
-					rowidx += 1
 
 					# Lightcurve file to load:
 					# We do not use the one from the database because in the simulations the
 					# raw and corrected light curves are stored in different files.
 					fname = os.path.join(self.input_folder, task['lightcurve'])
 
-					if self.testfraction > 0:
-						if rowidx in self.train_idx:
-							yield stcl.load_star(task, fname)
-					else:
-						yield stcl.load_star(task, fname)
+					yield stcl.load_star(task, fname)
 
 	#----------------------------------------------------------------------------------------------
 	def features_test(self):
 
 		if self.testfraction <= 0:
 			raise ValueError('features_test requires testfraction>0')
-		else:
-			rowidx = -1
-			with TaskManager(self.input_folder, overwrite=True) as tm:
-				with BaseClassifier(tset_key=self.key, features_cache=self.features_cache) as stcl:
-					while True:
-						task = tm.get_task(classifier=self.classifier, change_classifier=False)
-						if task is None: break
-						tm.start_task(task)
-						rowidx += 1
 
-						if rowidx in self.test_idx:
-							# Lightcurve file to load:
-							# We do not use the one from the database because in the simulations the
-							# raw and corrected light curves are stored in different files.
-							fname = os.path.join(self.input_folder, task['lightcurve'])
-							yield stcl.load_star(task, fname)
+		with TaskManager(self.input_folder, readonly=True, overwrite=False) as tm:
+			with BaseClassifier(tset_key=self.key, features_cache=self.features_cache) as stcl:
+				for rowidx in self.test_idx:
+					task = tm.get_task(priority=rowidx+1, change_classifier=False)
+					if task is None: break
+
+					# Lightcurve file to load:
+					# We do not use the one from the database because in the simulations the
+					# raw and corrected light curves are stored in different files.
+					fname = os.path.join(self.input_folder, task['lightcurve'])
+
+					yield stcl.load_star(task, fname)
+
 
 	#----------------------------------------------------------------------------------------------
 	def labels(self, level='L1'):

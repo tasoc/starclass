@@ -18,13 +18,12 @@ def featcalc(features, som,
 	"""
 	Calculates features for set of lightcurves
 	"""
-	logger = logging.getLogger(__name__)
 
 	featout = np.zeros([1,nfrequencies+16])
 	if isinstance(features,dict): #trick for single features
 		features = [features]
 
-	for obj in tqdm(features, disable=not logger.isEnabledFor(logging.INFO)):
+	for obj in features:
 		precalc = False
 		if savefeat is not None:
 			featfile = os.path.join(savefeat,str(obj['priority'])+'.txt')

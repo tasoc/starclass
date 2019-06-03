@@ -12,7 +12,6 @@ import numpy as np
 import os
 import copy
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import KFold
 from . import RF_GC_featcalc as fc
 from .. import BaseClassifier, StellarClasses
 from .. import utilities
@@ -142,14 +141,14 @@ class RFGCClassifier(BaseClassifier):
 		# Assumes that if self.classifier.trained=True,
 		# ...then self.classifier.som is not None
 
-		logger.info("Calculating features...")
+		logger.debug("Calculating features...")
 		featarray = fc.featcalc(features, self.classifier.som, savefeat=self.featdir, recalc=recalc)
 		#logger.info("Features calculated.")
 
 		# Do the magic:
 		#logger.info("We are starting the magic...")
 		classprobs = self.classifier.predict_proba(featarray)[0]
-		logger.info("Classification complete")
+		logger.debug("Classification complete")
 
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):

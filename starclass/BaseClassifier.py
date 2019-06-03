@@ -14,6 +14,7 @@ import os.path
 import logging
 from lightkurve import TessLightCurve
 from astropy.io import fits
+from tqdm import tqdm
 from sklearn.metrics import accuracy_score, confusion_matrix
 from .StellarClasses import StellarClasses
 from .features.freqextr import freqextr
@@ -66,6 +67,13 @@ class BaseClassifier(object):
 
 		if self.features_cache is not None and not os.path.exists(self.features_cache):
 			raise ValueError("features_cache directory does not exists")
+
+		self.classifier_key = {
+			'BaseClassifier': 'base',
+			'RFGCClassifier': 'rfgc',
+			'SLOSHClassifier': 'slosh',
+			'MetaClassifier': 'meta'
+		}[self.__class__.__name__]
 
 	def __enter__(self):
 		return self
@@ -133,7 +141,7 @@ class BaseClassifier(object):
 		"""
 		raise NotImplementedError()
 
-	def test(self, tset):
+	def test(self, tset, save=False, save_func=None):
 		"""
 		Parameters:
 			tset (``TrainingSet`` object): Training-set to run testing on.
@@ -151,15 +159,23 @@ class BaseClassifier(object):
 		# Classify test set (has to be one by one unless we change classifiers)
 		# TODO: Use TaskManager for this?
 		y_pred = []
-		for features in tset.features_test():
-			# Classify this start from the test-set:
+		for features in tqdm(tset.features_test(), total=len(tset.test_idx)):
+			# Classify this star from the test-set:
 			res = self.classify(features)
 
-			# TODO: Save results for this classifier/trainingset in database
-
-			#logger.info(res)
 			prediction = max(res, key=lambda key: res[key]).value
 			y_pred.append(prediction)
+
+			# TODO: Save results for this classifier/trainingset in database
+			if save:
+				res.update({
+					'priority': features['priority'],
+					'classifier': self.classifier_key,
+					'status': 1
+				})
+				logger.debug(res)
+				save_func(res)
+
 		y_pred = np.array(y_pred)
 
 		# Convert labels to ndarray:
@@ -173,12 +189,10 @@ class BaseClassifier(object):
 		# Confusion Matrix:
 		cf = confusion_matrix(labels_test, y_pred, labels=all_classes)
 
-		current_classifier = self.__class__.__name__
-
 		fig = plt.figure(figsize=(12,12))
 		plotConfMatrix(cf, all_classes)
-		plt.title(current_classifier + ' - ' + tset.key + ' - ' + self.level)
-		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_'  + tset.key + '_' + self.level + '_' + current_classifier + '.png'), bbox_inches='tight')
+		plt.title(self.classifier_key + ' - ' + tset.key + ' - ' + self.level)
+		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_'  + tset.key + '_' + self.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 
 

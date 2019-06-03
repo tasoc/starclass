@@ -10,7 +10,8 @@ import argparse
 import logging
 import numpy as np
 import os.path
-from starclass import training_sets, RFGCClassifier, XGBClassifier, SLOSHClassifier, MetaClassifier
+from starclass import (training_sets, TaskManager,
+					   RFGCClassifier, XGBClassifier, SLOSHClassifier, MetaClassifier)
 
 #----------------------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -62,7 +63,6 @@ if __name__ == '__main__':
 
 	# Settings to be passed onto the selected training set:
 	tset_settings = {
-		'classifier': current_classifier, # FIXME: Can we get rid of this?
 		'datalevel': args.datalevel,
 		'tf': args.testfraction,
 	}
@@ -80,19 +80,19 @@ if __name__ == '__main__':
 	if current_classifier == 'meta':
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in paralllel?
-		for cla in (RFGCClassifier, SLOSHClassifier, XGBClassifier):
+		with TaskManager(tset.input_folder, overwrite=True) as tm:
+			for cla in (RFGCClassifier, ): # SLOSHClassifier, XGBClassifier
 				# Split the tset object into cross-validation folds.
 				# These are objects with exactly the same properties as the original one,
 				# except that they will run through diffent subsets of the training and test sets:
 				for tset_fold in tset.folds(tf=0.2):
 					tset_key = tset.key + '/meta_fold{0:02d}'.format(tset_fold.fold)
 					with cla(level=args.level, features_cache=tset.features_cache, tset_key=tset_key) as stcl:
-
-						tset_fold.classifier = 'rfgc' # FIXME: Needs to be redefined!
-						logger.info('Training on Fold %d/%d...', tset_fold.fold, tset_fold.crossval_folds)
-
+						logger.info('Training %s on Fold %d/%d...', stcl.classifier_key, tset_fold.fold, tset_fold.crossval_folds)
 						stcl.train(tset_fold)
-						stcl.test(tset_fold) # , save=True
+						logger.info("Classifing test-set...")
+						stcl.test(tset_fold, save=True, save_func=tm.save_result)
+
 
 	# Initialize the classifier:
 	with classifier(level=args.level, features_cache=tset.features_cache, tset_key=tset.key) as stcl:

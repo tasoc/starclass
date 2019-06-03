@@ -45,13 +45,12 @@ class SLOSHClassifier(BaseClassifier):
 		else:
 			self.model_file = None
 
-		if self.model_file is not None:
-			if os.path.exists(self.model_file):
-				logger.info("Loading pre-trained model...")
-				# load pre-trained classifier
-				self.predictable = True
-				K.set_learning_phase(1)
-				self.classifier_list.append(load_model(self.model_file))
+		if self.model_file is not None and os.path.exists(self.model_file):
+			logger.info("Loading pre-trained model...")
+			# load pre-trained classifier
+			self.predictable = True
+			K.set_learning_phase(1)
+			self.classifier_list.append(load_model(self.model_file))
 		else:
 			logger.info('No saved models provided. Predict functions are disabled.')
 			self.predictable = False
@@ -148,9 +147,7 @@ class SLOSHClassifier(BaseClassifier):
 				psd = feat['powerspectrum'].standard
 
 				# Convert classifications to integer labels:
-				print(lbl)
 				label = 1 if StellarClasses.SOLARLIKE in lbl else 0
-				print(label)
 
 				preprocessing.generate_train_images(psd[0], psd[1],
 													feat['priority'],

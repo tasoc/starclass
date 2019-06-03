@@ -17,7 +17,7 @@ class TaskManager(object):
 	A TaskManager which keeps track of which targets to process.
 	"""
 
-	def __init__(self, todo_file, cleanup=False, overwrite=False):
+	def __init__(self, todo_file, cleanup=False, readonly=False, overwrite=False):
 		"""
 		Initialize the TaskManager which keeps track of which targets to process.
 
@@ -37,6 +37,8 @@ class TaskManager(object):
 		if not os.path.exists(todo_file):
 			raise FileNotFoundError('Could not find TODO-file')
 
+		self.readonly = readonly
+
 		# Keep a list of all the possible classifiers here:
 		self.all_classifiers = set(['rfgc', 'slosh', 'foptics', 'xgb'])
 
@@ -49,7 +51,10 @@ class TaskManager(object):
 		self.logger.setLevel(logging.INFO)
 
 		# Load the SQLite file:
-		self.conn = sqlite3.connect(todo_file)
+		if self.readonly:
+			self.conn = sqlite3.connect('file:' + todo_file + '?mode=ro', uri=True)
+		else:
+			self.conn = sqlite3.connect(todo_file)
 		self.conn.row_factory = sqlite3.Row
 		self.cursor = self.conn.cursor()
 
@@ -102,7 +107,18 @@ class TaskManager(object):
 		"""
 		raise NotImplementedError()
 
-	def _query_task(self, cl):
+	def _query_task(self, classifier=None, priority=None):
+
+		search_query = []
+		if classifier is not None:
+			search_query.append("todolist.priority NOT IN (SELECT starclass.priority FROM starclass WHERE starclass.priority=todolist.priority AND starclass.classifier='%s')" % classifier)
+
+		if priority is not None:
+			search_query.append('todolist.priority=%d' % priority)
+
+		if search_query:
+			search_query = "AND " + " AND ".join(search_query)
+
 		self.cursor.execute("""
 			SELECT
 				todolist.priority,
@@ -119,14 +135,12 @@ class TaskManager(object):
 				INNER JOIN diagnostics ON todolist.priority=diagnostics.priority
 			WHERE
 				todolist.status=1
-				AND todolist.priority NOT IN (
-					SELECT starclass.priority FROM starclass WHERE starclass.priority=todolist.priority AND starclass.classifier=:classifier
-				)
-			ORDER BY todolist.priority LIMIT 1;""", {'classifier': cl})
+				{0}
+			ORDER BY todolist.priority LIMIT 1;""".format(search_query))
 		task = self.cursor.fetchone()
 		if task:
 			task = dict(task)
-			task['classifier'] = cl
+			task['classifier'] = classifier
 
 			# Add things from the catalog file:
 			#catalog_file = os.path.join(????, 'catalog_sector{sector:03d}_camera{camera:d}_ccd{ccd:d}.sqlite')
@@ -135,23 +149,23 @@ class TaskManager(object):
 
 			# If the classifier that is running is the meta-classifier,
 			# add the results from all other classifiers to the task dict:
-			if cl == 'meta':
-				self.cursor.execute("SELECT classifier,class,prob FROM starclass WHERE priority=? AND classifier != 'meta';", (task['priority'], ))
-				if self.cursor.rowcount > 0:
-					rows = self.cursor.fetchall()
-				else:
-					rows = None
-				# Add as a Table to the task list:
-				task['other_classifiers'] = Table(
-					rows=rows,
-					names=('classifier', 'class', 'prob'),
-					dtype=('S256', 'S256', 'float32')
-				)
+			#if classifier == 'meta':
+			self.cursor.execute("SELECT classifier,class,prob FROM starclass WHERE priority=? AND classifier != 'meta';", (task['priority'], ))
+			if self.cursor.rowcount > 0:
+				rows = self.cursor.fetchall()
+			else:
+				rows = None
+			# Add as a Table to the task list:
+			task['other_classifiers'] = Table(
+				rows=rows,
+				names=('classifier', 'class', 'prob'),
+				dtype=('S256', 'S256', 'float32')
+			)
 
 			return task
 		return None
 
-	def get_task(self, classifier=None, change_classifier=True):
+	def get_task(self, priority=None, classifier=None, change_classifier=True):
 		"""
 		Get next task to be processed.
 
@@ -165,8 +179,7 @@ class TaskManager(object):
 		"""
 
 		task = None
-		if classifier is not None:
-			task = self._query_task(classifier)
+		task = self._query_task(classifier, priority=priority)
 
 		# If no task is returned for the given classifier, find another
 		# classifier where tasks are available:
@@ -175,7 +188,7 @@ class TaskManager(object):
 			# task for all of them:
 			all_tasks = []
 			for cl in self.all_classifiers.difference([classifier]):
-				task = self._query_task(cl)
+				task = self._query_task(cl, priority=priority)
 				if task is not None:
 					all_tasks.append(task)
 

@@ -11,7 +11,8 @@ import logging
 import numpy as np
 import os.path
 from starclass import (training_sets, TaskManager,
-					   RFGCClassifier, XGBClassifier, SLOSHClassifier, MetaClassifier)
+					   RFGCClassifier, XGBClassifier, SLOSHClassifier,
+					   FOPTICSClassifier, MetaClassifier)
 
 #----------------------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -56,7 +57,7 @@ if __name__ == '__main__':
 	classifier = {
 		'rfgc': RFGCClassifier,
 		'slosh': SLOSHClassifier,
-		#'foptics': FOPTICSClassifier,
+		'foptics': FOPTICSClassifier,
 		'xgb': XGBClassifier,
 		'meta': MetaClassifier
 	}[current_classifier]

@@ -73,6 +73,7 @@ class BaseClassifier(object):
 			'RFGCClassifier': 'rfgc',
 			'SLOSHClassifier': 'slosh',
 			'XGBClassifier': 'xgb',
+			'FOPTICSClassifier': 'foptics',
 			'MetaClassifier': 'meta'
 		}[self.__class__.__name__]
 

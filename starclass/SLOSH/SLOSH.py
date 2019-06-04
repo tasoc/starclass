@@ -161,7 +161,7 @@ class SLOSHClassifier(BaseClassifier):
 		train_generator = preprocessing.npy_generator(root=train_folder, batch_size=32,  dim=(128,128), extension='.npz')
 		logger.info('Training Classifier...')
 		epochs = 50
-		model.fit_generator(train_generator, epochs=epochs, steps_per_epoch=math.ceil(nb_files / 32),
+		model.fit_generator(train_generator, epochs=epochs, steps_per_epoch=len(train_generator),
 							callbacks=[reduce_lr], verbose=2)
 		model.save(self.model_file)
 

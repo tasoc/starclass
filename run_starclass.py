@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import os.path
 import argparse
 import logging
-from starclass import TaskManager, RFGCClassifier, XGBClassifier, SLOSHClassifier, MetaClassifier
+from starclass import TaskManager, RFGCClassifier, XGBClassifier, SLOSHClassifier, FOPTICSClassifier, MetaClassifier
 
 #----------------------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -59,7 +59,7 @@ if __name__ == '__main__':
 	classifier = {
 		'rfgc': RFGCClassifier,
 		'slosh': SLOSHClassifier,
-		#'foptics': FOPTICSClassifier,
+		'foptics': FOPTICSClassifier,
 		'xgb': XGBClassifier,
 		'meta': MetaClassifier
 	}[current_classifier]

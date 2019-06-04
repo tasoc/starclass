@@ -17,6 +17,9 @@ from keras.layers.core import Dense
 from keras.regularizers import l2
 from keras.optimizers import Adam
 
+from scipy.stats import binned_statistic
+from scipy.interpolate import interp1d
+
 class npy_generator(keras.utils.Sequence):
     """
     Generator that loads numpy arrays from a folder for training a deep learning model. This version has been tailored
@@ -215,11 +218,12 @@ def generate_train_images(freq, power, star_id, output_path, label):
         image = generate_single_image(freq, power)
         np.savez_compressed(file = output_path+'/%s' %star_id, im=image)
     else:
+        image = generate_single_image(freq, power)
         if not os.path.exists(output_path + '/1/'):
             os.mkdir(output_path + '/1/')
         if not os.path.exists(output_path + '/0/'):
             os.mkdir(output_path + '/0/')
-        np.savez_compressed(file=output_path+'/%s/%s'%(label, star_id))
+        np.savez_compressed(file=output_path+'/%s/%s'%(label, star_id), im=image)
 
 
 def default_classifier_model():

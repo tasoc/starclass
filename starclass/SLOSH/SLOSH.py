@@ -163,8 +163,19 @@ class SLOSHClassifier(BaseClassifier):
 		epochs = 50
 		model.fit_generator(train_generator, epochs=epochs, steps_per_epoch=len(train_generator),
 							callbacks=[reduce_lr], verbose=2)
-		model.save(self.model_file)
+		self.save_model(model, self.model_file)
 
+	def save_model(self, model, model_file):
+		'''
+		Saves out trained model
+		: param model: trained model
+		: param model_file: Output file name for model
+		:return: None
+		'''
+		# Save out model
+		model.save(model_file)
+		# Set predictable to true so can predict
+		self.predictable = True
 
 	def save(self, outfile):
 		'''

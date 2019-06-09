@@ -71,7 +71,7 @@ class XGBClassifier(BaseClassifier):
 
 
 		self.classifier = None
-		#self.trained = False
+		self.trained = False
 
 		if clfile is not None:
 			self.classifier_file = os.path.join(self.data_dir, clfile)

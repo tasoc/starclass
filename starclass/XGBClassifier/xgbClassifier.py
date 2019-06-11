@@ -71,7 +71,7 @@ class XGBClassifier(BaseClassifier):
 
 
 		self.classifier = None
-		#self.trained = False
+		self.trained = False
 
 		if clfile is not None:
 			self.classifier_file = os.path.join(self.data_dir, clfile)
@@ -146,7 +146,7 @@ class XGBClassifier(BaseClassifier):
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
 
-		if not self.classifier.trained:
+		if not self.trained:
 			logger.error('Please train classifer')
 			raise ValueError("Untrained Classifier")
 
@@ -179,7 +179,7 @@ class XGBClassifier(BaseClassifier):
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
 
-		if self.classifier.trained:
+		if self.trained:
 			return
 
 		logger.info('Calculating/Loading Features.')
@@ -216,11 +216,11 @@ class XGBClassifier(BaseClassifier):
 				with open('xgbClassifier_feat_import.json', 'w') as outfile:
 					json.dump(list(feature_importances), outfile)
 
-			self.classifier.trained = True
+			self.trained = True
 		except:
 			logger.exception('Training error ...')
 
-		if savecl and self.classifier.trained:
+		if savecl and self.trained:
 			if self.classifier_file is not None:
 				if not os.path.exists(self.classifier_file) or overwrite:
 					logger.info('Saving pickled xgb classifier to '+self.classifier_file)

@@ -13,6 +13,7 @@ import requests
 import zipfile
 import shutil
 import logging
+import tempfile
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from .. import BaseClassifier, TaskManager
@@ -126,18 +127,31 @@ class TrainingSet(object):
 	#----------------------------------------------------------------------------------------------
 	def features(self):
 
-		with TaskManager(self.input_folder, readonly=True, overwrite=False) as tm:
-			with BaseClassifier(tset_key=self.key, features_cache=self.features_cache) as stcl:
-				for rowidx in self.train_idx:
-					task = tm.get_task(priority=rowidx+1, change_classifier=False)
-					if task is None: break
+		# Create a temporary copy of the TODO-file that we are going to read from.
+		# This is due to errors we have detected, where the database is unexpectively locked
+		# when opened several times in parallel.
+		try:
+			with tempfile.NamedTemporaryFile(dir=self.input_folder, suffix='.sqlite', delete=False) as tmpdir:
+				# Copy the original TODO-file to the new temp file:
+				with open(os.path.join(self.input_folder, 'todo.sqlite'), 'rb') as fid:
+					shutil.copyfileobj(fid, tmpdir)
+				tmpdir.flush()
 
-					# Lightcurve file to load:
-					# We do not use the one from the database because in the simulations the
-					# raw and corrected light curves are stored in different files.
-					fname = os.path.join(self.input_folder, task['lightcurve'])
+				with TaskManager(tmpdir.name, readonly=True, overwrite=False, cleanup=False) as tm:
+					with BaseClassifier(tset_key=self.key, features_cache=self.features_cache) as stcl:
+						for rowidx in self.train_idx:
+							task = tm.get_task(priority=rowidx+1, change_classifier=False)
+							if task is None: break
 
-					yield stcl.load_star(task, fname)
+							# Lightcurve file to load:
+							# We do not use the one from the database because in the simulations the
+							# raw and corrected light curves are stored in different files.
+							fname = os.path.join(self.input_folder, task['lightcurve'])
+							yield stcl.load_star(task, fname)
+
+		finally:
+			if os.path.exists(tmpdir.name):
+				os.remove(tmpdir.name)
 
 	#----------------------------------------------------------------------------------------------
 	def features_test(self):
@@ -145,19 +159,31 @@ class TrainingSet(object):
 		if self.testfraction <= 0:
 			raise ValueError('features_test requires testfraction>0')
 
-		with TaskManager(self.input_folder, readonly=True, overwrite=False) as tm:
-			with BaseClassifier(tset_key=self.key, features_cache=self.features_cache) as stcl:
-				for rowidx in self.test_idx:
-					task = tm.get_task(priority=rowidx+1, change_classifier=False)
-					if task is None: break
+		# Create a temporary copy of the TODO-file that we are going to read from.
+		# This is due to errors we have detected, where the database is unexpectively locked
+		# when opened several times in parallel.
+		try:
+			with tempfile.NamedTemporaryFile(dir=self.input_folder, suffix='.sqlite', delete=False) as tmpdir:
+				# Copy the original TODO-file to the new temp file:
+				with open(os.path.join(self.input_folder, 'todo.sqlite'), 'rb') as fid:
+					shutil.copyfileobj(fid, tmpdir)
+				tmpdir.flush()
 
-					# Lightcurve file to load:
-					# We do not use the one from the database because in the simulations the
-					# raw and corrected light curves are stored in different files.
-					fname = os.path.join(self.input_folder, task['lightcurve'])
+				with TaskManager(tmpdir.name, readonly=True, overwrite=False, cleanup=False) as tm:
+					with BaseClassifier(tset_key=self.key, features_cache=self.features_cache) as stcl:
+						for rowidx in self.test_idx:
+							task = tm.get_task(priority=rowidx+1, change_classifier=False)
+							if task is None: break
 
-					yield stcl.load_star(task, fname)
+							# Lightcurve file to load:
+							# We do not use the one from the database because in the simulations the
+							# raw and corrected light curves are stored in different files.
+							fname = os.path.join(self.input_folder, task['lightcurve'])
+							yield stcl.load_star(task, fname)
 
+		finally:
+			if os.path.exists(tmpdir.name):
+				os.remove(tmpdir.name)
 
 	#----------------------------------------------------------------------------------------------
 	def labels(self, level='L1'):

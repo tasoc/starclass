@@ -28,7 +28,7 @@ class TaskManager(object):
 			overwrite (boolean): Overwrite any previously calculated results. Default=False.
 
 		Raises:
-			IOError: If TODO-file could not be found.
+			FileNotFoundError: If TODO-file could not be found.
 		"""
 
 		if os.path.isdir(todo_file):
@@ -59,7 +59,6 @@ class TaskManager(object):
 		self.cursor = self.conn.cursor()
 
 		# Reset the status of everything for a new run:
-		# TODO: This should obviously be removed once we start running for real
 		if overwrite:
 			self.cursor.execute("DROP TABLE IF EXISTS starclass;")
 			self.conn.commit()
@@ -212,20 +211,28 @@ class TaskManager(object):
 		status = result.pop('status')
 
 		# Store the results in database:
-		self.cursor.execute("DELETE FROM starclass WHERE priority=? AND classifier=?;", (priority, classifier))
-		for key, value in result.items():
-			self.cursor.execute("INSERT INTO starclass (priority,classifier,status,class,prob) VALUES (:priority,:classifier,:status,:class,:prob);", {
-				'priority': priority,
-				'classifier': classifier,
-				'status': status,
-				'class': key.name,
-				'prob': value
-			})
-		self.conn.commit()
+		try:
+			self.cursor.execute("DELETE FROM starclass WHERE priority=? AND classifier=?;", (priority, classifier))
+			for key, value in result.items():
+				self.cursor.execute("INSERT INTO starclass (priority,classifier,status,class,prob) VALUES (:priority,:classifier,:status,:class,:prob);", {
+					'priority': priority,
+					'classifier': classifier,
+					'status': status,
+					'class': key.name,
+					'prob': value
+				})
+			self.conn.commit()
+		except:
+			self.conn.rollback()
+			raise
 
 	def start_task(self, task):
 		"""
 		Mark a task as STARTED in the TODO-list.
 		"""
-		self.cursor.execute("INSERT INTO starclass (priority,classifier,status) VALUES (:priority,:classifier,6);", task)
-		self.conn.commit()
+		try:
+			self.cursor.execute("INSERT INTO starclass (priority,classifier,status) VALUES (:priority,:classifier,6);", task)
+			self.conn.commit()
+		except:
+			self.conn.rollback()
+			raise

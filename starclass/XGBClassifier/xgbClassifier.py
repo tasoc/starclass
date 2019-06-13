@@ -114,7 +114,7 @@ class XGBClassifier(BaseClassifier):
 
 		"""
 
-		self.classifier = None
+		#self.classifier = None
 		temp_classifier = copy.deepcopy(self.classifier)
 		utilities.savePickle(outfile, self.classifier)
 		self.classifier = temp_classifier
@@ -151,20 +151,20 @@ class XGBClassifier(BaseClassifier):
 			raise ValueError("Untrained Classifier")
 
 		## If classifer has been trained, calculate features
-		logger.info('Feature Extraction')
+		logger.debug("Calculating features...")
 		feature_results = xgb_features.feature_extract(features) ## Come back to this
-		logger.info('Feature Extraction done')
+		#logger.info('Feature Extraction done')
 
 		# Do the magic:
-		logger.info("We are staring the magic...")
+		#logger.info("We are staring the magic...")
 		xgb_classprobs = self.classifier.predict_proba(feature_results)[0]
-		logger.info('Done')
-
+		logger.debug("Classification complete")
 		class_results = {}
 
 		for c, cla in enumerate(self.classifier.classes_):
 			key = StellarClasses(cla)
-			class_results[key] = xgb_classprobs[c]
+			# Cast to float for prediction
+			class_results[key] = float(xgb_classprobs[c])
 
 		return class_results
 

@@ -73,10 +73,10 @@ class SLOSHClassifier(BaseClassifier):
 		# Pre-calculated power density spectrum:
 		psd = features['powerspectrum'].standard
 
-		logger.info('Generating Image...')
+		logger.debug('Generating Image...')
 		img_array = preprocessing.generate_single_image(psd[0], psd[1])
 
-		logger.info('Making Predictions...')
+		logger.debug('Making Predictions...')
 		pred_array = np.zeros((self.mc_iterations, len(self.classifier_list)))
 		for i in range(self.mc_iterations):
 			for j in range(len(self.classifier_list)):

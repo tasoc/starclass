@@ -101,21 +101,14 @@ class SLOSHClassifier(BaseClassifier):
 		#	label = 0
 		#pred_sigma = std_over_mc_iterations
 
-		result = {StellarClasses.SOLARLIKE: pred}
-
 		# Remaining probability
 		remainder = (1. - pred) / 9.
-		remaining_classes = [StellarClasses.RRLYR_CEPHEID,
-							 StellarClasses.ECLIPSE,
-							 StellarClasses.DSCT_BCEP,
-							 StellarClasses.GDOR_SPB,
-							 StellarClasses.TRANSIENT,
-							 StellarClasses.CONTACT_ROT,
-							 StellarClasses.APERIODIC,
-							 StellarClasses.CONSTANT,
-							 StellarClasses.RAPID]
-		for i in remaining_classes:
-			result[i] = remainder
+
+		result = {}
+		for c, cla in enumerate(self.classifier.classes_):
+			key = StellarClasses(cla)
+			result[key] = remainder
+		result[StellarClasses.SOLARLIKE] = pred
 		return result
 
 	def train(self, tset):

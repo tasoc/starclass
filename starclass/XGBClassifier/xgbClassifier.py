@@ -16,6 +16,9 @@ from . import xgb_feature_calc as xgb_features
 from .. import BaseClassifier, StellarClasses
 from .. import utilities
 
+seed = 125
+np.random.seed(seed)
+
 class Classifier_obj(xgb):
     """
 	Wrapper for sklearn XGBClassifier
@@ -23,16 +26,16 @@ class Classifier_obj(xgb):
     """
 
     def __init__(self,base_score=0.5, booster='gbtree', colsample_bylevel=1,
-       colsample_bytree=1, eval_metric='mlogloss', gamma=0,
+       colsample_bytree=0.7, eval_metric='mlogloss', gamma=0.0,
        learning_rate=0.1, max_delta_step=0, max_depth=13,
-       min_child_weight=1, missing=None, n_estimators=550, n_jobs=1,
-       nthread=None, objective='multi:softmax', random_state=0,
-       reg_alpha=1e-05, reg_lambda=1, scale_pos_weight=1, seed=125,
-       silent=True, subsample=1):
+       min_child_weight=1, missing=None, n_estimators=700, n_jobs=2,
+       nthread=None, objective='multi:softmax', random_state=seed,
+       reg_alpha=0.01, reg_lambda=1, scale_pos_weight=1, seed=seed,
+       silent=True, subsample=0.6):
 
         super(self.__class__, self).__init__(booster=booster,eval_metric=eval_metric,
              learning_rate=learning_rate, max_depth=max_depth,n_estimators=n_estimators,
-             objective=objective,reg_alpha=reg_alpha)
+             objective=objective,reg_alpha=reg_alpha, subsample = subsample)
 
         self.trained = False
 
@@ -47,9 +50,10 @@ class XGBClassifier(BaseClassifier):
 
     """
     def __init__(self,clfile='xgb_classifier_1.pickle',
-                 featdir="xgb_features",n_estimators=750,
-                 max_depth=13,learning_rate = 0.1,reg_alpha=1e-5,
-                 objective ='multi:softmax',
+                 featdir="xgb_features",n_estimators=700,
+                 max_depth=13,learning_rate = 0.1,reg_alpha=0.01,
+                 objective ='multi:softmax',colsample_bytree =0.7,
+                 subsample = 0.6,min_child_weight=1,
                  booster='gbtree',eval_metric='mlogloss', *args, **kwargs):
 
         """
@@ -142,7 +146,7 @@ class XGBClassifier(BaseClassifier):
 
         self.classifier = utilities.loadPickle(infile)
 
-    def do_classify(self, features):
+    def do_classify(self, features, recalc = False):
 
         """
 

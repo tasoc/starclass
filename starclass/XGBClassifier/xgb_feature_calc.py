@@ -7,8 +7,7 @@ Created on Wed Nov  7 09:05:24 2018
 """
 import pandas as pd
 import numpy as np
-import feets
-#import glob
+import upsilon
 import warnings
 import os
 import types
@@ -28,22 +27,10 @@ def lc_norm(lc, linflatten = False):
     Preprocess light curves using sigma clipping and normalise them with the median
     #This is is done under the assumption that missing (nan) have been removed
     """
-    #nan_values = (lc == 0) | np.isnan(lc)
-    lc = lc.remove_nans().remove_outliers(sigma=2.5)
-    #nancut = (lc.flux==0) | np.isnan(lc.flux)
-    #t = lc.time[~nancut]
+    lc = lc.remove_nans()
     lc = lc[lc.flux != 0]
     lc.flux = lc.flux*1e-6 + 1
     lc.flux_err = lc.flux_err * 1e-6
-    #mag = lc.flux[~nancut] * 1e-6 + 1
-    #dmag = lc.flux_err[~nancut] * 1e-6
-    #lc_clipped = np.array(utils.sigma_clipping(t,mag,dmag,threshold=2.5,iteration=1))
-
-    #mag_median = np.median(lc_clipped[1])
-    #mag_norm = lc_clipped[1]/mag_median
-    #error_norm = lc_clipped[2]/ mag_median
-    #t = lc_clipped[0]
-    #lc_f = np.array((t,mag, dmag))
 
     if linflatten:
         #lc_f[:,1] = lc_f[:,1] - np.polyval(np.polyfit(lc_f[:,0],lc_f[:,1],1),lc_f[:,0]) + 1
@@ -61,52 +48,18 @@ def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
             featfile = os.path.join(savefeat, str(obj['priority'])+'.txt')
             if os.path.exists(featfile) and not recalc:
                 objfeatures = pd.read_csv(featfile)
-                #print(np.shape(objfeatures))
-                #print(objfeatures)
                 precalc = True
                 featout = featout.append(objfeatures)
 
         if not precalc:
             lc = lc_norm(obj['lightcurve'], linflatten)
 
+            feature_e = upsilon.ExtractFeatures(*np.array([lc.time, lc.flux, lc.flux_err]))
+            feature_e.run()
+            lc_features = dict(feature_e.get_features())
+            selected_features = {'amplitude','eta', 'kurtosis', 'mad', 'shapiro_w','skewness'}
 
-
-            #Features_final = feature_extract_single(features,linflatten = True)
-            fs =feets.FeatureSpace(exclude=[#'Amplitude', 'Beyond1Std',
-                                            'Freq1_harmonics_amplitude_0',
-                                            'Freq1_harmonics_rel_phase_1', 'Freq1_harmonics_rel_phase_2',
-                                            'Freq1_harmonics_rel_phase_3', 'Freq2_harmonics_rel_phase_1',
-                                            'Freq2_harmonics_rel_phase_2', 'Freq2_harmonics_rel_phase_3',
-                                            'Freq3_harmonics_rel_phase_1', 'Freq3_harmonics_rel_phase_2',
-                                            'Freq3_harmonics_rel_phase_3',
-                                            #'LinearTrend', 'Meanvariance',
-                                            #'PairSlopeTrend',
-                                            'PeriodLS',
-                                            'Psi_CS', 'Rcs',
-                                            #'Skew',
-                                            'CAR_mean', 'CAR_sigma', 'CAR_tau',
-                                        'AndersonDarling','Color','Eta_color','Q31_color',
-                                        'StetsonK','StetsonJ','PercentDifferenceFluxPercentile',
-                                        'SlottedA_length','Autocor_length','Con','Mean','Eta_e',
-                                        'StructureFunction_index_21','StructureFunction_index_31',
-                                        'StructureFunction_index_32','Freq1_harmonics_rel_phase_0',
-                                        'FluxPercentileRatioMid20','FluxPercentileRatioMid35',
-                                        'FluxPercentileRatioMid50','FluxPercentileRatioMid65',
-                                        'FluxPercentileRatioMid80','Freq2_harmonics_rel_phase_0',
-                                        'Freq3_harmonics_rel_phase_0','Period_fit','StetsonK_AC','StetsonL',
-                                        'PercentAmplitude','Freq1_harmonics_amplitude_1','Freq1_harmonics_amplitude_2',
-                                        'Freq1_harmonics_amplitude_3','Freq2_harmonics_amplitude_0',
-                                        'Freq2_harmonics_amplitude_1','Freq2_harmonics_amplitude_2',
-                                        'Freq2_harmonics_amplitude_3','Freq3_harmonics_amplitude_0',
-                                        'Freq3_harmonics_amplitude_1','Freq3_harmonics_amplitude_2',
-                                        'Freq3_harmonics_amplitude_3','Gskew','MaxSlope',
-                                        'MedianAbsDev','MedianBRP','SmallKurtosis','Q31','Std','Psi_eta'])
-
-
-
-            Feature_ID, values = fs.extract(*np.array([lc.time, lc.flux, lc.flux_err]))
-
-            features_dict = dict(zip(Feature_ID,values))
+            features_dict = {k:v for k,v in lc_features.items() if k in selected_features}
 
 
             forbiddenfreqs=[13.49/4.]

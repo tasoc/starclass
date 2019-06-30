@@ -16,9 +16,6 @@ from . import xgb_feature_calc as xgb_features
 from .. import BaseClassifier, StellarClasses
 from .. import utilities
 
-seed = 125
-np.random.seed(seed)
-
 class Classifier_obj(xgb):
     """
 	Wrapper for sklearn XGBClassifier
@@ -26,16 +23,19 @@ class Classifier_obj(xgb):
     """
 
     def __init__(self,base_score=0.5, booster='gbtree', colsample_bylevel=1,
-       colsample_bytree=0.7, eval_metric='mlogloss', gamma=0.0,
-       learning_rate=0.1, max_delta_step=0, max_depth=13,
-       min_child_weight=1, missing=None, n_estimators=700, n_jobs=2,
-       nthread=None, objective='multi:softmax', random_state=seed,
-       reg_alpha=0.01, reg_lambda=1, scale_pos_weight=1, seed=seed,
+       colsample_bytree=0.7, eval_metric='mlogloss', gamma=0.2,
+       learning_rate=0.1, max_delta_step=0, max_depth=6,
+       min_child_weight=1, missing=None, n_estimators=500, n_jobs=-1,
+       nthread=None, objective='multi:softmax', random_state=154,
+       reg_alpha=1e-05, reg_lambda=1, scale_pos_weight=1, seed=154,
        silent=True, subsample=0.6):
 
         super(self.__class__, self).__init__(booster=booster,eval_metric=eval_metric,
-             learning_rate=learning_rate, max_depth=max_depth,n_estimators=n_estimators,
-             objective=objective,reg_alpha=reg_alpha, subsample = subsample)
+                                             colsample_bytree = colsample_bytree,
+                                             subsample = subsample, gamma = gamma,
+                                             learning_rate=learning_rate,max_depth=max_depth,
+                                             n_estimators=n_estimators,objective=objective,
+                                             reg_alpha=reg_alpha)
 
         self.trained = False
 
@@ -49,11 +49,12 @@ class XGBClassifier(BaseClassifier):
 	.. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
 
     """
-    def __init__(self,clfile='xgb_classifier_1.pickle',
-                 featdir="xgb_features",n_estimators=700,
-                 max_depth=13,learning_rate = 0.1,reg_alpha=0.01,
-                 objective ='multi:softmax',colsample_bytree =0.7,
-                 subsample = 0.6,min_child_weight=1,
+    def __init__(self,clfile='xgb_classifier.pickle',
+                 featdir="xgb_features",n_estimators=500,
+                 gamma=0.2,min_child_weight = 1,subsample = 0.8,
+                 max_depth=6,learning_rate = 0.1,reg_alpha=1e-5,
+                 objective ='multi:softmax',colsample_bytree = 0.7,
+                 random_state = 154,
                  booster='gbtree',eval_metric='mlogloss', *args, **kwargs):
 
         """
@@ -98,20 +99,15 @@ class XGBClassifier(BaseClassifier):
 
 
         if self.classifier is None:
-            self.classifier = Classifier_obj(#base_score=base_score,
-             booster=booster,#colsample_bylevel=colsample_bylevel,
-             #colsample_bytree=colsample_bytree,
-             eval_metric=eval_metric,
-             #gamma=gamma,
-             learning_rate=learning_rate,#max_delta_step=max_delta_step,
-             max_depth=max_depth, #min_child_weight=min_child_weight,
-             #missing=missing,
-             n_estimators=n_estimators,#n_jobs=n_jobs,
-             #nthread=nthread,
-             objective=objective,#random_state=random_state,
-             reg_alpha=reg_alpha #reg_lambda=reg_lambda,
-             #scale_pos_weight=scale_pos_weight, seed=seed,silent=silent,subsample=subsample
-             )
+            self.classifier = Classifier_obj(booster=booster,
+                                             colsample_bytree=colsample_bytree,
+                                             eval_metric=eval_metric,gamma=gamma,
+                                             learning_rate=learning_rate,max_depth=max_depth,
+                                             min_child_weight=min_child_weight,
+                                             n_estimators=n_estimators,
+                                             objective=objective,random_state=random_state,
+                                             reg_alpha=reg_alpha, subsample = subsample
+                                             )
 
         self.class_keys = {}
         self.class_keys['RRLyr/Ceph'] = StellarClasses.RRLYR_CEPHEID
@@ -146,7 +142,7 @@ class XGBClassifier(BaseClassifier):
 
         self.classifier = utilities.loadPickle(infile)
 
-    def do_classify(self, features, recalc = False):
+    def do_classify(self, features):
 
         """
 
@@ -201,28 +197,11 @@ class XGBClassifier(BaseClassifier):
         featarray = xgb_features.feature_extract(tset.features(), savefeat=self.featdir, recalc=recalc)
         logger.info('Features calculated/loaded.')
 
-        #if self.feature is not None:
-        #    if os.path.exists(self.features_file):
-        #        logger.info('Loading features from precalculated file.')
-        #        feature_results = pd.read_csv(self.features_file)
-        #        precalc = True
-
         fit_labels = self.parse_labels(tset.labels())
 
-        #if not precalc:
-        #    logger.info('Extracting Features ...')
-        #    # Calculate features
-        #    feature_results = xgb_features.feature_extract(features) ## absolute_import ##
-        #    # Save calcualted features
-        #    if savefeat:
-        #        if self.features_file is not None:
-        #            if not os.path.exists(self.features_file) or overwrite:
-        #                logger.info('Saving extracted features to feets_features.txt')
-        #                feature_results.to_csv(self.features_file, index=False)
         try:
             logger.info('Training ...')
-            #logger.info('SHAPES ', str(np.shape(featarray)))
-            #logger.info('SHAPES ', str(np.shape(fit_labels)))
+            
             self.classifier.fit(featarray, fit_labels)
             if feat_import == True:
                 importances = self.classifier.feature_importances_.astype(float)

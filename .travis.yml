@@ -19,6 +19,9 @@ jobs:
 #    - python: "2.7"
 
 # Command to install dependencies
+before_install:
+  # This is required for XGBoost to work on older Ubuntu machines:
+  - sudo apt-get update && sudo apt-get install libgomp1
 install:
   - pip install --upgrade pip
   - pip install -r requirements.txt

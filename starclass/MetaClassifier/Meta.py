@@ -11,8 +11,6 @@ import os.path
 import numpy as np
 import os
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import KFold
-from sklearn.metrics import confusion_matrix
 from xgboost import XGBClassifier
 from .. import BaseClassifier, StellarClasses
 from .. import utilities
@@ -68,6 +66,7 @@ class MetaClassifier(BaseClassifier):
 		# Start logger:
 		logger = logging.getLogger(__name__)
 
+		self.clfile = clfile
 		self.classifier = None
 
 		# Check if pre-trained classifier exists

@@ -58,7 +58,11 @@ class BaseClassifier(object):
 		self.level = level
 		self.features_cache = features_cache
 
-		self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level, tset_key))
+		if tset_key is not None:
+			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level, tset_key))
+		else:
+			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level))
+
 		logger.debug("Data Directory: %s", self.data_dir)
 		os.makedirs(self.data_dir, exist_ok=True)
 

@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
+.. codeauthor:: Kristine Kousholt Mikkelsen <201505068@post.au.dk>
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, with_statement, print_function, absolute_import
 import numpy as np
 import matplotlib.pyplot as plt
 import lightkurve
 import os.path
-from astropy.stats import LombScargle
+try:
+	from astropy.timeseries import LombScargle
+except ImportError:
+	from astropy.stats import LombScargle
 from bottleneck import nanmedian, nanmean, nanmax, nanmin
 from scipy.optimize import minimize_scalar
 from scipy.integrate import simps
@@ -22,6 +25,9 @@ class powerspectrum(object):
 		standard (tuple): Frequency in microHz and power density spectrum sampled
 			from 0 to ``nyquist`` with a spacing of ``df``.
 		ls (``astropy.stats.LombScargle`` object):
+
+	.. codeauthor:: Kristine Kousholt Mikkelsen <201505068@post.au.dk>
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
 	def __init__(self, lightcurve, fit_mean=False):
@@ -119,16 +125,19 @@ class powerspectrum(object):
 		# Calculate power at frequencies using fast Lomb-Scargle periodiogram:
 		power = self.ls.power(freq, normalization='psd', method='fast', assume_regular_frequency=assume_regular_frequency)
 
+		# Due to numerical errors, the "fast implementation" can return power < 0.
+		power = np.clip(power, 0, None)
+
 		# Different scales:
 		freq *= 1e6 # Rescale frequencies to being in microHz
 		if scale is None:
 			pass
 		elif scale == 'power':
-			power *= self.normfactor
+			power *= self.normfactor * 2
 		elif scale == 'powerdensity':
 			power *= self.normfactor/(self.df*1e6)
 		elif scale == 'amplitude':
-			power = np.sqrt(power*self.normfactor)
+			power = np.sqrt(power*self.normfactor*2)
 
 		return freq, power
 
@@ -184,8 +193,96 @@ class powerspectrum(object):
 			ax.set_xlim(self.standard[0][0], self.standard[0][-1])
 
 	#------------------------------------------------------------------------------
-	#def clean(self):
-	#
-	#	freq, power = self.powerspectrum(oversampling=4, scale='power')
-	#
-	#	freq_guess = freq[np.argmax(power)]
+	def optimize_peak(self, fmax):
+		"""
+		Optimize frequency to nearest peak.
+
+		Parameters:
+			fmax (float): Frequency in microHz.
+
+		Returns:
+			float: Optimized frequency in microHz.
+		"""
+		# Narrow search area around the given frequency
+		fmax = np.atleast_1d(fmax)
+		if len(fmax) == 3:
+			freq_low, fmax, freq_high = fmax
+		else:
+			fmax = fmax[0]
+			freq_low = fmax - 2*self.df*1e6
+			freq_high = fmax + 2*self.df*1e6
+
+		# Do not optimize too low to zero:
+		freq_low = np.clip(freq_low, 0.25*self.df*1e6, None)
+
+		# Optimize to find the correct frequency
+		func = lambda f: -self.ls.power(f*1e-6, method='fast', normalization='psd', assume_regular_frequency=False)
+
+		#res = minimize(func, fmax, bounds=((freq_low, freq_high),), method='TNC')
+		#return res.x[0]
+
+		res = minimize_scalar(func, bracket=[freq_low, fmax, freq_high], bounds=(freq_low, freq_high), method='bounded', options={'xatol': 1e-6})
+		#print(res)
+
+		#x = np.linspace(freq_low-10*self.df*1e6, freq_high+10*self.df*1e6, 200)
+		#plt.figure()
+		#plt.plot(x, func(x), 'k-', lw=0.5)
+		#plt.axvline(fmax)
+		#plt.axvline(freq_low)
+		#plt.axvline(freq_high)
+		#plt.plot(res.x, res.fun, 'ro')
+
+		return res.x
+
+	#------------------------------------------------------------------------------
+	def alpha_beta(self, freq):
+
+		"""
+		omega = freq*2*np.pi*1e-6
+
+		#w = np.ones_like(self.ls.t) # self.ls.y_err**-2
+
+		# Calcultae sums:
+		sx = np.sin(omega*self.ls.t)
+		cx = np.cos(omega*self.ls.t)
+		s  = np.sum(self.ls.y * sx)
+		c  = np.sum(self.ls.y * cx)
+		cs = np.sum(sx * cx)
+		cc = np.sum(cx * cx)
+
+		# Calculate ss on basis of cc and the sum
+		# of the weights, which was calculated in
+		# ImportData:
+		sumWeights = len(self.ls.t) # np.sum(w)
+		ss = sumWeights - cc
+
+		# Calculate amplitude and phase:
+		D = ss*cc - cs*cs
+		alpha = (s * cc - c * cs)/D
+		beta  = (c * ss - s * cs)/D
+		"""
+
+		alpha, beta = self.ls.model_parameters(freq*1e-6, units=False)
+
+		return alpha, beta
+
+	#------------------------------------------------------------------------------
+	def false_alarm_probability(self, freq):
+		"""
+		Calculate Lomb-Scargle false alarm probability for given frequency.
+
+		Parameters:
+			freq (ndarray): Frequency in microHz.
+
+		Returns:
+			ndarray: False alarm probability (p-value).
+		"""
+
+		p_harmonic = self.ls.power(freq*1e-6, method='fast')
+		return self.ls.false_alarm_probability(p_harmonic)
+
+	#------------------------------------------------------------------------------
+	def replace_lightcurve(self, lightcurve):
+		# Create LombScargle object of timeseries, where time is in seconds:
+		indx = np.isfinite(lightcurve.flux)
+		self.ls = LombScargle(lightcurve.time[indx]*86400, lightcurve.flux[indx], center_data=True, fit_mean=self.fit_mean)

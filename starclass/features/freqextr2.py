@@ -34,7 +34,7 @@ def model(x, a, b, Freq):
 			b * np.cos(2 * np.pi * Freq * 1e-6 * x * 86400) )
 
 #------------------------------------------------------------------------------
-def freqextr(lightcurve, n_peaks=6, n_harmonics=4, hifac=1, ofac=4, snrlim=4.0, conseclim=10):
+def freqextr(lightcurve, n_peaks=6, n_harmonics=4, hifac=1, ofac=4, snrlim=4.0, conseclim=10, harmonics_list=None):
 	"""
 	Extract frequencies from timeseries.
 
@@ -65,6 +65,10 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=4, hifac=1, ofac=4, snrlim=4.0, 
 	alphadev = 0.50 # 0.75
 	Noptimize = 10 # Optimize all peaks = -1
 	optim_max_diff = 10 # uHz
+
+	# If no list of harmonics is given, do the simple one:
+	if harmonics_list is None:
+		harmonics_list = np.arange(2, n_harmonics+2)
 
 	# Constants:
 	power_median_to_mean = (1 - 1/9)**-3
@@ -114,9 +118,13 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=4, hifac=1, ofac=4, snrlim=4.0, 
 			mean_noise = power_median_to_mean * mean_noise_func(frequency)
 			mean_noise = np.clip(mean_noise, 0, None)
 
-			#plt.figure()
+			plt.figure()
 			#plt.plot(frequency, np.sqrt(power/mean_noise), 'k-', lw=0.5)
-			#plt.title(i)
+			plt.plot(frequency, power, 'b')
+			plt.plot(frequency, mean_noise,'k-')
+			plt.title(i)
+			plt.show()
+
 
 		# Finds the frequency of the largest peak:
 		pmax_index = np.argmax(power / mean_noise)
@@ -125,6 +133,7 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=4, hifac=1, ofac=4, snrlim=4.0, 
 		logger.debug('Fundamental frequency: %f', nu[i,0])
 
 		# Stop if significance becomes too low (lombscargle significance)
+
 		if faplim is not None:
 			FAP = ps.false_alarm_probability(nu[i,0])
 			if FAP > faplim:
@@ -174,15 +183,16 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=4, hifac=1, ofac=4, snrlim=4.0, 
 
 		# Loop through all harmonics:
 		for h in range(1, n_harmonics+1):
+			n_harmonic = harmonics_list[h-1]
 			# Don't find harmonics outside frequnecy range:
-			if (h+1)*nu[i,0] > f_max:
+			if n_harmonic*nu[i,0] > f_max:
 				break
 
 			# Updates the flux and optimize to find the correct frequency
 			ps = powerspectrum(lightcurve)
 
 			# Checks the significance of the harmonics. If it is too low NaN is returned in amplitude, frequency and phase for the given harmonic
-			nu[i,h] = ps.optimize_peak((h+1)*nu[i,0])
+			nu[i,h] = ps.optimize_peak(n_harmonic*nu[i,0])
 
 			# Stop if significance becomes too low (lombscargle significance)
 			if faplim is not None:
@@ -195,7 +205,29 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=4, hifac=1, ofac=4, snrlim=4.0, 
 					beta[i,h] = np.nan
 					continue
 
-			# TODO: Also reject on SNR
+			# Stop if significance becomes too low (SNR ratio):
+			if snrlim is not None:
+				# TODO: Subtract peak first?
+				noise = np.sqrt(power_median_to_mean * np.median(power[(frequency > (nu[i,0] - 15*df)) & (frequency < (nu[i,0] + 15*df))]))
+				amp = np.sqrt(alpha[i,0]**2 + beta[i,0]**2)
+				snr = amp / noise
+				logger.debug("SNR: %f", snr)
+
+				#plt.figure()
+				#plt.plot(frequency, np.sqrt(power), 'k-', lw=0.5)
+				#plt.plot(frequency, np.sqrt(mean_noise), 'r-', lw=0.5)
+				#plt.plot(frequency[pmax_index], np.sqrt(power[pmax_index]), 'go')
+				#plt.plot(nu[i,0], ps.powerspectrum(nu[i,0]*1e-6, scale='amplitude')[1], 'ro')
+				#plt.axhline(noise)
+				#plt.axvline(nu[i,0] - 15*df)
+				#plt.axvline(nu[i,0] + 15*df)
+
+				if snr < snrlim:
+					logger.debug("Stopped from SNR")
+					nu[i,0] = np.nan
+					alpha[i,0] = np.nan
+					beta[i,0] = np.nan
+					break
 
 			# Removes the harmonic peak from the data:
 			alpha[i,h], beta[i,h] = ps.alpha_beta(nu[i,h])
@@ -249,7 +281,6 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=4, hifac=1, ofac=4, snrlim=4.0, 
 
 						# Remove the oscillation again:
 						lightcurve -= model(lightcurve.time, alpha[j], beta[j], nu[j])
-
 
 	# Remove anything that in the end was marked with a large deviation:
 	for i in range(n_peaks):
@@ -313,27 +344,28 @@ if __name__ == '__main__':
 		  + 12*np.sin(2*np.pi*91.3e-6*time*86400 + 0.32) + 6*np.sin(2*np.pi*2*91.3e-6*time*86400 + 0.32) \
 		  + 2.4*np.random.randn(len(time))
 
+	#flux = np.random.normal(0, 2, size=len(time))
+
 	lc = TessLightCurve(
 		time=time,
 		flux=flux
 	)
 
-	time, flux = np.loadtxt('kic1162345_all.dat', unpack=True, usecols=(0,1))
-	lc = KeplerLightCurve(
-		time=time,
-		flux=flux,
-		targetid=1162345,
-		time_format='bkjd',
-		time_scale='tdb'
-	)
+	#time, flux = np.loadtxt('kic1162345_all.dat', unpack=True, usecols=(0,1))
+	#lc = KeplerLightCurve(
+	#	time=time,
+	#	flux=flux,
+	#	targetid=1162345,
+	#	time_format='bkjd',
+	#	time_scale='tdb'
+	#)
 
 	lc = lc.remove_nans().remove_outliers()
 	lc.plot(normalize=False)
 
-
-	n_peaks = 100
-	n_harminics = 0
-	feat = freqextr(lc.copy(), n_peaks=n_peaks, n_harmonics=n_harminics, snrlim=None)
+	n_peaks = 5
+	n_harminics = 2
+	feat = freqextr(lc.copy(), n_peaks=n_peaks, n_harmonics=n_harminics)
 
 	print("-"*72)
 
@@ -358,4 +390,6 @@ if __name__ == '__main__':
 			if np.isfinite(f):
 				plt.plot(f, a, 'go')
 				print("%d   %7.3f   %6.3f   %6.3f" % (j, f, a, p))
+
+	plt.show()
 

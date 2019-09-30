@@ -22,7 +22,6 @@ from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import savePickle, loadPickle
 from .plots import plotConfMatrix, plt
-from sklearn.utils import shuffle as sklshuffle
 
 __docformat__ = 'restructuredtext'
 

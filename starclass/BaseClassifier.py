@@ -160,7 +160,7 @@ class BaseClassifier(object):
 		# TODO: Use TaskManager for this?
 		y_pred = []
 
-		for features, labels in tqdm(zip(tset.features_test(), tset.labels_test()), total=len(tset.test_idx)):
+		for features in tqdm(tset.features_test(), total=len(tset.test_idx)):
 			# Classify this star from the test-set:
 			res = self.classify(features)
 			

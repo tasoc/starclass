@@ -22,6 +22,7 @@ from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import savePickle, loadPickle
 from .plots import plotConfMatrix, plt
+from sklearn.utils import shuffle as sklshuffle
 
 __docformat__ = 'restructuredtext'
 
@@ -147,7 +148,6 @@ class BaseClassifier(object):
 		Parameters:
 			tset (``TrainingSet`` object): Training-set to run testing on.
 		"""
-
 		if tset.testfraction == 0:
 			return
 
@@ -156,15 +156,17 @@ class BaseClassifier(object):
 
 		# TODO: Only include classes from the current level
 		all_classes = [lbl.value for lbl in StellarClasses]
-
+		
 		# Classify test set (has to be one by one unless we change classifiers)
 		# TODO: Use TaskManager for this?
 		y_pred = []
-		for features in tqdm(tset.features_test(), total=len(tset.test_idx)):
+
+		for features, labels in tqdm(zip(tset.features_test(), tset.labels_test()), total=len(tset.test_idx)):
 			# Classify this star from the test-set:
 			res = self.classify(features)
-
+			
 			prediction = max(res, key=lambda key: res[key]).value
+
 			y_pred.append(prediction)
 
 			# TODO: Save results for this classifier/trainingset in database
@@ -182,7 +184,6 @@ class BaseClassifier(object):
 		# Convert labels to ndarray:
 		# FIXME: Only keeping the first label
 		labels_test = np.array([lbl[0].value for lbl in tset.labels_test(level=self.level)])
-
 		# Compare to known labels:
 		acc = accuracy_score(labels_test, y_pred)
 		logger.info('Accuracy: %.2f%%', acc*100)

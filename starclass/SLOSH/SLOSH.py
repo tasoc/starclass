@@ -14,6 +14,13 @@ from keras.models import load_model
 from keras.callbacks import ReduceLROnPlateau
 from . import SLOSH_prepro as preprocessing
 from .. import BaseClassifier, StellarClasses
+from sklearn.utils import shuffle
+from tqdm import tqdm
+from sklearn.metrics import accuracy_score, confusion_matrix
+from .. import plots as plots
+
+
+import matplotlib.pyplot as plt
 
 
 class SLOSHClassifier(BaseClassifier):
@@ -75,42 +82,50 @@ class SLOSHClassifier(BaseClassifier):
 
 		logger.debug('Generating Image...')
 		img_array = preprocessing.generate_single_image(psd[0], psd[1])
-
 		logger.debug('Making Predictions...')
-		pred_array = np.zeros((self.mc_iterations, len(self.classifier_list)))
+		pred_array = np.zeros((self.mc_iterations, 8))#len(self.classifier_list)))
+		#print("CLASSIFIER LIST: ", self.classifier_list)
+
 		for i in range(self.mc_iterations):
-			for j in range(len(self.classifier_list)):
-				prediction = self.classifier_list[j].predict(img_array.reshape(1, 128, 128, 1))
-				try:  # some models have 2 output neurons instead of 1
-					pred_array[i, j] = prediction[:, 1]
-				except:
-					pred_array[i, j] = prediction[:]
-		average_over_models = np.mean(pred_array, axis=1)
+		#for j in range(len(self.classifier_list)):
+			pred_array[i,:] = self.classifier_list[0].predict(img_array.reshape(1, 128, 128, 1))
+				#print(np.shape(prediction))
+				#sys.exit()
+				#try:  # some models have 2 output neurons instead of 1
+				#	pred_array[i, j] = prediction[:, 1]
+				#except:
+				#	pred_array[i, j] = prediction[:]
+		average_over_mc_iterations = np.mean(pred_array, axis=0)
 		#std_over_models = np.std(pred_array, axis=1)
-		average_over_mc_iterations = np.mean(average_over_models)
+		#print(average_over_models)
+		#average_over_mc_iterations = np.mean(average_over_models)
+		#print(average_over_mc_iterations)
+
 		#std_over_mc_iterations = 0
 
 		#for i in range(len(std_over_models)):
 		#	std_over_mc_iterations += std_over_models[i] ** 2
 		#std_over_mc_iterations = np.sqrt(std_over_mc_iterations)
-
+		
 		pred = average_over_mc_iterations
 		#if pred >= 0.5:
 		#	label = 1
 		#else:
 		#	label = 0
 		#pred_sigma = std_over_mc_iterations
-
-		# Remaining probability
-		remainder = (1. - pred) / 9.
-
+		# Must be a better way to do this!
 		result = {}
-		for c, cla in enumerate(self.classifier.classes_):
-			key = StellarClasses(cla)
-			result[key] = remainder
-		result[StellarClasses.SOLARLIKE] = pred
-		return result
+		result[StellarClasses.RRLYR_CEPHEID] = pred[0]
+		result[StellarClasses.APERIODIC] = pred[1]
+		result[StellarClasses.CONSTANT] = pred[2]
+		result[StellarClasses.CONTACT_ROT] = pred[3]
+		result[StellarClasses.DSCT_BCEP] = pred[4]
+		result[StellarClasses.GDOR_SPB] = pred[5]
+		result[StellarClasses.SOLARLIKE] = pred[6]
+		result[StellarClasses.ECLIPSE] = pred[7]
 
+		return result
+		
 	def train(self, tset):
 		'''
 		Trains a fresh classifier using a default NN architecture and parameters as of the Hon et al. (2018) paper.
@@ -133,15 +148,34 @@ class SLOSHClassifier(BaseClassifier):
 		train_folder = os.path.join(self.features_cache, 'SLOSH_Train_Images')
 		if not os.path.exists(train_folder):
 			os.makedirs(train_folder)
-
+			#lbls = self.parse_labels(tset.labels())
 			logger.info('Generating Train Images...')
+
 			for feat, lbl in zip(tset.features(), tset.labels()):
+			#for feat, lbl in zip(features, labels):
 				# Power density spectrum from pre-calculated features:
 				psd = feat['powerspectrum'].standard
 
 				# Convert classifications to integer labels:
-				label = 1 if StellarClasses.SOLARLIKE in lbl else 0
-
+				#print("LABEL: ", lbl)
+				if StellarClasses.RRLYR_CEPHEID in lbl:
+					label = 0
+				elif StellarClasses.APERIODIC in lbl:
+					label = 1
+				elif StellarClasses.CONSTANT in lbl:
+					label = 2
+				elif StellarClasses.CONTACT_ROT in lbl:
+					label = 3
+				elif StellarClasses.DSCT_BCEP in lbl:
+					label = 4
+				elif StellarClasses.GDOR_SPB in lbl:
+					label = 5
+				elif StellarClasses.SOLARLIKE in lbl:
+					label = 6
+				elif StellarClasses.ECLIPSE in lbl:
+					label = 7
+				else:
+					logger.error("Label doesn't exist")
 				preprocessing.generate_train_images(psd[0], psd[1],
 													feat['priority'],
 													output_path=train_folder, label=label)
@@ -167,6 +201,7 @@ class SLOSHClassifier(BaseClassifier):
 		'''
 		# Save out model
 		model.save(model_file)
+		self.classifier_list = [model]
 		# Set predictable to true so can predict
 		self.predictable = True
 
@@ -199,3 +234,33 @@ class SLOSHClassifier(BaseClassifier):
 		'''
 		del self.classifier_list[:]
 		self.predictable = False
+
+	def parse_labels(self,labels,removeduplicates=False):
+		"""
+		"""
+		fitlabels = []
+		for lbl in labels:
+			if removeduplicates:
+				#is it multi-labelled? In which case, what takes priority?
+				#or duplicate it once for each label
+				if len(lbl)>1:#Priority order loosely based on signal clarity
+					if StellarClasses.ECLIPSE in lbl:
+						fitlabels.append('transit/eclipse')
+					elif StellarClasses.RRLYR_CEPHEID in lbl:
+						fitlabels.append('RRLyr/Ceph')
+					elif StellarClasses.CONTACT_ROT in lbl:
+						fitlabels.append('contactEB/spots')
+					elif StellarClasses.DSCT_BCEP in lbl:
+						fitlabels.append('dSct/bCep')
+					elif StellarClasses.GDOR_SPB in lbl:
+						fitlabels.append('gDor/spB')
+					elif StellarClasses.SOLARLIKE in lbl:
+						fitlabels.append('solar')
+					else:
+						fitlabels.append(lbl[0].value)
+				else:
+					#then convert to str
+					fitlabels.append(lbl[0].value)
+			else:
+				fitlabels.append(lbl[0].value)
+		return np.array(fitlabels)

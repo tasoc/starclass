@@ -16,6 +16,7 @@ import logging
 import tempfile
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.utils import shuffle as sklshuffle
 from .. import BaseClassifier, TaskManager
 
 #----------------------------------------------------------------------------------------------
@@ -61,7 +62,7 @@ class TrainingSet(object):
 		labels_test = [lbl[0].value for lbl in self.labels()]
 
 		# If keyword is true then split according to KFold cross-vadliation
-		skf = StratifiedKFold(n_splits=n_splits, random_state=42)
+		skf = StratifiedKFold(n_splits=n_splits, random_state=42, shuffle=True)
 		skf_splits = skf.split(self.train_idx, labels_test)
 
 		# We are doing cross-validation, so we will return a copy
@@ -70,7 +71,6 @@ class TrainingSet(object):
 		for fold, (train_idx, test_idx) in enumerate(skf_splits):
 			#newtset = deepcopy(self)
 			newtset = self.__class__(datalevel=self.datalevel, tf=tf)
-
 			newtset.train_idx = self.train_idx[train_idx]
 			newtset.test_idx = self.train_idx[test_idx]
 			newtset.crossval_folds = n_splits

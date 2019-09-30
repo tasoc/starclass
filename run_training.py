@@ -80,8 +80,9 @@ if __name__ == '__main__':
 	if current_classifier == 'meta':
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in paralllel?
-		with TaskManager(tset.input_folder, overwrite=True) as tm:
-			for cla in (RFGCClassifier, SLOSHClassifier, XGBClassifier):
+		
+		with TaskManager(tset.input_folder, overwrite=False) as tm:
+			for cla in (MetaClassifier, ): #(RFGCClassifier, MetaClassifier, XGBClassifier):
 				# Split the tset object into cross-validation folds.
 				# These are objects with exactly the same properties as the original one,
 				# except that they will run through diffent subsets of the training and test sets:
@@ -92,12 +93,12 @@ if __name__ == '__main__':
 						stcl.train(tset_fold)
 						logger.info("Classifing test-set...")
 						stcl.test(tset_fold, save=True, save_func=tm.save_result)
-
-
+		
 	# Initialize the classifier:
 	with classifier(level=args.level, features_cache=tset.features_cache, tset_key=tset.key) as stcl:
 		# Run the training of the classifier:
 		logger.info("Starting training...")
 		stcl.train(tset)
-		stcl.test(tset)
 		logger.info("Training done...")
+		logger.info("Classifing test-set...")
+		stcl.test(tset)

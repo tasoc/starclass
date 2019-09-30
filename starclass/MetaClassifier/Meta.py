@@ -10,41 +10,47 @@ import logging
 import os.path
 import numpy as np
 import os
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import KFold
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, accuracy_score
 from xgboost import XGBClassifier
 from .. import BaseClassifier, StellarClasses
 from .. import utilities
 
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.calibration import CalibratedClassifierCV, calibration_curve
+
+from scipy.special import expit
+from scipy.special import xlogy
+from scipy.optimize import fmin_bfgs
+
+from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin, clone
+from sklearn.utils import check_X_y, check_array, indexable, column_or_1d
+from sklearn.utils.validation import check_is_fitted, check_consistent_length
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
+
+from sklearn.preprocessing import label_binarize, LabelBinarizer
+
 class Classifier_obj(RandomForestClassifier):
 	"""
-	Wrapper for sklearn RandomForestClassifier
+	Wrapper for sklearn RandomForestClassifier.
 	"""
-	def __init__(self, n_estimators=1000, min_samples_split=2):
+	def __init__(self, n_estimators=100, min_samples_split=2):
 		super(self.__class__, self).__init__(n_estimators=n_estimators,
 										min_samples_split=min_samples_split,
-										class_weight='balanced')
+										class_weight='balanced', max_depth=3)
 		self.trained = False
 
-class xgb_Classifier_obj(XGBClassifier):
+class Classifier_obj2(LogisticRegression):
 	"""
-	Wrapper for sklearn XGBClassifier
-
+	Wrapper for sklearn LogisticRegression.
 	"""
-
-	def __init__(self,base_score=0.5, booster='gbtree', colsample_bylevel=1,
-	   colsample_bytree=1, eval_metric='mlogloss', gamma=0,
-	   learning_rate=0.1, max_delta_step=0, max_depth=13,
-	   min_child_weight=1, missing=None, n_estimators=550, n_jobs=1,
-	   nthread=None, objective='multi:softmax', random_state=0,
-	   reg_alpha=1e-05, reg_lambda=1, scale_pos_weight=1, seed=125,
-	   silent=True, subsample=1):
-
-		super(self.__class__, self).__init__(booster=booster,eval_metric=eval_metric,
-			 learning_rate=learning_rate, max_depth=max_depth,n_estimators=n_estimators,
-			 objective=objective,reg_alpha=reg_alpha)
-
+	def __init__(self):
+		super(self.__class__, self).__init__(C=50/4000, multi_class='multinomial', solver='saga', tol=0.1)
 		self.trained = False
 
 class MetaClassifier(BaseClassifier):
@@ -70,6 +76,11 @@ class MetaClassifier(BaseClassifier):
 
 		self.classifier = None
 
+		if clfile is not None:
+			self.clfile = os.path.join(self.data_dir, clfile)
+		else:
+			self.clfile = None
+
 		# Check if pre-trained classifier exists
 		if self.clfile is not None:
 			if os.path.exists(self.clfile):
@@ -88,9 +99,9 @@ class MetaClassifier(BaseClassifier):
 
 		# Set up classifier
 		if self.classifier is None:
-			self.classifier = Classifier_obj()
+			self.classifier = Classifier_obj() #TestObject()
 
-
+		self.indiv_classifiers = ['rfgc', 'SLOSH', 'xgb']
 
 		self.class_keys = {}
 		self.class_keys['RRLyr/Ceph'] = StellarClasses.RRLYR_CEPHEID
@@ -98,11 +109,11 @@ class MetaClassifier(BaseClassifier):
 		self.class_keys['solar'] = StellarClasses.SOLARLIKE
 		self.class_keys['dSct/bCep'] = StellarClasses.DSCT_BCEP
 		self.class_keys['gDor/spB'] = StellarClasses.GDOR_SPB
-		self.class_keys['transient'] = StellarClasses.TRANSIENT
+		#self.class_keys['transient'] = StellarClasses.TRANSIENT
 		self.class_keys['contactEB/spots'] = StellarClasses.CONTACT_ROT
 		self.class_keys['aperiodic'] = StellarClasses.APERIODIC
 		self.class_keys['constant'] = StellarClasses.CONSTANT
-		self.class_keys['rapid'] = StellarClasses.RAPID
+		#self.class_keys['rapid'] = StellarClasses.RAPID
 
 	def save(self, outfile):
 		"""
@@ -147,23 +158,37 @@ class MetaClassifier(BaseClassifier):
 		# Assumes that if self.classifier.trained=True,
 		# ...then self.classifier.som is not None
 
-		logger.info("Importing features...")
-		logger.error("Not yet implemented!")
-		sys.exit()
-		logger.info("Features imported.")
 
-		# Do the magic:
-		logger.info("We are starting the magic...")
-		classprobs = self.classifier.predict_proba(featarray)[0]
-		logger.info("Classification complete")
-
+		logger.debug("Importing features...")
+		featarray = np.array(features['other_classifiers']['prob']).reshape(1,-1)
+		#featarray = self.scaler.transform(featarray)
+		logger.debug("We are starting the magic...")
+		# Comes out with shape (1,8), but instead want shape (8,) so squeeze
+		classprobs = self.classifier.predict_proba(featarray).squeeze()#, 
+												   #ntree_limit=self.classifier.get_booster().best_ntree_limit)[0]
+		logger.debug("Classification complete")
+		
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):
 			key = self.class_keys[cla]
 			result[key] = classprobs[c]
 		return result
 
-	def train(self, features, labels, savecl=True, recalc=False, overwrite=False):
+	def create_prediction_features(self, i):
+		"""
+		Go from feature file containing all probabilities from different classifiers to the 
+		"""
+		features = np.array(feature['other_classifiers']['prob'])
+		rfgc_predictions = np.array(i['other_classifiers']['class'])[:24//3][np.argmax(np.array(i['other_classifiers']['prob'])[:24//3])]
+		rfgc_probs = np.array(i['other_classifiers']['prob'])[:24//3]
+		slosh_predictions = np.array(i['other_classifiers']['class'])[24//3:2*24//3][np.argmax(np.array(i['other_classifiers']['prob'])[24//3: 2*24//3])]
+		slosh_probs = np.array(i['other_classifiers']['prob'])[24//3:2*24//3]
+		slosh_probs = np.array([slosh_probs[0], np.sum(slosh_probs[1:])])
+		xgb_predictions = np.array(i['other_classifiers']['class'])[2*24//3:][np.argmax(np.array(i['other_classifiers']['prob'])[2*24//3:])]
+		xgb_probs = np.array(i['other_classifiers']['prob'])[2*24//3:]
+		return rfgc_predictions, rfgc_probs, slosh_predictions, slosh_probs, xgb_predictions, xgb_probs
+
+	def train(self, tset, savecl=True, recalc=False, overwrite=False):
 		"""
 		Train the classifier.
 		Assumes lightcurve time is in days
@@ -174,29 +199,40 @@ class MetaClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		# Check for pre-calculated features
-
-		fitlabels = self.parse_labels(labels)
+		fitlabels = self.parse_labels(tset.labels())
 
 		logger.info("Importing features...")
-		logger.error("Not yet implemented!")
-		sys.exit()
+		# This bit is hardcoded! Not good for generalisability!
+		for idx, i in tqdm(enumerate(tset.features())):
+			if idx == 0:
+				features = np.array(i['other_classifiers']['prob'])
+				preds = np.array(i['other_classifiers']['class'])
+			else:
+				features = np.vstack((features,
+									 np.array(i['other_classifiers']['prob'])))
+				preds = np.vstack((preds,
+									np.array(i['other_classifiers']['class'])))
+
 		logger.info("Features imported.")
 
-		try:
-			self.classifier.oob_score = True
-			self.classifier.fit(featarray, fitlabels)
-			logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
-			self.classifier.oob_score = False
-			self.classifier.trained = True
-		except:
-			logger.exception('Training Error') # add more details...
+		#try:
+		#self.classifier.oob_score = True
+		#self.classifier.fit(featarray, fitlabels)
+		#logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
+		#self.classifier.oob_score = False
+		logger.info("Fitting model.")
+		self.classifier.fit(features, fitlabels)
+		#logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
+		#self.classifier.oob_score = False
+		self.classifier.trained = True
+		#except:
+		#	logger.exception('Training Error') # add more details...
 
 		if savecl and self.classifier.trained:
 			if self.clfile is not None:
 				if not os.path.exists(self.clfile) or overwrite or recalc:
-					logger.info('Saving pickled classifier instance to rfgc_classifier_v01.pickle')
+					logger.info('Saving pickled classifier instance to meta_classifier.pickle')
 					self.save(self.clfile)
-
 
 	def parse_labels(self,labels,removeduplicates=False):
 		"""
@@ -225,5 +261,8 @@ class MetaClassifier(BaseClassifier):
 					#then convert to str
 					fitlabels.append(lbl[0].value)
 			else:
-				fitlabels.append(lbl[0].value)
+				try:
+					fitlabels.append(lbl.value)
+				except:
+					fitlabels.append(lbl[0].value)
 		return np.array(fitlabels)

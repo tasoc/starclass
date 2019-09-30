@@ -10,8 +10,7 @@ import logging
 import os.path
 import numpy as np
 import os
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from sklearn.metrics import confusion_matrix, accuracy_score
 from xgboost import XGBClassifier
@@ -20,20 +19,6 @@ from .. import utilities
 
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.calibration import CalibratedClassifierCV, calibration_curve
-
-from scipy.special import expit
-from scipy.special import xlogy
-from scipy.optimize import fmin_bfgs
-
-from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin, clone
-from sklearn.utils import check_X_y, check_array, indexable, column_or_1d
-from sklearn.utils.validation import check_is_fitted, check_consistent_length
-from sklearn.isotonic import IsotonicRegression
-from sklearn.linear_model import LogisticRegression
-
-from sklearn.preprocessing import label_binarize, LabelBinarizer
 
 class Classifier_obj(RandomForestClassifier):
 	"""
@@ -43,14 +28,6 @@ class Classifier_obj(RandomForestClassifier):
 		super(self.__class__, self).__init__(n_estimators=n_estimators,
 										min_samples_split=min_samples_split,
 										class_weight='balanced', max_depth=3)
-		self.trained = False
-
-class Classifier_obj2(LogisticRegression):
-	"""
-	Wrapper for sklearn LogisticRegression.
-	"""
-	def __init__(self):
-		super(self.__class__, self).__init__(C=50/4000, multi_class='multinomial', solver='saga', tol=0.1)
 		self.trained = False
 
 class MetaClassifier(BaseClassifier):
@@ -161,11 +138,9 @@ class MetaClassifier(BaseClassifier):
 
 		logger.debug("Importing features...")
 		featarray = np.array(features['other_classifiers']['prob']).reshape(1,-1)
-		#featarray = self.scaler.transform(featarray)
 		logger.debug("We are starting the magic...")
 		# Comes out with shape (1,8), but instead want shape (8,) so squeeze
-		classprobs = self.classifier.predict_proba(featarray).squeeze()#, 
-												   #ntree_limit=self.classifier.get_booster().best_ntree_limit)[0]
+		classprobs = self.classifier.predict_proba(featarray).squeeze()
 		logger.debug("Classification complete")
 		
 		result = {}
@@ -173,20 +148,6 @@ class MetaClassifier(BaseClassifier):
 			key = self.class_keys[cla]
 			result[key] = classprobs[c]
 		return result
-
-	def create_prediction_features(self, i):
-		"""
-		Go from feature file containing all probabilities from different classifiers to the 
-		"""
-		features = np.array(feature['other_classifiers']['prob'])
-		rfgc_predictions = np.array(i['other_classifiers']['class'])[:24//3][np.argmax(np.array(i['other_classifiers']['prob'])[:24//3])]
-		rfgc_probs = np.array(i['other_classifiers']['prob'])[:24//3]
-		slosh_predictions = np.array(i['other_classifiers']['class'])[24//3:2*24//3][np.argmax(np.array(i['other_classifiers']['prob'])[24//3: 2*24//3])]
-		slosh_probs = np.array(i['other_classifiers']['prob'])[24//3:2*24//3]
-		slosh_probs = np.array([slosh_probs[0], np.sum(slosh_probs[1:])])
-		xgb_predictions = np.array(i['other_classifiers']['class'])[2*24//3:][np.argmax(np.array(i['other_classifiers']['prob'])[2*24//3:])]
-		xgb_probs = np.array(i['other_classifiers']['prob'])[2*24//3:]
-		return rfgc_predictions, rfgc_probs, slosh_predictions, slosh_probs, xgb_predictions, xgb_probs
 
 	def train(self, tset, savecl=True, recalc=False, overwrite=False):
 		"""
@@ -216,14 +177,10 @@ class MetaClassifier(BaseClassifier):
 		logger.info("Features imported.")
 
 		#try:
-		#self.classifier.oob_score = True
-		#self.classifier.fit(featarray, fitlabels)
-		#logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
-		#self.classifier.oob_score = False
+		self.classifier.oob_score = True
 		logger.info("Fitting model.")
 		self.classifier.fit(features, fitlabels)
-		#logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
-		#self.classifier.oob_score = False
+		logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
 		self.classifier.trained = True
 		#except:
 		#	logger.exception('Training Error') # add more details...

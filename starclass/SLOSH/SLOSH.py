@@ -83,36 +83,13 @@ class SLOSHClassifier(BaseClassifier):
 		logger.debug('Generating Image...')
 		img_array = preprocessing.generate_single_image(psd[0], psd[1])
 		logger.debug('Making Predictions...')
-		pred_array = np.zeros((self.mc_iterations, 8))#len(self.classifier_list)))
-		#print("CLASSIFIER LIST: ", self.classifier_list)
+		pred_array = np.zeros((self.mc_iterations, 8))
 
 		for i in range(self.mc_iterations):
-		#for j in range(len(self.classifier_list)):
 			pred_array[i,:] = self.classifier_list[0].predict(img_array.reshape(1, 128, 128, 1))
-				#print(np.shape(prediction))
-				#sys.exit()
-				#try:  # some models have 2 output neurons instead of 1
-				#	pred_array[i, j] = prediction[:, 1]
-				#except:
-				#	pred_array[i, j] = prediction[:]
 		average_over_mc_iterations = np.mean(pred_array, axis=0)
-		#std_over_models = np.std(pred_array, axis=1)
-		#print(average_over_models)
-		#average_over_mc_iterations = np.mean(average_over_models)
-		#print(average_over_mc_iterations)
-
-		#std_over_mc_iterations = 0
-
-		#for i in range(len(std_over_models)):
-		#	std_over_mc_iterations += std_over_models[i] ** 2
-		#std_over_mc_iterations = np.sqrt(std_over_mc_iterations)
-		
 		pred = average_over_mc_iterations
-		#if pred >= 0.5:
-		#	label = 1
-		#else:
-		#	label = 0
-		#pred_sigma = std_over_mc_iterations
+
 		# Must be a better way to do this!
 		result = {}
 		result[StellarClasses.RRLYR_CEPHEID] = pred[0]
@@ -148,16 +125,12 @@ class SLOSHClassifier(BaseClassifier):
 		train_folder = os.path.join(self.features_cache, 'SLOSH_Train_Images')
 		if not os.path.exists(train_folder):
 			os.makedirs(train_folder)
-			#lbls = self.parse_labels(tset.labels())
 			logger.info('Generating Train Images...')
 
 			for feat, lbl in zip(tset.features(), tset.labels()):
-			#for feat, lbl in zip(features, labels):
 				# Power density spectrum from pre-calculated features:
 				psd = feat['powerspectrum'].standard
-
 				# Convert classifications to integer labels:
-				#print("LABEL: ", lbl)
 				if StellarClasses.RRLYR_CEPHEID in lbl:
 					label = 0
 				elif StellarClasses.APERIODIC in lbl:

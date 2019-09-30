@@ -222,15 +222,11 @@ def generate_train_images(freq, power, star_id, output_path, label):
         image = generate_single_image(freq, power)
         np.savez_compressed(file = output_path+'/%s' %star_id, im=image)
     else:
-        #sys.exit()
         image = generate_single_image(freq, power)
         if not os.path.exists(output_path + '/'+str(label)+'/'):
             os.mkdir(output_path + '/'+str(label)+'/')
-        #if not os.path.exists(output_path + '/0/'):
-        #    os.mkdir(output_path + '/0/')
         np.savez_compressed(file=output_path+'/%s/%s'%(label, star_id), im=image)
-        #sys.exit()
-
+        
 
 def default_classifier_model():
     '''
@@ -240,7 +236,7 @@ def default_classifier_model():
     reg = l2(7.5E-4)
     adam = Adam(clipnorm=1.)
     input1 = Input(shape=(128, 128, 1))
-    drop0 = Dropout(0.2)(input1)#(0.25)(input1)
+    drop0 = Dropout(0.2)(input1)
     conv1 = Conv2D(4, kernel_size=(7, 7), padding='same', kernel_initializer='glorot_uniform',
                    kernel_regularizer=reg)(drop0)
     lrelu1 = LeakyReLU(0.1)(conv1)
@@ -255,9 +251,8 @@ def default_classifier_model():
     pool3 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu3)
 
     flat = Flatten()(pool3)
-    drop1 = Dropout(0.2)(flat)#(0.5)(flat)
+    drop1 = Dropout(0.2)(flat)
     dense1 = Dense(128, kernel_initializer='glorot_uniform', activation='relu', kernel_regularizer=reg)(drop1)
-    #output = Dense(2, kernel_initializer='glorot_uniform', activation='softmax')(dense1)
     output = Dense(8, kernel_initializer='glorot_uniform', activation='softmax')(dense1)
     model = Model(input1, output)
 

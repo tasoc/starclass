@@ -19,6 +19,7 @@ from .. import utilities
 
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from joblib import dump, load
 
 class Classifier_obj(RandomForestClassifier):
 	"""
@@ -175,7 +176,7 @@ class MetaClassifier(BaseClassifier):
 									np.array(i['other_classifiers']['class'])))
 
 		logger.info("Features imported.")
-
+		print(np.shape(features))
 		#try:
 		self.classifier.oob_score = True
 		logger.info("Fitting model.")

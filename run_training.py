@@ -81,7 +81,7 @@ if __name__ == '__main__':
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in paralllel?
 		with TaskManager(tset.input_folder, overwrite=False) as tm:
-			for cla in (XGBClassifier, ):#SLOSHClassifier, XGBClassifier, MetaClassifier):
+			for cla in (RFGCClassifier, SLOSHClassifier, XGBClassifier, MetaClassifier):
 				# Split the tset object into cross-validation folds.
 				# These are objects with exactly the same properties as the original one,
 				# except that they will run through diffent subsets of the training and test sets:

@@ -13,7 +13,6 @@ import warnings
 import os
 import types
 import upsilon
-
 from tqdm import tqdm
 from ..RFGCClassifier import RF_GC_featcalc
 

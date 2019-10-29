@@ -10,3 +10,4 @@ tensorflow
 Pillow
 xgboost
 feets
+[-e] git+https://github.com/jsk389/upsilon

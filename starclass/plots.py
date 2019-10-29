@@ -39,12 +39,12 @@ def plotConfMatrix(confmatrix, ticklabels, ax=None, cmap='Blues'):
 		for y in range(N):
 			if confmatrix[y,x] > 0.7:
 				ax.text(x, y, "%d"%np.round(confmatrix[y,x]*100),
-						 va='center', ha='center', color='w')
+						 va='center', ha='center', color='w', fontsize=14)
 			elif confmatrix[y,x] < 0.01 and confmatrix[y,x] > 0:
-				ax.text(x, y, "<1", va='center', ha='center')
+				ax.text(x, y, "<1", va='center', ha='center', fontsize=14)
 			elif confmatrix[y,x] > 0:
 				ax.text(x, y, "%d"%np.round(confmatrix[y,x]*100),
-						 va='center', ha='center')
+						 va='center', ha='center', fontsize=14)
 
 	for x in np.arange(confmatrix.shape[0]):
 		ax.plot([x+0.5,x+0.5],[-0.5,N-0.5], ':', color='0.5', lw=0.5)
@@ -52,12 +52,13 @@ def plotConfMatrix(confmatrix, ticklabels, ax=None, cmap='Blues'):
 
 	ax.set_xlim(-0.5, N-0.5)
 	ax.set_ylim(-0.5, N-0.5)
-	ax.set_xlabel('Predicted Class')
-	ax.set_ylabel('True Class')
+	ax.set_xlabel('Predicted Class', fontsize=18)
+	ax.set_ylabel('True Class', fontsize=18)
 
 	#class labels
 	plt.xticks(np.arange(N), ticklabels, rotation='vertical')
 	plt.yticks(np.arange(N), ticklabels)
+	ax.tick_params(axis='both', which='major', labelsize=18)
 
 if __name__ == '__main__':
 	mat = np.identity(7)

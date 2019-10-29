@@ -250,7 +250,7 @@ class keplerq9(TrainingSet):
 
 			# Create list of all the classes for each star:
 			lookup = []
-			for rowidx,row in enumerate(data):
+			for rowidx, row in enumerate(data):
 				#starid = int(row[0][4:])
 				labels = row[1].strip().split(';')
 				lbls = []
@@ -264,5 +264,4 @@ class keplerq9(TrainingSet):
 
 				if rowidx in self.test_idx:
 					lookup.append(tuple(set(lbls)))
-
 			return tuple(lookup)

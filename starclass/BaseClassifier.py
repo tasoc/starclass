@@ -6,7 +6,6 @@ All other specific stellar classification algorithms will inherit from BaseClass
 
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
-
 import warnings
 warnings.filterwarnings('ignore', category=DeprecationWarning, message='Using or importing the ABCs from \'collections\' instead of from \'collections.abc\' is deprecated')
 import numpy as np
@@ -147,25 +146,51 @@ class BaseClassifier(object):
 		Parameters:
 			tset (``TrainingSet`` object): Training-set to run testing on.
 		"""
-
-		if tset.testfraction == 0:
-			return
+		#if tset.testfraction == 0:
+		#	return
 
 		# Start logger:
 		logger = logging.getLogger(__name__)
 
 		# TODO: Only include classes from the current level
 		all_classes = [lbl.value for lbl in StellarClasses]
-
+		
 		# Classify test set (has to be one by one unless we change classifiers)
 		# TODO: Use TaskManager for this?
 		y_pred = []
-		for features in tqdm(tset.features_test(), total=len(tset.test_idx)):
+
+		
+		#for features, labels in tqdm(zip(tset.features(), tset.labels(level=self.level)),total=len(tset.train_idx)):
+			# Classify this star from the test-set:
+		#	res = self.classify(features)
+			
+		#	prediction = max(res, key=lambda key: res[key]).value
+
+		#	y_pred.append(prediction)
+
+		#	ps = features['powerspectrum'].standard
+		#	plt.plot(ps[0], ps[1])
+		#	print(features)
+		#	print(prediction, labels)
+		#	plt.show()
+		#	sys.exit()
+
+		for features, labels in tqdm(zip(tset.features_test(), tset.labels_test(level=self.level)),total=len(tset.test_idx)):
 			# Classify this star from the test-set:
 			res = self.classify(features)
-
+			#print(tset.test_idx[0])
+			#print(tset.labels_test(level=self.level)[0])
 			prediction = max(res, key=lambda key: res[key]).value
+
 			y_pred.append(prediction)
+
+			ps = features['powerspectrum'].standard
+			#plt.plot(ps[0], ps[1])
+			#print(features)
+			#print(prediction, labels)
+			#plt.show()
+			#sys.exit()
+			#print(labels)
 
 			# TODO: Save results for this classifier/trainingset in database
 			if save:
@@ -179,10 +204,11 @@ class BaseClassifier(object):
 
 		y_pred = np.array(y_pred)
 
+
+
 		# Convert labels to ndarray:
 		# FIXME: Only keeping the first label
 		labels_test = np.array([lbl[0].value for lbl in tset.labels_test(level=self.level)])
-
 		# Compare to known labels:
 		acc = accuracy_score(labels_test, y_pred)
 		logger.info('Accuracy: %.2f%%', acc*100)

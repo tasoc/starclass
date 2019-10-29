@@ -16,7 +16,10 @@ import logging
 import tempfile
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.utils import shuffle as sklshuffle
 from .. import BaseClassifier, TaskManager
+
+from copy import deepcopy
 
 #----------------------------------------------------------------------------------------------
 class TrainingSet(object):
@@ -47,7 +50,10 @@ class TrainingSet(object):
 				random_state=42,
 				stratify=self.labels()
 			)
-
+			# Have to sort as train_test_split shuffles and we don't want that
+			self.train_idx = np.sort(self.train_idx)
+			self.test_idx = np.sort(self.test_idx)
+		#print("LENGTHS: ", len(self.train_idx), len(self.test_idx))
 		# Cross Validation
 		self.fold = 0
 		self.crossval_folds = 0
@@ -60,17 +66,23 @@ class TrainingSet(object):
 
 		labels_test = [lbl[0].value for lbl in self.labels()]
 
-		# If keyword is true then split according to KFold cross-vadliation
-		skf = StratifiedKFold(n_splits=n_splits, random_state=42)
+		# If keyword is true then split according to KFold cross-validation
+		skf = StratifiedKFold(n_splits=n_splits, random_state=42, shuffle=True)
 		skf_splits = skf.split(self.train_idx, labels_test)
+
+		global_testfraction = self.testfraction
 
 		# We are doing cross-validation, so we will return a copy
 		# of the training-set where we have redefined the training- and test-
 		# sets from the folding:
 		for fold, (train_idx, test_idx) in enumerate(skf_splits):
 			#newtset = deepcopy(self)
-			newtset = self.__class__(datalevel=self.datalevel, tf=tf)
-
+			print(fold, len(train_idx), len(test_idx))
+			# Set tf to be zero here so the training set isn't further split 
+			# as want to run all the data through CV
+			newtset = self.__class__(datalevel=self.datalevel, tf=0.0)
+			# Set testfraction to value from CV i.e. 1/n_splits)
+			newtset.testfraction = tf
 			newtset.train_idx = self.train_idx[train_idx]
 			newtset.test_idx = self.train_idx[test_idx]
 			newtset.crossval_folds = n_splits

@@ -58,6 +58,7 @@ class TaskManager(object):
 			self.conn = sqlite3.connect(todo_file)
 		self.conn.row_factory = sqlite3.Row
 		self.cursor = self.conn.cursor()
+		self.cursor.execute("PRAGMA foreign_keys=ON;")
 
 		# Reset the status of everything for a new run:
 		if overwrite:
@@ -66,15 +67,18 @@ class TaskManager(object):
 
 		# Create table for diagnostics:
 		self.cursor.execute("""CREATE TABLE IF NOT EXISTS starclass (
-			priority INT NOT NULL,
+			priority INTEGER NOT NULL,
 			classifier TEXT NOT NULL,
-			status INT NOT NULL,
+			status INTEGER NOT NULL,
 			class TEXT,
 			prob REAL,
 			FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
 		);""")
 		self.cursor.execute("CREATE INDEX IF NOT EXISTS priority_classifier_idx ON starclass (priority, classifier);")
 		self.conn.commit()
+
+		# Analyze the tables for better query planning:
+		self.cursor.execute("ANALYZE;")
 
 		# Run a cleanup/optimization of the database before we get started:
 		if cleanup:

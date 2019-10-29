@@ -22,6 +22,7 @@ class Classifier_obj(xgb):
 
 	"""
 
+<<<<<<< HEAD
 	def __init__(self,base_score=0.5, booster='gbtree', colsample_bylevel=1,
 		colsample_bytree=0.7, eval_metric='mlogloss', gamma=7.5,
 		learning_rate=0.1, max_delta_step=0, max_depth=6,
@@ -36,6 +37,22 @@ class Classifier_obj(xgb):
 			 								 learning_rate=learning_rate, max_depth=max_depth,
 											 n_estimators=n_estimators, 
 											 objective=objective,reg_alpha=reg_alpha)
+=======
+    def __init__(self,base_score=0.5, booster='gbtree', colsample_bylevel=1,
+       colsample_bytree=0.7, eval_metric='mlogloss', gamma=0.2,
+       learning_rate=0.1, max_delta_step=0, max_depth=6,
+       min_child_weight=1, missing=None, n_estimators=500, n_jobs=-1,
+       nthread=None, objective='multi:softmax', random_state=154,
+       reg_alpha=1e-05, reg_lambda=1, scale_pos_weight=1, seed=154,
+       silent=True, subsample=0.6):
+
+        super(self.__class__, self).__init__(booster=booster,eval_metric=eval_metric,
+                                             colsample_bytree = colsample_bytree,
+                                             subsample = subsample, gamma = gamma,
+                                             learning_rate=learning_rate,max_depth=max_depth,
+                                             n_estimators=n_estimators,objective=objective,
+                                             reg_alpha=reg_alpha)
+>>>>>>> devel
 
 		self.trained = False
 
@@ -48,6 +65,7 @@ class XGBClassifier(BaseClassifier):
 
 	.. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
 
+<<<<<<< HEAD
 	"""
 	def __init__(self,clfile='xgb_classifier_1.pickle',
 		featdir="xgb_features",n_estimators=500, gamma=7.5,
@@ -55,6 +73,16 @@ class XGBClassifier(BaseClassifier):
 		learning_rate = 0.1, reg_alpha=1e-5,
 		objective ='multi:softmax', colsample_bytree=0.7, random_state=154,
 		booster='gbtree',eval_metric='mlogloss', *args, **kwargs):
+=======
+    """
+    def __init__(self,clfile='xgb_classifier.pickle',
+                 featdir="xgb_features",n_estimators=500,
+                 gamma=0.2,min_child_weight = 1,subsample = 0.8,
+                 max_depth=6,learning_rate = 0.1,reg_alpha=1e-5,
+                 objective ='multi:softmax',colsample_bytree = 0.7,
+                 random_state = 154,
+                 booster='gbtree',eval_metric='mlogloss', *args, **kwargs):
+>>>>>>> devel
 
 		"""
 
@@ -96,6 +124,7 @@ class XGBClassifier(BaseClassifier):
 			self.featdir = None
 
 
+<<<<<<< HEAD
 		if self.classifier is None:
 			self.classifier = Classifier_obj(booster=booster,
 			 								colsample_bytree=colsample_bytree,
@@ -109,6 +138,18 @@ class XGBClassifier(BaseClassifier):
 											random_state=random_state,
 			 								reg_alpha=reg_alpha,
 											subsample=subsample)
+=======
+        if self.classifier is None:
+            self.classifier = Classifier_obj(booster=booster,
+                                             colsample_bytree=colsample_bytree,
+                                             eval_metric=eval_metric,gamma=gamma,
+                                             learning_rate=learning_rate,max_depth=max_depth,
+                                             min_child_weight=min_child_weight,
+                                             n_estimators=n_estimators,
+                                             objective=objective,random_state=random_state,
+                                             reg_alpha=reg_alpha, subsample = subsample
+                                             )
+>>>>>>> devel
 
 
 	def save(self, outfile):
@@ -145,6 +186,7 @@ class XGBClassifier(BaseClassifier):
 		Returns:
 			dict: Dictionary of stellar classifications.
 
+<<<<<<< HEAD
 		"""
 
 		# Start a logger that should be used to output e.g. debug information:
@@ -265,3 +307,100 @@ class XGBClassifier(BaseClassifier):
 			else:
 				fitlabels.append(lbl[0].value)
 		return np.array(fitlabels)
+=======
+        """
+
+    	# Start a logger that should be used to output e.g. debug information:
+        logger = logging.getLogger(__name__)
+
+        if not self.classifier.trained:
+            logger.error('Please train classifer')
+            raise ValueError("Untrained Classifier")
+
+        ## If classifer has been trained, calculate features
+        logger.info('Feature Extraction')
+        feature_results = xgb_features.feature_extract(features) ## Come back to this
+        logger.info('Feature Extraction done')
+
+        # Do the magic:
+        logger.info("We are staring the magic...")
+        xgb_classprobs = self.classifier.predict_proba(feature_results)[0]
+        logger.info('Done')
+
+        class_results = {}
+
+        for c, cla in enumerate(self.classifier.classes_):
+            key = self.class_keys[cla]
+            class_results[key] = xgb_classprobs[c]
+
+        return class_results
+
+    def train(self, tset, savecl=True, recalc=False, overwrite=False, feat_import=True):
+
+        """
+
+        Training classifier using the ...
+
+        """
+
+        # Start a logger that should be used to output e.g. debug information:
+        logger = logging.getLogger(__name__)
+
+        logger.info('Calculating/Loading Features.')
+        featarray = xgb_features.feature_extract(tset.features(), savefeat=self.featdir, recalc=recalc)
+        logger.info('Features calculated/loaded.')
+
+        fit_labels = self.parse_labels(tset.labels())
+
+        try:
+            logger.info('Training ...')
+            
+            self.classifier.fit(featarray, fit_labels)
+            if feat_import == True:
+                importances = self.classifier.feature_importances_.astype(float)
+                feature_importances = zip(list(featarray),
+                                          importances)
+                with open('xgbClassifier_feat_import.json', 'w') as outfile:
+                    json.dump(list(feature_importances), outfile)
+
+            self.classifier.trained = True
+        except:
+            logger.exception('Training error ...')
+
+        if savecl and self.classifier.trained:
+            if self.classifier_file is not None:
+                if not os.path.exists(self.classifier_file) or overwrite:
+                    logger.info('Saving pickled xgb classifier to '+self.classifier_file)
+                    self.save(self.classifier_file)
+                    #self.save_model(self.classifier_file)
+
+    def parse_labels(self,labels,removeduplicates=False):
+        """
+        """
+        fitlabels = []
+        for lbl in labels:
+            if removeduplicates:
+                #is it multi-labelled? In which case, what takes priority?
+                #or duplicate it once for each label
+                if len(lbl)>1:#Priority order loosely based on signal clarity
+                    if StellarClasses.ECLIPSE in lbl:
+                        fitlabels.append('transit/eclipse')
+                    elif StellarClasses.RRLYR_CEPHEID in lbl:
+                        fitlabels.append('RRLyr/Ceph')
+                    elif StellarClasses.CONTACT_ROT in lbl:
+                        fitlabels.append('contactEB/spots')
+                    elif StellarClasses.DSCT_BCEP in lbl:
+                        fitlabels.append('dSct/bCep')
+                    elif StellarClasses.GDOR_SPB in lbl:
+                        fitlabels.append('gDor/spB')
+                    elif StellarClasses.SOLARLIKE in lbl:
+                        fitlabels.append('solar')
+                    else:
+                        fitlabels.append(lbl[0].value)
+                else:
+                    #then convert to str
+                    fitlabels.append(lbl[0].value)
+            else:
+                fitlabels.append(lbl[0].value)
+        return np.array(fitlabels)
+>>>>>>> devel

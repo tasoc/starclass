@@ -7,8 +7,7 @@ Created on Wed Nov  7 09:05:24 2018
 """
 import pandas as pd
 import numpy as np
-import feets
-#import glob
+import upsilon
 import warnings
 import os
 import types

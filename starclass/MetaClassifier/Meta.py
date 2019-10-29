@@ -52,6 +52,7 @@ class MetaClassifier(BaseClassifier):
 		# Start logger:
 		logger = logging.getLogger(__name__)
 
+		self.clfile = clfile
 		self.classifier = None
 
 		if clfile is not None:

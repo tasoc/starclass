@@ -12,17 +12,36 @@ jobs:
       dist: xenial
       sudo: required
 
-# Allow some versions of Python to fail:
-#matrix:
-#  fast_finish: true
-#  allow_failures:
-#    - python: "2.7"
+    - name: "Flake8"
+      python: "3.6"
+      git:
+        lfs_skip_smudge: true
+      install:
+        - pip install flake8
+      script:
+        - flake8
+
+  # Allow some newer versions of Python to fail for now
+  # This will be changed once the required packages starts
+  # supporting the newer versions of Python:
+  fast_finish: true
+  allow_failures:
+    - name: "Flake8"
 
 # Command to install dependencies
+before_install:
+  # This is required for XGBoost to work on older Ubuntu machines:
+  - sudo apt-get update && sudo apt-get install libgomp1
 install:
+  - pip install --upgrade pip
+  - pip uninstall numpy Bottleneck -y
+  - pip install numpy==1.15.4 --no-cache-dir
   - pip install -r requirements.txt
+  - pip install codecov pytest-cov
 script:
-  - pytest
+  - pytest --cov=starclass/
+after_success:
+  - codecov
 branches:
   only:
     - master

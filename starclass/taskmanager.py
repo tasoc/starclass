@@ -52,10 +52,10 @@ class TaskManager(object):
 		self.logger.setLevel(logging.INFO)
 
 		# Load the SQLite file:
-		if self.readonly:
-			self.conn = sqlite3.connect('file:' + todo_file + '?mode=ro', uri=True)
-		else:
-			self.conn = sqlite3.connect(todo_file)
+		#if self.readonly:
+		#	self.conn = sqlite3.connect('file:' + todo_file + '?mode=ro', uri=True)
+		#else:
+		self.conn = sqlite3.connect(todo_file)
 		self.conn.row_factory = sqlite3.Row
 		self.cursor = self.conn.cursor()
 		self.cursor.execute("PRAGMA foreign_keys=ON;")

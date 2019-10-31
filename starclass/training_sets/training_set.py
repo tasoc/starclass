@@ -53,7 +53,6 @@ class TrainingSet(object):
 			# Have to sort as train_test_split shuffles and we don't want that
 			self.train_idx = np.sort(self.train_idx)
 			self.test_idx = np.sort(self.test_idx)
-		#print("LENGTHS: ", len(self.train_idx), len(self.test_idx))
 		# Cross Validation
 		self.fold = 0
 		self.crossval_folds = 0

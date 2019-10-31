@@ -34,7 +34,7 @@ def model(x, a, b, Freq):
 			b * np.cos(2 * np.pi * Freq * 1e-6 * x * 86400) )
 
 #------------------------------------------------------------------------------
-def freqextr(lightcurve, n_peaks=6, n_harmonics=4, hifac=1, ofac=4, snrlim=4.0, conseclim=10, harmonics_list=None):
+def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None, conseclim=10, harmonics_list=None):
 	"""
 	Extract frequencies from timeseries.
 

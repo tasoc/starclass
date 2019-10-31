@@ -192,21 +192,33 @@ def SOM_alldataprep(features, outfile=None, cardinality=64):
     '''
     logger = logging.getLogger(__name__)
     SOMarray = np.ones(cardinality)
+    i = 0
+    total = 0
     for obj in tqdm(features, disable=not logger.isEnabledFor(logging.INFO)):
         lc = obj['lightcurve']
         lc = prepLCs(lc, linflatten=True)
 
         freq = obj['freq1']
+        #if np.isfinite(freq):
+        
+        time, flux = lc.time.copy(), lc.flux.copy()
+
+        #check double period
         if np.isfinite(freq):
-
-            time, flux = lc.time.copy(), lc.flux.copy()
-
-            #check double period
+            # Put in random longer period than timeseries if no dominant frequency is found
+            # Set to length of timeseries
+            per = (time.max() - time.min())
+        else:
             per = 1./(freq*1e-6)/86400. #convert to days
-            EBper = EBperiod(time, flux, per)
-            if EBper > 0: #ignores others
-                binlc,range = prepFilePhasefold(time, flux, EBper, cardinality)
-                SOMarray = np.vstack((SOMarray,binlc))
+        EBper = EBperiod(time, flux, per)
+        if EBper > 0: #ignores others
+            binlc,range = prepFilePhasefold(time, flux, EBper, cardinality)
+            SOMarray = np.vstack((SOMarray,binlc))
+        i += 1
+        total += 1
+    print("Size of features: ", i)
+    print("Total features: ", total)
+
     if outfile is not None:
         np.savetxt(outfile,SOMarray[1:,:])
     return SOMarray[1:,:] #drop first line as this is just ones

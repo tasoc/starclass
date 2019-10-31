@@ -9,7 +9,7 @@ Extract frequencies from timeseries.
 
 import numpy as np
 import logging
-from powerspectrum import powerspectrum
+from .powerspectrum import powerspectrum
 from bottleneck import nanmedian, move_median
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
@@ -34,7 +34,7 @@ def model(x, a, b, Freq):
 			b * np.cos(2 * np.pi * Freq * 1e-6 * x * 86400) )
 
 #------------------------------------------------------------------------------
-def freqextr(lightcurve, n_peaks=6, n_harmonics=4, hifac=1, ofac=4, snrlim=4.0, conseclim=10, harmonics_list=None):
+def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None, conseclim=10, harmonics_list=None):
 	"""
 	Extract frequencies from timeseries.
 
@@ -118,12 +118,12 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=4, hifac=1, ofac=4, snrlim=4.0, 
 			mean_noise = power_median_to_mean * mean_noise_func(frequency)
 			mean_noise = np.clip(mean_noise, 0, None)
 
-			plt.figure()
+			#plt.figure()
 			#plt.plot(frequency, np.sqrt(power/mean_noise), 'k-', lw=0.5)
-			plt.plot(frequency, power, 'b')
-			plt.plot(frequency, mean_noise,'k-')
-			plt.title(i)
-			plt.show()
+			#plt.plot(frequency, power, 'b')
+			#plt.plot(frequency, mean_noise,'k-')
+			#plt.title(i)
+			#plt.show()
 
 
 		# Finds the frequency of the largest peak:

@@ -41,7 +41,7 @@ class TaskManager(object):
 		self.readonly = readonly
 
 		# Keep a list of all the possible classifiers here:
-		self.all_classifiers = set(['rfgc', 'slosh', 'foptics', 'xgb'])
+		self.all_classifiers = set(['rfgc', 'slosh', 'xgb'])
 
 		# Setup logging:
 		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -214,6 +214,8 @@ class TaskManager(object):
 		priority = result.pop('priority')
 		classifier = result.pop('classifier')
 		status = result.pop('status')
+		worker_wait_time = result.pop('worker_wait_time')
+		details = result.pop('details')
 
 		# Store the results in database:
 		try:

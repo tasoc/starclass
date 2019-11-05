@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from .StellarClasses import StellarClasses
-from .BaseClassifier import BaseClassifier
+from .BaseClassifier import BaseClassifier, STATUS
 from .taskmanager import TaskManager
 from .RFGCClassifier import RFGCClassifier
 from .SLOSH import SLOSHClassifier

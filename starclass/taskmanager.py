@@ -11,7 +11,7 @@ import os
 import sqlite3
 import logging
 from astropy.table import Table
-from . import StellarClasses
+from . import STATUS, StellarClasses
 
 class TaskManager(object):
 	"""
@@ -59,22 +59,34 @@ class TaskManager(object):
 		self.conn.row_factory = sqlite3.Row
 		self.cursor = self.conn.cursor()
 		self.cursor.execute("PRAGMA foreign_keys=ON;")
+		self.cursor.execute("PRAGMA locking_mode=EXCLUSIVE;")
+		self.cursor.execute("PRAGMA journal_mode=TRUNCATE;")
 
 		# Reset the status of everything for a new run:
 		if overwrite:
-			self.cursor.execute("DROP TABLE IF EXISTS starclass;")
+			self.cursor.execute("DROP TABLE IF EXISTS starclass_diagnostics;")
+			self.cursor.execute("DROP TABLE IF EXISTS starclass_results;")
 			self.conn.commit()
 
 		# Create table for diagnostics:
-		self.cursor.execute("""CREATE TABLE IF NOT EXISTS starclass (
+		self.cursor.execute("""CREATE TABLE IF NOT EXISTS starclass_diagnostics (
 			priority INTEGER NOT NULL,
 			classifier TEXT NOT NULL,
 			status INTEGER NOT NULL,
-			class TEXT,
-			prob REAL,
+			elaptime REAL,
+			worker_wait_time REAL,
+			errors TEXT,
+			PRIMARY KEY (priority, classifier),
 			FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
 		);""")
-		self.cursor.execute("CREATE INDEX IF NOT EXISTS priority_classifier_idx ON starclass (priority, classifier);")
+		self.cursor.execute("""CREATE TABLE IF NOT EXISTS starclass_results (
+			priority INTEGER NOT NULL,
+			classifier TEXT NOT NULL,
+			class TEXT,
+			prob REAL,
+			FOREIGN KEY (priority, classifier) REFERENCES starclass_diagnostics(priority, classifier) ON DELETE CASCADE ON UPDATE CASCADE
+		);""")
+		self.cursor.execute("CREATE INDEX IF NOT EXISTS starclass_resu_priority_classifier_idx ON starclass_results (priority, classifier);")
 		self.conn.commit()
 
 		# Analyze the tables for better query planning:
@@ -114,37 +126,45 @@ class TaskManager(object):
 	def _query_task(self, classifier=None, priority=None):
 
 		search_query = []
-		if classifier is not None:
-			search_query.append("todolist.priority NOT IN (SELECT starclass.priority FROM starclass WHERE starclass.priority=todolist.priority AND starclass.classifier='%s')" % classifier)
+		#if classifier is not None:
+		#	search_query.append("todolist.priority NOT IN (SELECT starclass.priority FROM starclass WHERE starclass.priority=todolist.priority AND starclass.classifier='%s')" % classifier)
 
 		if priority is not None:
 			search_query.append('todolist.priority=%d' % priority)
 
 		if search_query:
 			search_query = "AND " + " AND ".join(search_query)
+		else:
+			search_query = ''
 
+		# TODO: Add check of data validation!
 		self.cursor.execute("""
 			SELECT
 				todolist.priority,
 				todolist.starid,
-				tmag,
-				lightcurve,
-				mean_flux,
-				variance,
-				variability,
-				camera,
-				ccd
+				todolist.tmag,
+				lightcurve AS lightcurve,
+				todolist.camera,
+				todolist.ccd
 			FROM
 				todolist
 				INNER JOIN diagnostics ON todolist.priority=diagnostics.priority
+				LEFT JOIN starclass_diagnostics ON todolist.priority=starclass_diagnostics.priority AND starclass_diagnostics.classifier='{1}'
 			WHERE
 				todolist.status=1
+				AND starclass_diagnostics.status IS NULL
 				{0}
-			ORDER BY todolist.priority LIMIT 1;""".format(search_query))
+			ORDER BY todolist.priority LIMIT 1;""".format(
+			search_query,
+			classifier
+		)) # AND todolist.status_corr=1
 		task = self.cursor.fetchone()
 		if task:
 			task = dict(task)
 			task['classifier'] = classifier
+
+			# FIXMe: HORRIBLE HACK!
+			task['lightcurve'] = task['lightcurve'].replace('tasoc', 'tasoc-cbv')
 
 			# Add things from the catalog file:
 			#catalog_file = os.path.join(????, 'catalog_sector{sector:03d}_camera{camera:d}_ccd{ccd:d}.sqlite')
@@ -153,18 +173,18 @@ class TaskManager(object):
 
 			# If the classifier that is running is the meta-classifier,
 			# add the results from all other classifiers to the task dict:
-			#if classifier == 'meta':
-			self.cursor.execute("SELECT classifier,class,prob FROM starclass WHERE priority=? AND status=1 AND classifier != 'meta';", (task['priority'], ))
+			if classifier == 'meta':
+				self.cursor.execute("SELECT classifier,class,prob FROM starclass_results WHERE priority=? AND status=? AND classifier != 'meta';", (task['priority'], STATUS.OK.value))
 
-			# Add as a Table to the task list:
-			rows = []
-			for r in self.cursor.fetchall():
-				rows.append([r['classifier'], StellarClasses[r['class']], r['prob']])
-			if not rows: rows = None
-			task['other_classifiers'] = Table(
-				rows=rows,
-				names=('classifier', 'class', 'prob'),
-			)
+				# Add as a Table to the task list:
+				rows = []
+				for r in self.cursor.fetchall():
+					rows.append([r['classifier'], StellarClasses[r['class']], r['prob']])
+				if not rows: rows = None
+				task['other_classifiers'] = Table(
+					rows=rows,
+					names=('classifier', 'class', 'prob'),
+				)
 
 			return task
 		return None
@@ -203,7 +223,7 @@ class TaskManager(object):
 
 		return task
 
-	def save_result(self, result):
+	def save_results(self, result):
 		"""
 		Save results and diagnostics. This will update the TODO list.
 
@@ -211,23 +231,39 @@ class TaskManager(object):
 			results (dict): Dictionary of results and diagnostics.
 		"""
 
-		priority = result.pop('priority')
-		classifier = result.pop('classifier')
-		status = result.pop('status')
-		worker_wait_time = result.pop('worker_wait_time')
-		details = result.pop('details')
+		priority = result.get('priority')
+		classifier = result.get('classifier')
+		status = result.get('status')
+		details = result.get('details', {})
+		starclass_results = result.get('starclass_results', {})
+
+		# Save additional diagnostics:
+		error_msg = details.get('errors', None)
+		if error_msg:
+			error_msg = '\n'.join(error_msg)
+			#self.summary['last_error'] = error_msg
 
 		# Store the results in database:
 		try:
-			self.cursor.execute("DELETE FROM starclass WHERE priority=? AND classifier=?;", (priority, classifier))
-			for key, value in result.items():
-				self.cursor.execute("INSERT INTO starclass (priority,classifier,status,class,prob) VALUES (:priority,:classifier,:status,:class,:prob);", {
+			# Save additional diagnostics:
+			self.cursor.execute("INSERT OR REPLACE INTO starclass_diagnostics (priority,classifier,status,errors,worker_wait_time) VALUES (:priority,:classifier,:status,:errors,:worker_wait_time);", {
+				'priority': priority,
+				'classifier': classifier,
+				'status': status.value,
+				'elaptime': result.get('elaptime'),
+				'worker_wait_time': result.get('worker_wait_time'),
+				'errors': error_msg
+			})
+
+			self.cursor.execute("DELETE FROM starclass_results WHERE priority=? AND classifier=?;", (priority, classifier))
+			for key, value in starclass_results.items():
+				self.cursor.execute("INSERT INTO starclass_results (priority,classifier,class,prob) VALUES (:priority,:classifier,:class,:prob);", {
 					'priority': priority,
 					'classifier': classifier,
-					'status': status,
 					'class': key.name,
 					'prob': value
 				})
+			
 			self.conn.commit()
 		except:
 			self.conn.rollback()
@@ -238,7 +274,11 @@ class TaskManager(object):
 		Mark a task as STARTED in the TODO-list.
 		"""
 		try:
-			self.cursor.execute("INSERT INTO starclass (priority,classifier,status) VALUES (:priority,:classifier,6);", task)
+			self.cursor.execute("INSERT INTO starclass_diagnostics (priority,classifier,status) VALUES (:priority,:classifier,:status);", {
+				'priority': task['priority'],
+				'classifier': task['classifier'],
+				'status': STATUS.STARTED.value
+			})
 			self.conn.commit()
 		except:
 			self.conn.rollback()

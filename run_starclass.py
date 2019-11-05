@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 import os.path
 import argparse
 import logging
-from starclass import TaskManager, RFGCClassifier, XGBClassifier, SLOSHClassifier, MetaClassifier
+from timeit import default_timer
+import starclass
 
 #----------------------------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -56,60 +57,58 @@ if __name__ == '__main__':
 	# Choose which classifier to use
 	# For now, there is only one...
 	current_classifier = args.classifier
-	classifier = {
-		'rfgc': RFGCClassifier,
-		'slosh': SLOSHClassifier,
-		#'foptics': FOPTICSClassifier,
-		'xgb': XGBClassifier,
-		'meta': MetaClassifier
-	}[current_classifier]
+
+	# Get the class for the selected method:
+	ClassificationClass = {
+		'rfgc': starclass.RFGCClassifier,
+		'slosh': starclass.SLOSHClassifier,
+		#'foptics': starclass.FOPTICSClassifier,
+		'xgb': starclass.XGBClassifier,
+		'meta': starclass.MetaClassifier
+	}
+	stcl = None
 
 	# Path to TODO file and feature cache:
-	todo_file = os.path.join(input_folder, 'todo.sqlite')
 	features_cache = os.path.join(input_folder, 'features_cache_%s' % args.datalevel)
-
 	if not os.path.exists(features_cache):
 		os.makedirs(features_cache)
 
 	# Running:
 	# When simply running the classifier on new stars:
-	with TaskManager(todo_file, overwrite=args.overwrite) as tm:
+	with starclass.TaskManager(input_folder, overwrite=args.overwrite) as tm:
+		while True:
+			task = tm.get_task(classifier=current_classifier)
+			if task is None: break
+			tm.start_task(task)
 
-		with classifier(level=args.level, features_cache=features_cache, tset_key='keplerq9') as stcl:
+			if task['classifier'] != current_classifier or stcl is None:
+				current_classifier = task['classifier']
+				if stcl: stcl.close()
+				stcl = ClassificationClass[current_classifier](level=args.level, features_cache=features_cache, tset_key='keplerq9')
 
-			while True:
-				task = tm.get_task(classifier=current_classifier)
-				if task is None: break
-				tm.start_task(task)
+			# ----------------- This code would run on each worker ------------------------
 
-				#if task['classifier'] != current_classifier:
-				#	stcl.close()
-				#	stcl = classifier(level=args.level, features_cache=features_cache)
+			fname = os.path.join(input_folder, task['lightcurve']) # These are the lightcurves INCLUDING SYSTEMATIC NOISE
+			features = stcl.load_star(task, fname)
 
-				# ----------------- This code would run on each worker ------------------------
+			print(features)
+			lc = features['lightcurve']
+			lc.show_properties()
 
-				fname = os.path.join(input_folder, task['lightcurve']) # These are the lightcurves INCLUDING SYSTEMATIC NOISE
-				features = stcl.load_star(task, fname)
+			plt.close('all')
+			lc.plot()
 
-				print(features)
-				lc = features['lightcurve']
-				lc.show_properties()
+			res = task.copy()
+			
+			tic_predict = default_timer()
+			res['starclass_results'] = stcl.classify(features)
+			toc_predict = default_timer()
 
-				plt.close('all')
-				lc.plot()
+			# ----------------- This code would run on each worker ------------------------
 
-				res = stcl.classify(features)
-				#res = {
-				#	StellarClasses.SOLARLIKE: np.random.rand(),
-				#	StellarClasses.RRLYR: np.random.rand()
-				#}
-
-				# ----------------- This code would run on each worker ------------------------
-
-				# Pad results with metadata and return to TaskManager to be saved:
-				res.update({
-					'priority': task['priority'],
-					'classifier': task['classifier'],
-					'status': 1
-				})
-				tm.save_result(res)
+			# Pad results with metadata and return to TaskManager to be saved:
+			res.update({
+				'status': starclass.STATUS.OK,
+				'elaptime': toc_predict - tic_predict
+			})
+			tm.save_results(res)

@@ -28,6 +28,7 @@ import logging
 import traceback
 import os
 import enum
+import itertools
 import starclass
 from timeit import default_timer
 
@@ -67,14 +68,24 @@ def main():
 
 	if rank == 0:
 		try:
-			with starclass.TaskManager(input_folder, cleanup=True, overwrite=args.overwrite, summary=os.path.join(input_folder, 'summary_starclass.json')) as tm:
+			with starclass.TaskManager(input_folder, cleanup=True, overwrite=args.overwrite) as tm:
 				# Get list of tasks:
 				#numtasks = tm.get_number_tasks()
 				#tm.logger.info("%d tasks to be run", numtasks)
 
+				# Number of available workers:
+				num_workers = size - 1
+
+				# Create a set of initial classifiers to initialize the workers as:
+				initial_classifiers = []
+				for k, c in enumerate(itertools.cycle(tm.all_classifiers)):
+					if k >= num_workers: break
+					initial_classifiers.append(c)
+
+				print(initial_classifiers)
+
 				# Start the master loop that will assign tasks
 				# to the workers:
-				num_workers = size - 1
 				closed_workers = 0
 				tm.logger.info("Master starting with %d workers", num_workers)
 				while closed_workers < num_workers:
@@ -91,12 +102,12 @@ def main():
 					if tag in (tags.DONE, tags.READY):
 						# Worker is ready, so send it a task
 						# If provided, try to find a task that is with the same classifier
-						task = tm.get_task(classifier=data.get('classifier'), change_classifier=True)
+						cl = initial_classifiers[source-1] if data is None else data.get('classifier')
+						task = tm.get_task(classifier=cl, change_classifier=True)
 						if task:
-							task_index = task['priority']
-							tm.start_task(task_index)
+							tm.start_task(task)
 							comm.send(task, dest=source, tag=tags.START)
-							tm.logger.info("Sending task %d to worker %d", task_index, source)
+							tm.logger.info("Sending task %d to worker %d", task['priority'], source)
 						else:
 							comm.send(None, dest=source, tag=tags.EXIT)
 
@@ -123,7 +134,7 @@ def main():
 		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 		console = logging.StreamHandler()
 		console.setFormatter(formatter)
-		logger = logging.getLogger('corrections')
+		logger = logging.getLogger('starclass')
 		logger.addHandler(console)
 		logger.setLevel(logging.WARNING)
 
@@ -144,38 +155,41 @@ def main():
 
 			while True:
 				# Receive a task from the master:
-				tic = default_timer()
+				tic_wait = default_timer()
 				task = comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
 				tag = status.Get_tag()
-				toc = default_timer()
+				toc_wait = default_timer()
 
 				if tag == tags.START:
 					result = task.copy()
 
 					# Run the classification prediction:
 					try:
-						if task['classifier'] != current_classifier:
+						if task['classifier'] != current_classifier or stcl is None:
 							current_classifier = task['classifier']
 							if stcl: stcl.close()
 							stcl = ClassificationClass[current_classifier](level=args.level, features_cache=None, tset_key='keplerq9')
 
 						fname = os.path.join(input_folder, task['lightcurve'])
 						features = stcl.load_star(task, fname)
-						result = stcl.classify(features)
+						
+						tic_predict = default_timer()
+						result['starclass_results'] = stcl.classify(features)
+						toc_predict = default_timer()
+						
+						result['elaptime'] = toc_predict - tic_predict
+						result['status'] = starclass.STATUS.OK
 					except:
 						# Something went wrong
 						error_msg = traceback.format_exc().strip()
 						result.update({
-							'status_corr': starclass.STATUS.ERROR,
+							'status': starclass.STATUS.ERROR,
 							'details': {'errors': error_msg},
 						})
 
 					# Pad results with metadata and return to TaskManager to be saved:
 					result.update({
-						'worker_wait_time': toc-tic,
-						'priority': task['priority'],
-						'classifier': task['classifier'],
-						'status': starclass.STATUS.OK
+						'worker_wait_time': toc_wait - tic_wait
 					})
 
 					# Send the result back to the master:

@@ -9,4 +9,4 @@ keras
 tensorflow == 1.13.1
 Pillow
 xgboost
--e git+https://github.com/jsk389/upsilon
+-e git+https://github.com/jsk389/upsilon#egg=upsilon

@@ -14,6 +14,7 @@ import logging
 from lightkurve import TessLightCurve
 from astropy.io import fits
 from tqdm import tqdm
+import enum
 from sklearn.metrics import accuracy_score, confusion_matrix
 from .StellarClasses import StellarClasses
 from .features.freqextr import freqextr
@@ -23,6 +24,19 @@ from .utilities import savePickle, loadPickle
 from .plots import plotConfMatrix, plt
 
 __docformat__ = 'restructuredtext'
+
+@enum.unique
+class STATUS(enum.Enum):
+	"""
+	Status indicator of the status of the photometry.
+	"""
+	UNKNOWN = 0 #: The status is unknown. The actual calculation has not started yet.
+	STARTED = 6 #: The calculation has started, but not yet finished.
+	OK = 1      #: Everything has gone well.
+	ERROR = 2   #: Encountered a catastrophic error that I could not recover from.
+	WARNING = 3 #: Something is a bit fishy. Maybe we should try again with a different algorithm?
+	ABORT = 4   #: The calculation was aborted.
+	SKIPPED = 5 #: The target was skipped because the algorithm found that to be the best solution.
 
 class BaseClassifier(object):
 	"""

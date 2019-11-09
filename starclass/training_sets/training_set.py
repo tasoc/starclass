@@ -43,6 +43,7 @@ class TrainingSet(object):
 
 		# Generate training/test indices
 		self.train_idx = np.arange(self.nobjects, dtype=int) # Define here because it is needed by self.labels() used below
+		self.test_idx = np.array([], dtype=int)
 		if self.testfraction > 0:
 			self.train_idx, self.test_idx = train_test_split(
 				np.arange(self.nobjects),

@@ -9,3 +9,4 @@ from .SLOSH import SLOSHClassifier
 from .XGBClassifier import XGBClassifier
 from .MetaClassifier import MetaClassifier
 from .utilities import PICKLE_DEFAULT_PROTOCOL
+from . import training_sets

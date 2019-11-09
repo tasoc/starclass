@@ -184,7 +184,7 @@ def main():
 						error_msg = traceback.format_exc().strip()
 						result.update({
 							'status': starclass.STATUS.ERROR,
-							'details': {'errors': error_msg},
+							'details': {'errors': [error_msg]},
 						})
 
 					# Pad results with metadata and return to TaskManager to be saved:

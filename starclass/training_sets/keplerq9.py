@@ -5,7 +5,6 @@
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, with_statement, print_function, absolute_import
 import six
 import os.path
 import numpy as np
@@ -49,41 +48,34 @@ class keplerq9(TrainingSet):
 			cursor = conn.cursor()
 
 			cursor.execute("""CREATE TABLE todolist (
-				priority BIGINT PRIMARY KEY NOT NULL,
+				priority INTEGER PRIMARY KEY NOT NULL,
 				starid BIGINT NOT NULL,
 				datasource TEXT NOT NULL DEFAULT 'ffi',
-				camera INT NOT NULL,
-				ccd INT NOT NULL,
+				camera INTEGER NOT NULL,
+				ccd INTEGER NOT NULL,
 				method TEXT DEFAULT NULL,
 				tmag REAL,
-				status INT DEFAULT NULL,
-				cbv_area INT NOT NULL
+				status INTEGER DEFAULT NULL,
+				corr_status INTEGER DEFAULT NULL,
+				cbv_area INTEGER NOT NULL
 			);""")
 
-			cursor.execute("""CREATE TABLE diagnostics (
-				priority BIGINT PRIMARY KEY NOT NULL,
-				starid BIGINT NOT NULL,
+			cursor.execute("""CREATE TABLE diagnostics_corr (
+				priority INTEGER PRIMARY KEY NOT NULL,
 				lightcurve TEXT,
-				elaptime REAL NOT NULL,
-				mean_flux DOUBLE PRECISION,
-				variance DOUBLE PRECISION,
-				variability DOUBLE PRECISION,
-				mask_size INT,
-				pos_row REAL,
-				pos_column REAL,
-				contamination REAL,
-				stamp_resizes INT,
-				errors TEXT,
-				eclon DOUBLE PRECISION,
-				eclat DOUBLE PRECISION
+				elaptime REAL,
+				worker_wait_time REAL,
+				variance REAL,
+				rms_hour REAL,
+				ptp REAL,
+				errors TEXT
 			);""")
 
 			# Create the same indicies as is available in the real todolists:
 			cursor.execute("CREATE UNIQUE INDEX priority_idx ON todolist (priority);")
-			cursor.execute("CREATE INDEX starid_datasource_idx ON todolist (starid, datasource);") # FIXME: Should be "UNIQUE", but something is weird in ETE-6?!
 			cursor.execute("CREATE INDEX status_idx ON todolist (status);")
+			cursor.execute("CREATE INDEX corr_status_idx ON todolist (corr_status);")
 			cursor.execute("CREATE INDEX starid_idx ON todolist (starid);")
-			cursor.execute("CREATE INDEX variability_idx ON diagnostics (variability);")
 			conn.commit()
 
 			logger.info("Step 1: Reading file and extracting information...")
@@ -147,37 +139,26 @@ class keplerq9(TrainingSet):
 				#sqlite_file = os.path.join(self.input_folder, 'todo-sector%02d.sqlite' % s)
 
 				pri += 1
+				elaptime = np.random.normal(3.14, 0.5)
 				mean_flux = nanmedian(data[:,1])
 				variance = nansum((data[:,1] - mean_flux)**2) / (data.shape[0] - 1)
+				rms_hour = None
+				ptp = None
 
-				# This could be done in the photometry code as well:
-				time = data[:,0]
-				flux = data[:,1] #/ mean_flux
-				indx = np.isfinite(flux)
-				p = np.polyfit(time[indx], flux[indx], 3)
-				variability = np.nanstd(flux - np.polyval(p, time))
-
-				elaptime = np.random.normal(3.14, 0.5)
-				Npixels = np.interp(tmag, np.array([8.0, 9.0, 10.0, 12.0, 14.0, 16.0]), np.array([350.0, 200.0, 125.0, 100.0, 50.0, 40.0]))
-
-				cursor.execute("INSERT INTO todolist (priority,starid,tmag,datasource,status,camera,ccd,cbv_area) VALUES (?,?,?,?,1,?,0,0);", (
+				cursor.execute("INSERT INTO todolist (priority,starid,tmag,datasource,status,corr_status,camera,ccd,cbv_area) VALUES (?,?,?,?,1,1,?,0,0);", (
 					pri,
 					starid,
 					tmag,
 					datasource,
 					camera
 				))
-				cursor.execute("INSERT INTO diagnostics (priority,starid,lightcurve,elaptime,mean_flux,variance,variability,mask_size,pos_row,pos_column,contamination,stamp_resizes,eclon,eclat) VALUES (?,?,?,?,?,?,?,?,0,0,0.0,0,?,?);", (
+				cursor.execute("INSERT INTO diagnostics_corr (priority,lightcurve,elaptime,variance,rms_hour,ptp) VALUES (?,?,?,?,?,?);", (
 					pri,
-					starid,
 					lightcurve,
 					elaptime,
-					mean_flux,
 					variance,
-					variability,
-					int(Npixels),
-					ecllon,
-					ecllat
+					rms_hour,
+					ptp
 				))
 
 			conn.commit()

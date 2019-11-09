@@ -1,25 +1,22 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-XGBClassifier
+General XGB Classification
+
+.. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
 """
 import logging
-#import os.path
 import os
 import copy
 import json
 import numpy as np
 from xgboost import XGBClassifier as xgb
 from . import xgb_feature_calc as xgb_features
-from .. import BaseClassifier, StellarClasses
-from .. import utilities
-
-import matplotlib.pyplot as plt
+from .. import BaseClassifier, StellarClasses, utilities
 
 class Classifier_obj(xgb):
 	"""
 	Wrapper for sklearn XGBClassifier
-
 	"""
 
 	def __init__(self,base_score=0.5, booster='gbtree', colsample_bylevel=1,
@@ -30,34 +27,35 @@ class Classifier_obj(xgb):
 		reg_alpha=1e-5, reg_lambda=1, scale_pos_weight=1, seed=154,
 		silent=True, subsample=0.6):
 
-		super(self.__class__, self).__init__(booster=booster, eval_metric=eval_metric,
-											 colsample_bytree=colsample_bytree,
-											 subsample=subsample, gamma=gamma,
-			 								 learning_rate=learning_rate, max_depth=max_depth,
-											 n_estimators=n_estimators,
-											 objective=objective,reg_alpha=reg_alpha)
+		super(self.__class__, self).__init__(
+			booster=booster,
+			eval_metric=eval_metric,
+			colsample_bytree=colsample_bytree,
+			subsample=subsample,
+			gamma=gamma,
+			learning_rate=learning_rate,
+			max_depth=max_depth,
+			n_estimators=n_estimators,
+			objective=objective,
+			reg_alpha=reg_alpha
+		)
 
-		self.trained = False
+		#self.trained = False
 
 
 class XGBClassifier(BaseClassifier):
-
 	"""
-
 	General XGB Classification
 
 	.. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
-
 	"""
-	def __init__(self,clfile='xgb_classifier_1.pickle',
-		featdir="xgb_features",n_estimators=500, gamma=7.5,
+	def __init__(self, clfile='xgb_classifier_1.pickle',
+		featdir="xgb_features", n_estimators=500, gamma=7.5,
 		min_child_weight=1, subsample=0.8, max_depth=6,
 		learning_rate = 0.1, reg_alpha=1e-5,
 		objective ='multi:softmax', colsample_bytree=0.7, random_state=154,
-		booster='gbtree',eval_metric='mlogloss', *args, **kwargs):
-
+		booster='gbtree', eval_metric='mlogloss', *args, **kwargs):
 		"""
-
 		Initialize the classifier object with optimised parameters.
 
 		Parameters:
@@ -73,49 +71,47 @@ class XGBClassifier(BaseClassifier):
 
 		"""
 
+		# Initialize the parent class:
 		super(self.__class__, self).__init__(*args, **kwargs)
 
-
+		# Attributes of this classifier:
 		self.classifier = None
-		self.trained = False
+		self.classifier_file = None
+		self.featdir = None
 
 		if clfile is not None:
 			self.classifier_file = os.path.join(self.data_dir, clfile)
-		else:
-			self.classifier_file = None
 
-		if self.classifier_file is not None:
-			if os.path.exists(self.classifier_file):
-				# Load pre-trained classifier
-				self.load(self.classifier_file)
-
-		if featdir is not None:
+		if self.features_cache is not None and featdir is not None:
 			self.featdir = os.path.join(self.features_cache, featdir)
 			os.makedirs(self.featdir, exist_ok=True)
+
+		if self.classifier_file is not None and os.path.exists(self.classifier_file):
+			# Load pre-trained classifier
+			self.load(self.classifier_file)
+			self.trained = True # Assume any classifier loaded is already trained
 		else:
-			self.featdir = None
-
-
-		if self.classifier is None:
-			self.classifier = Classifier_obj(booster=booster,
-			 								colsample_bytree=colsample_bytree,
-											eval_metric=eval_metric,
-			 								gamma=gamma,
-											learning_rate=learning_rate,
-			 								max_depth=max_depth,
-											min_child_weight=min_child_weight,
-			 								n_estimators=n_estimators,
-			 								objective=objective,
-											random_state=random_state,
-			 								reg_alpha=reg_alpha,
-											subsample=subsample)
+			# Create new untrained classifier:
+			self.classifier = Classifier_obj(
+				booster=booster,
+				colsample_bytree=colsample_bytree,
+				eval_metric=eval_metric,
+				gamma=gamma,
+				learning_rate=learning_rate,
+				max_depth=max_depth,
+				min_child_weight=min_child_weight,
+				n_estimators=n_estimators,
+				objective=objective,
+				random_state=random_state,
+				reg_alpha=reg_alpha,
+				subsample=subsample
+			)
+			self.trained = False
 
 
 	def save(self, outfile):
 		"""
-
 		Save xgb classifier object with pickle
-
 		"""
 
 		#self.classifier = None
@@ -123,28 +119,22 @@ class XGBClassifier(BaseClassifier):
 		utilities.savePickle(outfile, self.classifier)
 		self.classifier = temp_classifier
 
-	def load(self, infile, classifier_file=None):
-
+	def load(self, infile):
 		"""
 		Loading the xgb clasifier
-
 		"""
 
 		self.classifier = utilities.loadPickle(infile)
 
 	def do_classify(self, features):
-
 		"""
-
 		My classification that will be run on each lightcurve
 
 		Parameters:
-			lightcurve (``lightkurve.TessLightCurve`` object): Lightcurve.
 			features (dict): Dictionary of other features.
 
 		Returns:
 			dict: Dictionary of stellar classifications.
-
 		"""
 
 		# Start a logger that should be used to output e.g. debug information:
@@ -154,9 +144,9 @@ class XGBClassifier(BaseClassifier):
 			logger.error('Please train classifer')
 			raise ValueError("Untrained Classifier")
 
-		## If classifer has been trained, calculate features
+		# If classifer has been trained, calculate features
 		logger.debug("Calculating features...")
-		feature_results = xgb_features.feature_extract(features) ## Come back to this
+		feature_results = xgb_features.feature_extract(features) # TODO: Come back to this
 		#logger.info('Feature Extraction done')
 
 		# Do the magic:
@@ -173,11 +163,8 @@ class XGBClassifier(BaseClassifier):
 		return class_results
 
 	def train(self, tset, savecl=True, recalc=False, overwrite=False, feat_import=True):
-
 		"""
-
 		Training classifier using the ...
-
 		"""
 
 		# Start a logger that should be used to output e.g. debug information:

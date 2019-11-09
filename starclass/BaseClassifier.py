@@ -161,72 +161,53 @@ class BaseClassifier(object):
 
 	def test(self, tset, save=False, save_func=None):
 		"""
+		Test classifier using training-set, which has been created with a test-fraction.
+		
 		Parameters:
 			tset (``TrainingSet`` object): Training-set to run testing on.
+			save (boolean, optional): Save results of test-predictions?
+			save_func (callable, optional): Function to call for saving test-predictions.
 		"""
-		#if tset.testfraction == 0:
-		#	return
 
 		# Start logger:
 		logger = logging.getLogger(__name__)
+		
+		# If the training-set is created with zero testfraction,
+		# simply don't do anything:
+		if tset.testfraction <= 0:
+			logger.info("Test-fraction is zero, so no testing is performed.")
+			return
 
 		# TODO: Only include classes from the current level
 		all_classes = [lbl.value for lbl in StellarClasses]
 		
 		# Classify test set (has to be one by one unless we change classifiers)
-		# TODO: Use TaskManager for this?
 		y_pred = []
-
-		
-		#for features, labels in tqdm(zip(tset.features(), tset.labels(level=self.level)),total=len(tset.train_idx)):
-			# Classify this star from the test-set:
-		#	res = self.classify(features)
+		for features, labels in tqdm(zip(tset.features_test(), tset.labels_test(level=self.level)), total=len(tset.test_idx)):
+			# Create result-dict that is understood by the TaskManager:
+			res = {
+				'priority': features['priority'],
+				'classifier': self.classifier_key,
+				'status': STATUS.OK
+			}
 			
-		#	prediction = max(res, key=lambda key: res[key]).value
-
-		#	y_pred.append(prediction)
-
-		#	ps = features['powerspectrum'].standard
-		#	plt.plot(ps[0], ps[1])
-		#	print(features)
-		#	print(prediction, labels)
-		#	plt.show()
-		#	sys.exit()
-
-		for features, labels in tqdm(zip(tset.features_test(), tset.labels_test(level=self.level)),total=len(tset.test_idx)):
 			# Classify this star from the test-set:
-			res = self.classify(features)
-			#print(tset.test_idx[0])
-			#print(tset.labels_test(level=self.level)[0])
+			res['starclass_results'] = self.classify(features)
+			
+			# FIXME: Only keeping the first label
 			prediction = max(res, key=lambda key: res[key]).value
-
 			y_pred.append(prediction)
 
-			ps = features['powerspectrum'].standard
-			#plt.plot(ps[0], ps[1])
-			#print(features)
-			#print(prediction, labels)
-			#plt.show()
-			#sys.exit()
-			#print(labels)
-
-			# TODO: Save results for this classifier/trainingset in database
+			# Save results for this classifier/trainingset in database:
 			if save:
-				res.update({
-					'priority': features['priority'],
-					'classifier': self.classifier_key,
-					'status': 1
-				})
 				logger.debug(res)
 				save_func(res)
 
-		y_pred = np.array(y_pred)
-
-
-
 		# Convert labels to ndarray:
-		# FIXME: Only keeping the first label
+		# FIXME: Only comparing to the first label
+		y_pred = np.array(y_pred)
 		labels_test = np.array([lbl[0].value for lbl in tset.labels_test(level=self.level)])
+		
 		# Compare to known labels:
 		acc = accuracy_score(labels_test, y_pred)
 		logger.info('Accuracy: %.2f%%', acc*100)
@@ -234,6 +215,7 @@ class BaseClassifier(object):
 		# Confusion Matrix:
 		cf = confusion_matrix(labels_test, y_pred, labels=all_classes)
 
+		# Create plot of confusion matrix:
 		fig = plt.figure(figsize=(12,12))
 		plotConfMatrix(cf, all_classes)
 		plt.title(self.classifier_key + ' - ' + tset.key + ' - ' + self.level)
@@ -262,8 +244,8 @@ class BaseClassifier(object):
 				time_format='jd',
 				time_scale='tdb',
 				targetid=task['starid'],
-				camera=task['camera'],
-				ccd=task['ccd'],
+				camera=1,
+				ccd=1,
 				sector=2,
 				#ra=0,
 				#dec=0,
@@ -316,7 +298,7 @@ class BaseClassifier(object):
 		# Add the fields from the task to the list of features:
 		features['priority'] = task['priority']
 		features['starid'] = task['starid']
-		for key in ('tmag', 'mean_flux', 'variance', 'variability', 'other_classifiers'):
+		for key in ('tmag', 'variance', 'rms_hour', 'ptp', 'other_classifiers'):
 			if key in task.keys():
 				features[key] = task[key]
 

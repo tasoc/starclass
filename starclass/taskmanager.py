@@ -79,6 +79,7 @@ class TaskManager(object):
 			PRIMARY KEY (priority, classifier),
 			FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
 		);""")
+		self.cursor.execute("CREATE INDEX IF NOT EXISTS starclass_diag_status_idx ON starclass_diagnostics (status);")
 		self.cursor.execute("""CREATE TABLE IF NOT EXISTS starclass_results (
 			priority INTEGER NOT NULL,
 			classifier TEXT NOT NULL,
@@ -143,28 +144,26 @@ class TaskManager(object):
 				todolist.priority,
 				todolist.starid,
 				todolist.tmag,
-				lightcurve AS lightcurve,
-				todolist.camera,
-				todolist.ccd
+				diagnostics_corr.lightcurve AS lightcurve
 			FROM
 				todolist
-				INNER JOIN diagnostics ON todolist.priority=diagnostics.priority
+				INNER JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority
 				LEFT JOIN starclass_diagnostics ON todolist.priority=starclass_diagnostics.priority AND starclass_diagnostics.classifier='{1}'
 			WHERE
-				todolist.status=1
+				todolist.corr_status=1
 				AND starclass_diagnostics.status IS NULL
 				{0}
 			ORDER BY todolist.priority LIMIT 1;""".format(
 			search_query,
 			classifier
-		)) # AND todolist.status_corr=1
+		))
 		task = self.cursor.fetchone()
 		if task:
 			task = dict(task)
 			task['classifier'] = classifier
 
 			# FIXMe: HORRIBLE HACK!
-			task['lightcurve'] = task['lightcurve'].replace('tasoc', 'tasoc-cbv')
+			#task['lightcurve'] = task['lightcurve'].replace('tasoc', 'tasoc-cbv')
 
 			# Add things from the catalog file:
 			#catalog_file = os.path.join(????, 'catalog_sector{sector:03d}_camera{camera:d}_ccd{ccd:d}.sqlite')
@@ -246,7 +245,7 @@ class TaskManager(object):
 		# Store the results in database:
 		try:
 			# Save additional diagnostics:
-			self.cursor.execute("INSERT OR REPLACE INTO starclass_diagnostics (priority,classifier,status,errors,worker_wait_time) VALUES (:priority,:classifier,:status,:errors,:worker_wait_time);", {
+			self.cursor.execute("INSERT OR REPLACE INTO starclass_diagnostics (priority,classifier,status,errors,elaptime,worker_wait_time) VALUES (:priority,:classifier,:status,:errors,:elaptime,:worker_wait_time);", {
 				'priority': priority,
 				'classifier': classifier,
 				'status': status.value,

@@ -5,8 +5,6 @@
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, with_statement, print_function, absolute_import
-from numpy import ceil
 import numpy as np
 import os
 import requests
@@ -16,21 +14,19 @@ import logging
 import tempfile
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
-from sklearn.utils import shuffle as sklshuffle
 from .. import BaseClassifier, TaskManager
-
-from copy import deepcopy
 
 #----------------------------------------------------------------------------------------------
 class TrainingSet(object):
 
 	def __init__(self, datalevel='corr', tf=0.0):
 
+		# Basic checks of input:
+		if tf < 0 or tf >= 1:
+			raise ValueError("Invalid testfraction provided")
+
 		self.datalevel = datalevel
 		self.testfraction = tf
-
-		if self.testfraction < 0 or self.testfraction >= 1:
-			raise ValueError("Invalid testfraction provided")
 
 		# Define cache location where we will save common features:
 		self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)
@@ -61,8 +57,17 @@ class TrainingSet(object):
 	#----------------------------------------------------------------------------------------------
 	def folds(self, n_splits=5, tf=0.2):
 		"""
+		Split training set object into stratified folds.
 
+		Parameters:
+			n_splits (integer, optional): Number of folds to split training set into. Default=5.
+			tf (real, optional): Test-fraction, between 0 and 1, to split from each fold.
+
+		Returns:
+			Iterator of ``TrainingSet`` objects: Iterator of folds, which are also ``TrainingSet`` objects.
 		"""
+
+		logger = logging.getLogger(__name__)
 
 		labels_test = [lbl[0].value for lbl in self.labels()]
 
@@ -70,18 +75,18 @@ class TrainingSet(object):
 		skf = StratifiedKFold(n_splits=n_splits, random_state=42, shuffle=True)
 		skf_splits = skf.split(self.train_idx, labels_test)
 
-		global_testfraction = self.testfraction
-
 		# We are doing cross-validation, so we will return a copy
 		# of the training-set where we have redefined the training- and test-
 		# sets from the folding:
 		for fold, (train_idx, test_idx) in enumerate(skf_splits):
-			#newtset = deepcopy(self)
-			print(fold, len(train_idx), len(test_idx))
-			# Set tf to be zero here so the training set isn't further split 
+			# Write some debug information:
+			logger.debug("Fold %d: Training set=%d, Test set=%d", fold+1, len(train_idx), len(test_idx))
+
+			# Set tf to be zero here so the training set isn't further split
 			# as want to run all the data through CV
 			newtset = self.__class__(datalevel=self.datalevel, tf=0.0)
-			# Set testfraction to value from CV i.e. 1/n_splits)
+
+			# Set testfraction to value from CV i.e. 1/n_splits
 			newtset.testfraction = tf
 			newtset.train_idx = self.train_idx[train_idx]
 			newtset.test_idx = self.train_idx[test_idx]
@@ -91,6 +96,18 @@ class TrainingSet(object):
 
 	#----------------------------------------------------------------------------------------------
 	def tset_datadir(self, tset, url):
+		"""
+		Setup TrainingSet data directory. If the directory doesn't already exist,
+
+		Parameters:
+			tset (string): Name of TrainingSet folder.
+			url (string): URL from where to download the training-set if it doesn't already exist.
+
+		Returns:
+			string: Path to directory where training set is stored.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 
 		logger = logging.getLogger(__name__)
 
@@ -114,7 +131,7 @@ class TrainingSet(object):
 				total_size = int(res.headers.get('content-length', 0));
 				block_size = 1024
 				with open(zip_tmp, 'wb') as fid:
-					for data in tqdm(res.iter_content(block_size), total=ceil(total_size/block_size), unit='KB', unit_scale=True):
+					for data in tqdm(res.iter_content(block_size), total=np.ceil(total_size/block_size), unit='KB', unit_scale=True):
 						fid.write(data)
 
 				# Extract ZIP file:
@@ -138,6 +155,14 @@ class TrainingSet(object):
 
 	#----------------------------------------------------------------------------------------------
 	def features(self):
+		"""
+		Iterator of features for training.
+
+		Returns:
+			Iterator: Iterator of dicts containing features to be used for training.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 
 		# Create a temporary copy of the TODO-file that we are going to read from.
 		# This is due to errors we have detected, where the database is unexpectively locked
@@ -167,9 +192,17 @@ class TrainingSet(object):
 
 	#----------------------------------------------------------------------------------------------
 	def features_test(self):
+		"""
+		Iterator of features for testing.
+
+		Returns:
+			Iterator: Iterator of dicts containing features to be used for testing.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 
 		if self.testfraction <= 0:
-			raise ValueError('features_test requires testfraction>0')
+			raise ValueError('features_test requires testfraction > 0')
 
 		# Create a temporary copy of the TODO-file that we are going to read from.
 		# This is due to errors we have detected, where the database is unexpectively locked

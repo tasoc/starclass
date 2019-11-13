@@ -5,8 +5,6 @@
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, with_statement, print_function, absolute_import
-import six
 import os.path
 import numpy as np
 from bottleneck import nanmedian, nansum
@@ -90,9 +88,7 @@ class tda_simulations(TrainingSet):
 
 				# Get starid:
 				starname = star[0]
-				if not isinstance(starname, six.string_types): starname = starname.decode("utf-8") # For Python 3
 				starid = int(starname[4:])
-
 
 				data_sysnoise = np.loadtxt(os.path.join(self.input_folder, 'sysnoise', 'Star%d.sysnoise' % starid))
 				#data_noisy = np.loadtxt(os.path.join(self.input_folder, 'noisy', 'Star%d.noisy' % starid))

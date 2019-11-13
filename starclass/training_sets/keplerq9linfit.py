@@ -5,8 +5,6 @@
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, with_statement, print_function, absolute_import
-import six
 import os.path
 import numpy as np
 from bottleneck import nanmedian, nansum
@@ -53,7 +51,7 @@ class keplerq9linfit(TrainingSet):
 			cursor = conn.cursor()
 
 			cursor.execute("""CREATE TABLE todolist (
-				priority BIGINT PRIMARY KEY NOT NULL,
+				priority INTEGER PRIMARY KEY NOT NULL,
 				starid BIGINT NOT NULL,
 				datasource TEXT NOT NULL DEFAULT 'ffi',
 				camera INT NOT NULL,
@@ -65,7 +63,7 @@ class keplerq9linfit(TrainingSet):
 			);""")
 
 			cursor.execute("""CREATE TABLE diagnostics (
-				priority BIGINT PRIMARY KEY NOT NULL,
+				priority INTEGER PRIMARY KEY NOT NULL,
 				starid BIGINT NOT NULL,
 				lightcurve TEXT,
 				elaptime REAL NOT NULL,
@@ -99,8 +97,6 @@ class keplerq9linfit(TrainingSet):
 				# Get starid:
 				starname = star[0]
 				starclass = star[1]
-				if not isinstance(starname, six.string_types): starname = starname.decode("utf-8") # For Python 3
-				if not isinstance(starclass, six.string_types): starclass = starclass.decode("utf-8") # For Python 3
 				if starname.startswith('constant_'):
 					starid = -1
 				elif starname.startswith('fakerrlyr_'):

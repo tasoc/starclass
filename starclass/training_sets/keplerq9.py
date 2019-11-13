@@ -5,7 +5,6 @@
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-import six
 import os.path
 import numpy as np
 from bottleneck import nanmedian, nansum
@@ -87,8 +86,6 @@ class keplerq9(TrainingSet):
 				# Get starid:
 				starname = star[0]
 				starclass = star[1]
-				if not isinstance(starname, six.string_types): starname = starname.decode("utf-8") # For Python 3
-				if not isinstance(starclass, six.string_types): starclass = starclass.decode("utf-8") # For Python 3
 				if starname.startswith('constant_'):
 					starid = -1
 				elif starname.startswith('fakerrlyr_'):
@@ -107,7 +104,6 @@ class keplerq9(TrainingSet):
 				# Extract the camera from the lattitude:
 				tmag = -99
 				ecllat = 0
-				ecllon = 0
 				if ecllat < 6+24:
 					camera = 1
 				elif ecllat < 6+2*24:

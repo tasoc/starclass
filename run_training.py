@@ -89,7 +89,7 @@ def main():
 						logger.info('Training %s on Fold %d/%d...', stcl.classifier_key, tset_fold.fold, tset_fold.crossval_folds)
 						stcl.train(tset_fold)
 						logger.info("Classifying test-set...")
-						stcl.test(tset_fold, save=True, save_func=tm.save_result)
+						stcl.test(tset_fold, save=True, save_func=tm.save_results)
 
 	# Initialize the classifier:
 	classifier = ClassificationClass[current_classifier]

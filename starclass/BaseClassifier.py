@@ -195,7 +195,7 @@ class BaseClassifier(object):
 			res['starclass_results'] = self.classify(features)
 			
 			# FIXME: Only keeping the first label
-			prediction = max(res, key=lambda key: res[key]).value
+			prediction = max(res['starclass_results'], key=lambda key: res['starclass_results'][key]).value
 			y_pred.append(prediction)
 
 			# Save results for this classifier/trainingset in database:

@@ -172,18 +172,19 @@ class TaskManager(object):
 
 			# If the classifier that is running is the meta-classifier,
 			# add the results from all other classifiers to the task dict:
-			if classifier == 'meta':
-				self.cursor.execute("SELECT classifier,class,prob FROM starclass_results WHERE priority=? AND status=? AND classifier != 'meta';", (task['priority'], STATUS.OK.value))
+			# FIXME: Enforce this for META only. The problem is the TrainingSet class, which doesn't know about which classifier is running it
+			#if classifier == 'meta':
+			self.cursor.execute("SELECT starclass_results.classifier,class,prob FROM starclass_results INNER JOIN starclass_diagnostics ON starclass_results.priority=starclass_diagnostics.priority AND starclass_results.classifier=starclass_diagnostics.classifier WHERE starclass_results.priority=? AND status=? AND starclass_results.classifier != 'meta';", (task['priority'], STATUS.OK.value))
 
-				# Add as a Table to the task list:
-				rows = []
-				for r in self.cursor.fetchall():
-					rows.append([r['classifier'], StellarClasses[r['class']], r['prob']])
-				if not rows: rows = None
-				task['other_classifiers'] = Table(
-					rows=rows,
-					names=('classifier', 'class', 'prob'),
-				)
+			# Add as a Table to the task list:
+			rows = []
+			for r in self.cursor.fetchall():
+				rows.append([r['classifier'], StellarClasses[r['class']], r['prob']])
+			if not rows: rows = None
+			task['other_classifiers'] = Table(
+				rows=rows,
+				names=('classifier', 'class', 'prob'),
+			)
 
 			return task
 		return None

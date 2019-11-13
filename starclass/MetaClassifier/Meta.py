@@ -9,18 +9,13 @@ The meta-classifier.
 import logging
 import os.path
 import numpy as np
+from tqdm import tqdm
 import os
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import KFold
-from sklearn.metrics import confusion_matrix, accuracy_score
-from xgboost import XGBClassifier
 from .. import BaseClassifier, StellarClasses
 from .. import utilities
 
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-from joblib import dump, load
-
+#--------------------------------------------------------------------------------------------------
 class Classifier_obj(RandomForestClassifier):
 	"""
 	Wrapper for sklearn RandomForestClassifier.
@@ -31,12 +26,14 @@ class Classifier_obj(RandomForestClassifier):
 										class_weight='balanced', max_depth=3)
 		self.trained = False
 
+#--------------------------------------------------------------------------------------------------
 class MetaClassifier(BaseClassifier):
 	"""
 	The meta-classifier.
 
 	.. codeauthor::  James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
 	"""
+
 	def __init__(self, clfile='meta_classifier.pickle', featdir='',
 					   *args, **kwargs):
 		"""
@@ -61,10 +58,9 @@ class MetaClassifier(BaseClassifier):
 			self.clfile = None
 
 		# Check if pre-trained classifier exists
-		if self.clfile is not None:
-			if os.path.exists(self.clfile):
-				#load pre-trained classifier
-				self.load(self.clfile)
+		if self.clfile is not None and os.path.exists(self.clfile):
+			# Load pre-trained classifier
+			self.load(self.clfile)
 
 		# Check for features TODO: THIS NEEDS TO BE CHANGED!
 		if featdir is not None:
@@ -78,7 +74,7 @@ class MetaClassifier(BaseClassifier):
 
 		# Set up classifier
 		if self.classifier is None:
-			self.classifier = Classifier_obj() #TestObject()
+			self.classifier = Classifier_obj()
 
 		self.indiv_classifiers = ['rfgc', 'SLOSH', 'xgb']
 
@@ -94,11 +90,13 @@ class MetaClassifier(BaseClassifier):
 		self.class_keys['constant'] = StellarClasses.CONSTANT
 		#self.class_keys['rapid'] = StellarClasses.RAPID
 
+
 	def save(self, outfile):
 		"""
 		Saves the classifier object with pickle.
 		"""
-		utilities.savePickle(outfile,self.classifier)
+		utilities.savePickle(outfile, self.classifier)
+
 
 	def load(self, infile, somfile=None):
 		"""
@@ -107,9 +105,10 @@ class MetaClassifier(BaseClassifier):
 		self.classifier = utilities.loadPickle(infile)
 
 
-	def do_classify(self, features, recalc=False):
+	def do_classify(self, features):
 		"""
 		Classify a single lightcurve.
+
 		Assumes lightcurve time is in days
 		Assumes featdict contains ['freq1'],['freq2']...['freq6'] in units of muHz
 		Assumes featdict contains ['amp1'],['amp2'],['amp3']
@@ -144,7 +143,7 @@ class MetaClassifier(BaseClassifier):
 		# Comes out with shape (1,8), but instead want shape (8,) so squeeze
 		classprobs = self.classifier.predict_proba(featarray).squeeze()
 		logger.debug("Classification complete")
-		
+
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):
 			key = self.class_keys[cla]
@@ -176,16 +175,13 @@ class MetaClassifier(BaseClassifier):
 				preds = np.vstack((preds,
 									np.array(i['other_classifiers']['class'])))
 
-		logger.info("Features imported.")
-		print(np.shape(features))
-		#try:
+		logger.info("Features imported. Shape = %s", np.shape(features))
+
 		self.classifier.oob_score = True
 		logger.info("Fitting model.")
 		self.classifier.fit(features, fitlabels)
 		logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
 		self.classifier.trained = True
-		#except:
-		#	logger.exception('Training Error') # add more details...
 
 		if savecl and self.classifier.trained:
 			if self.clfile is not None:

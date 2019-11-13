@@ -41,7 +41,7 @@ class TaskManager(object):
 		self.readonly = readonly
 
 		# Keep a list of all the possible classifiers here:
-		self.all_classifiers = set(['rfgc', 'slosh', 'xgb'])
+		self.all_classifiers = ('rfgc', 'slosh', 'xgb')
 
 		# Setup logging:
 		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -127,9 +127,6 @@ class TaskManager(object):
 	def _query_task(self, classifier=None, priority=None):
 
 		search_query = []
-		#if classifier is not None:
-		#	search_query.append("todolist.priority NOT IN (SELECT starclass.priority FROM starclass WHERE starclass.priority=todolist.priority AND starclass.classifier='%s')" % classifier)
-
 		if priority is not None:
 			search_query.append('todolist.priority=%d' % priority)
 
@@ -162,9 +159,6 @@ class TaskManager(object):
 			task = dict(task)
 			task['classifier'] = classifier
 
-			# FIXMe: HORRIBLE HACK!
-			#task['lightcurve'] = task['lightcurve'].replace('tasoc', 'tasoc-cbv')
-
 			# Add things from the catalog file:
 			#catalog_file = os.path.join(????, 'catalog_sector{sector:03d}_camera{camera:d}_ccd{ccd:d}.sqlite')
 			# cursor.execute("SELECT ra,decl as dec,teff FROM catalog WHERE starid=?;", (task['starid'], ))
@@ -173,18 +167,18 @@ class TaskManager(object):
 			# If the classifier that is running is the meta-classifier,
 			# add the results from all other classifiers to the task dict:
 			# FIXME: Enforce this for META only. The problem is the TrainingSet class, which doesn't know about which classifier is running it
-			#if classifier == 'meta':
-			self.cursor.execute("SELECT starclass_results.classifier,class,prob FROM starclass_results INNER JOIN starclass_diagnostics ON starclass_results.priority=starclass_diagnostics.priority AND starclass_results.classifier=starclass_diagnostics.classifier WHERE starclass_results.priority=? AND status=? AND starclass_results.classifier != 'meta';", (task['priority'], STATUS.OK.value))
+			if classifier == 'meta' or classifier is None:
+				self.cursor.execute("SELECT starclass_results.classifier,class,prob FROM starclass_results INNER JOIN starclass_diagnostics ON starclass_results.priority=starclass_diagnostics.priority AND starclass_results.classifier=starclass_diagnostics.classifier WHERE starclass_results.priority=? AND status=? AND starclass_results.classifier != 'meta';", (task['priority'], STATUS.OK.value))
 
-			# Add as a Table to the task list:
-			rows = []
-			for r in self.cursor.fetchall():
-				rows.append([r['classifier'], StellarClasses[r['class']], r['prob']])
-			if not rows: rows = None
-			task['other_classifiers'] = Table(
-				rows=rows,
-				names=('classifier', 'class', 'prob'),
-			)
+				# Add as a Table to the task list:
+				rows = []
+				for r in self.cursor.fetchall():
+					rows.append([r['classifier'], StellarClasses[r['class']], r['prob']])
+				if not rows: rows = None
+				task['other_classifiers'] = Table(
+					rows=rows,
+					names=('classifier', 'class', 'prob'),
+				)
 
 			return task
 		return None
@@ -211,7 +205,7 @@ class TaskManager(object):
 			# Make a search on all the classifiers, and record the next
 			# task for all of them:
 			all_tasks = []
-			for cl in self.all_classifiers.difference([classifier]):
+			for cl in set(self.all_classifiers).difference([classifier]):
 				task = self._query_task(cl, priority=priority)
 				if task is not None:
 					all_tasks.append(task)

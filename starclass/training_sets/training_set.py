@@ -189,6 +189,8 @@ class TrainingSet(object):
 		finally:
 			if os.path.exists(tmpdir.name):
 				os.remove(tmpdir.name)
+			if os.path.exists(tmpdir.name + '-journal'):
+				os.remove(tmpdir.name + '-journal')
 
 	#----------------------------------------------------------------------------------------------
 	def features_test(self):
@@ -229,6 +231,8 @@ class TrainingSet(object):
 		finally:
 			if os.path.exists(tmpdir.name):
 				os.remove(tmpdir.name)
+			if os.path.exists(tmpdir.name + '-journal'):
+				os.remove(tmpdir.name + '-journal')
 
 	#----------------------------------------------------------------------------------------------
 	def labels(self, level='L1'):

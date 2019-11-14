@@ -83,15 +83,18 @@ class TaskManager(object):
 		self.cursor.execute("""CREATE TABLE IF NOT EXISTS starclass_results (
 			priority INTEGER NOT NULL,
 			classifier TEXT NOT NULL,
-			class TEXT,
-			prob REAL,
+			class TEXT NOT NULL,
+			prob REAL NOT NULL,
 			FOREIGN KEY (priority, classifier) REFERENCES starclass_diagnostics(priority, classifier) ON DELETE CASCADE ON UPDATE CASCADE
 		);""")
 		self.cursor.execute("CREATE INDEX IF NOT EXISTS starclass_resu_priority_classifier_idx ON starclass_results (priority, classifier);")
-		self.conn.commit()
+
+		# Make sure we have proper indicies that should have been created by the previous pipeline steps:
+		self.cursor.execute("CREATE INDEX IF NOT EXISTS corr_status_idx ON todolist (corr_status);")
 
 		# Analyze the tables for better query planning:
 		self.cursor.execute("ANALYZE;")
+		self.conn.commit()
 
 		# Run a cleanup/optimization of the database before we get started:
 		if cleanup:
@@ -257,7 +260,7 @@ class TaskManager(object):
 					'class': key.name,
 					'prob': value
 				})
-			
+
 			self.conn.commit()
 		except:
 			self.conn.rollback()

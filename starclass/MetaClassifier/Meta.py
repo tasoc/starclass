@@ -3,14 +3,13 @@
 """
 The meta-classifier.
 
-.. codeauthor::  James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
+.. codeauthor:: James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
 """
 
 import logging
-import os.path
+import os
 import numpy as np
 from tqdm import tqdm
-import os
 from sklearn.ensemble import RandomForestClassifier
 from .. import BaseClassifier, StellarClasses
 from .. import utilities
@@ -21,9 +20,12 @@ class Classifier_obj(RandomForestClassifier):
 	Wrapper for sklearn RandomForestClassifier.
 	"""
 	def __init__(self, n_estimators=100, min_samples_split=2):
-		super(self.__class__, self).__init__(n_estimators=n_estimators,
-										min_samples_split=min_samples_split,
-										class_weight='balanced', max_depth=3)
+		super(self.__class__, self).__init__(
+			n_estimators=n_estimators,
+			min_samples_split=min_samples_split,
+			class_weight='balanced',
+			max_depth=3
+		)
 		self.trained = False
 
 #--------------------------------------------------------------------------------------------------
@@ -31,11 +33,10 @@ class MetaClassifier(BaseClassifier):
 	"""
 	The meta-classifier.
 
-	.. codeauthor::  James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
+	.. codeauthor:: James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
 	"""
 
-	def __init__(self, clfile='meta_classifier.pickle', featdir='',
-					   *args, **kwargs):
+	def __init__(self, clfile='meta_classifier.pickle', featdir='', *args, **kwargs):
 		"""
 		Initialise the classifier object.
 
@@ -90,20 +91,17 @@ class MetaClassifier(BaseClassifier):
 		self.class_keys['constant'] = StellarClasses.CONSTANT
 		#self.class_keys['rapid'] = StellarClasses.RAPID
 
-
 	def save(self, outfile):
 		"""
 		Saves the classifier object with pickle.
 		"""
 		utilities.savePickle(outfile, self.classifier)
 
-
 	def load(self, infile, somfile=None):
 		"""
 		Loads classifier object.
 		"""
 		self.classifier = utilities.loadPickle(infile)
-
 
 	def do_classify(self, features):
 		"""
@@ -170,10 +168,8 @@ class MetaClassifier(BaseClassifier):
 				features = np.array(i['other_classifiers']['prob'])
 				preds = np.array(i['other_classifiers']['class'])
 			else:
-				features = np.vstack((features,
-									 np.array(i['other_classifiers']['prob'])))
-				preds = np.vstack((preds,
-									np.array(i['other_classifiers']['class'])))
+				features = np.vstack((features, np.array(i['other_classifiers']['prob'])))
+				preds = np.vstack((preds, np.array(i['other_classifiers']['class'])))
 
 		logger.info("Features imported. Shape = %s", np.shape(features))
 
@@ -195,9 +191,9 @@ class MetaClassifier(BaseClassifier):
 		fitlabels = []
 		for lbl in labels:
 			if removeduplicates:
-				#is it multi-labelled? In which case, what takes priority?
-				#or duplicate it once for each label
-				if len(lbl)>1:#Priority order loosely based on signal clarity
+				# is it multi-labelled? In which case, what takes priority?
+				# or duplicate it once for each label
+				if len(lbl) > 1: # Priority order loosely based on signal clarity
 					if StellarClasses.ECLIPSE in lbl:
 						fitlabels.append('transit/eclipse')
 					elif StellarClasses.RRLYR_CEPHEID in lbl:

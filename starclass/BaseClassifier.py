@@ -6,8 +6,8 @@ All other specific stellar classification algorithms will inherit from BaseClass
 
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
-import warnings
-warnings.filterwarnings('ignore', category=DeprecationWarning, message='Using or importing the ABCs from \'collections\' instead of from \'collections.abc\' is deprecated')
+#import warnings
+#warnings.filterwarnings('ignore', category=DeprecationWarning, message='Using or importing the ABCs from \'collections\' instead of from \'collections.abc\' is deprecated')
 import numpy as np
 import os.path
 import logging
@@ -25,6 +25,7 @@ from .plots import plotConfMatrix, plt
 
 __docformat__ = 'restructuredtext'
 
+#--------------------------------------------------------------------------------------------------
 @enum.unique
 class STATUS(enum.Enum):
 	"""
@@ -38,6 +39,7 @@ class STATUS(enum.Enum):
 	ABORT = 4   #: The calculation was aborted.
 	SKIPPED = 5 #: The target was skipped because the algorithm found that to be the best solution.
 
+#--------------------------------------------------------------------------------------------------
 class BaseClassifier(object):
 	"""
 	The basic stellar classifier class for the TASOC pipeline.
@@ -162,7 +164,7 @@ class BaseClassifier(object):
 	def test(self, tset, save=False, save_func=None):
 		"""
 		Test classifier using training-set, which has been created with a test-fraction.
-		
+
 		Parameters:
 			tset (``TrainingSet`` object): Training-set to run testing on.
 			save (boolean, optional): Save results of test-predictions?
@@ -171,7 +173,7 @@ class BaseClassifier(object):
 
 		# Start logger:
 		logger = logging.getLogger(__name__)
-		
+
 		# If the training-set is created with zero testfraction,
 		# simply don't do anything:
 		if tset.testfraction <= 0:
@@ -180,7 +182,7 @@ class BaseClassifier(object):
 
 		# TODO: Only include classes from the current level
 		all_classes = [lbl.value for lbl in StellarClasses]
-		
+
 		# Classify test set (has to be one by one unless we change classifiers)
 		y_pred = []
 		for features, labels in tqdm(zip(tset.features_test(), tset.labels_test(level=self.level)), total=len(tset.test_idx)):
@@ -190,10 +192,10 @@ class BaseClassifier(object):
 				'classifier': self.classifier_key,
 				'status': STATUS.OK
 			}
-			
+
 			# Classify this star from the test-set:
 			res['starclass_results'] = self.classify(features)
-			
+
 			# FIXME: Only keeping the first label
 			prediction = max(res['starclass_results'], key=lambda key: res['starclass_results'][key]).value
 			y_pred.append(prediction)
@@ -207,7 +209,7 @@ class BaseClassifier(object):
 		# FIXME: Only comparing to the first label
 		y_pred = np.array(y_pred)
 		labels_test = np.array([lbl[0].value for lbl in tset.labels_test(level=self.level)])
-		
+
 		# Compare to known labels:
 		acc = accuracy_score(labels_test, y_pred)
 		logger.info('Accuracy: %.2f%%', acc*100)
@@ -219,7 +221,7 @@ class BaseClassifier(object):
 		fig = plt.figure(figsize=(12,12))
 		plotConfMatrix(cf, all_classes)
 		plt.title(self.classifier_key + ' - ' + tset.key + ' - ' + self.level)
-		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_'  + tset.key + '_' + self.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
+		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + self.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 
 

@@ -173,7 +173,9 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 
 		# Stops if there are to many consecutive failed peaks
 		if conseclim is not None:
-			deviation_large = (deviation > 1/alphadev) | (deviation < alphadev)
+			# Stop numpy from warning us that deviation contains NaN
+			with np.errstate(invalid='ignore'):
+				deviation_large = (deviation > 1/alphadev) | (deviation < alphadev)
 			if np.all( deviation_large[max(i-conseclim, 0):(i+1), 0] ): # Only checking main peaks right now!
 				logger.debug('Stopped due to too many consecutive failed peaks')
 				break
@@ -258,7 +260,8 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 				# Only optimize a peak if it is closer than the set limit.
 				# NOTE: Be careful as this doesn't take the window function into account
 				if optim_max_diff is not None:
-					indx_optim &= (nusort[order] < optim_max_diff)
+					with np.errstate(invalid='ignore'):
+						indx_optim &= (nusort[order] < optim_max_diff)
 
 				# Pick out the peaks that should be optimized:
 				order = order[indx_optim]
@@ -392,4 +395,3 @@ if __name__ == '__main__':
 				print("%d   %7.3f   %6.3f   %6.3f" % (j, f, a, p))
 
 	plt.show()
-

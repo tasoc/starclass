@@ -6,7 +6,6 @@ An example classifier.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, print_function, with_statement, absolute_import
 import logging
 import numpy as np
 from .. import BaseClassifier, StellarClasses
@@ -31,7 +30,6 @@ class ExampleClassifier(BaseClassifier):
 
 		# Load stuff:
 		self.something = np.load('my_classifier.npy')
-
 
 	def do_classify(self, features):
 		"""
@@ -65,7 +63,6 @@ class ExampleClassifier(BaseClassifier):
 		logger.error("This is an error")
 
 		return result
-
 
 	def train(self, features, labels):
 		"""

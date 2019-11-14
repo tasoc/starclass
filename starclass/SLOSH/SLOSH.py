@@ -3,25 +3,17 @@
 """
 The SLOSH method for detecting solar-like oscillations (2D deep learning methods).
 
-.. codeauthor::  Marc Hon <mtyh555@uowmail.edu.au>
+.. codeauthor:: Marc Hon <mtyh555@uowmail.edu.au>
 """
 
-from __future__ import division, print_function, absolute_import
 import numpy as np
-import os, math, logging
+import os
+import logging
 from keras import backend as K
 from keras.models import load_model
 from keras.callbacks import ReduceLROnPlateau
 from . import SLOSH_prepro as preprocessing
 from .. import BaseClassifier, StellarClasses
-from sklearn.utils import shuffle
-from tqdm import tqdm
-from sklearn.metrics import accuracy_score, confusion_matrix
-from .. import plots as plots
-
-
-import matplotlib.pyplot as plt
-
 
 class SLOSHClassifier(BaseClassifier):
 	"""
@@ -102,7 +94,7 @@ class SLOSHClassifier(BaseClassifier):
 		result[StellarClasses.ECLIPSE] = pred[7]
 
 		return result
-		
+
 	def train(self, tset):
 		'''
 		Trains a fresh classifier using a default NN architecture and parameters as of the Hon et al. (2018) paper.
@@ -214,9 +206,9 @@ class SLOSHClassifier(BaseClassifier):
 		fitlabels = []
 		for lbl in labels:
 			if removeduplicates:
-				#is it multi-labelled? In which case, what takes priority?
-				#or duplicate it once for each label
-				if len(lbl)>1:#Priority order loosely based on signal clarity
+				# is it multi-labelled? In which case, what takes priority?
+				# or duplicate it once for each label
+				if len(lbl) > 1: # Priority order loosely based on signal clarity
 					if StellarClasses.ECLIPSE in lbl:
 						fitlabels.append('transit/eclipse')
 					elif StellarClasses.RRLYR_CEPHEID in lbl:

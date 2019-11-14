@@ -3,10 +3,9 @@
 """
 Utilities for SLOSH (2D deep learning methods).
 
-.. codeauthor::  Marc Hon <mtyh555@uowmail.edu.au>
+.. codeauthor:: Marc Hon <mtyh555@uowmail.edu.au>
 """
 
-from __future__ import division, print_function, absolute_import
 import os
 import numpy as np
 import keras.backend as K
@@ -16,7 +15,6 @@ from keras.models import Model
 from keras.layers.core import Dense
 from keras.regularizers import l2
 from keras.optimizers import Adam
-
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
 from sklearn.utils import shuffle as sklearn_shuffle

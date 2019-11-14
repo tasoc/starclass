@@ -131,12 +131,9 @@ class MetaClassifier(BaseClassifier):
 			logger.error('Classifier has not been trained. Exiting.')
 			raise ValueError('Classifier has not been trained. Exiting.')
 
-		# Assumes that if self.classifier.trained=True,
-		# ...then self.classifier.som is not None
-
-
 		logger.debug("Importing features...")
 		featarray = np.array(features['other_classifiers']['prob']).reshape(1,-1)
+
 		logger.debug("We are starting the magic...")
 		# Comes out with shape (1,8), but instead want shape (8,) so squeeze
 		classprobs = self.classifier.predict_proba(featarray).squeeze()

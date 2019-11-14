@@ -11,6 +11,7 @@ All other specific stellar classification algorithms will inherit from BaseClass
 import numpy as np
 import os.path
 import logging
+from astropy.units import cds
 from lightkurve import TessLightCurve
 from astropy.io import fits
 from tqdm import tqdm
@@ -261,6 +262,7 @@ class BaseClassifier(object):
 					time=hdu['LIGHTCURVE'].data['TIME'],
 					flux=hdu['LIGHTCURVE'].data['FLUX_CORR'],
 					flux_err=hdu['LIGHTCURVE'].data['FLUX_CORR_ERR'],
+					flux_unit=cds.ppm,
 					centroid_col=hdu['LIGHTCURVE'].data['MOM_CENTR1'],
 					centroid_row=hdu['LIGHTCURVE'].data['MOM_CENTR2'],
 					quality=np.asarray(hdu['LIGHTCURVE'].data['QUALITY'], dtype='int32'),

@@ -92,6 +92,12 @@ class TaskManager(object):
 		# Make sure we have proper indicies that should have been created by the previous pipeline steps:
 		self.cursor.execute("CREATE INDEX IF NOT EXISTS corr_status_idx ON todolist (corr_status);")
 
+		# Find out if data-validation information exists:
+		self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='datavalidataion_corr';")
+		self.datavalidation_exists = (self.cursor.fetchone() is not None)
+		if not self.datavalidation_exists:
+			self.logger.warning("DATA-VALIDATION information is not available in this TODO-file. Assuming all targets are good.")
+
 		# Analyze the tables for better query planning:
 		self.cursor.execute("ANALYZE;")
 		self.conn.commit()
@@ -129,16 +135,30 @@ class TaskManager(object):
 
 	def _query_task(self, classifier=None, priority=None):
 
+		search_joins = []
 		search_query = []
+
+		# Build list of constrainits:
 		if priority is not None:
 			search_query.append('todolist.priority=%d' % priority)
+
+		# If data-validation information is available, only include targets
+		# which passed the data validation:
+		if self.datavalidation_exists:
+			search_joins.append("INNER JOIN datavalidation_corr ON datavalidation_corr.prioriry=todolist.priority")
+			search_query.append("datavalidataion_corr.approved=1")
+
+		# Build query string:
+		if search_joins:
+			search_joins = "\n".join(search_joins)
+		else:
+			search_joins = ''
 
 		if search_query:
 			search_query = "AND " + " AND ".join(search_query)
 		else:
 			search_query = ''
 
-		# TODO: Add check of data validation!
 		self.cursor.execute("""
 			SELECT
 				todolist.priority,
@@ -147,15 +167,17 @@ class TaskManager(object):
 				diagnostics_corr.lightcurve AS lightcurve
 			FROM
 				todolist
+				{joins:s}
 				INNER JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority
-				LEFT JOIN starclass_diagnostics ON todolist.priority=starclass_diagnostics.priority AND starclass_diagnostics.classifier='{1}'
+				LEFT JOIN starclass_diagnostics ON todolist.priority=starclass_diagnostics.priority AND starclass_diagnostics.classifier='{classifier:s}'
 			WHERE
 				todolist.corr_status=1
 				AND starclass_diagnostics.status IS NULL
-				{0}
+				{constraints:s}
 			ORDER BY todolist.priority LIMIT 1;""".format(
-			search_query,
-			classifier
+			joins=search_joins,
+			constraints=search_query,
+			classifier=classifier
 		))
 		task = self.cursor.fetchone()
 		if task:

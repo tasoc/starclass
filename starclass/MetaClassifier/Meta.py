@@ -3,56 +3,40 @@
 """
 The meta-classifier.
 
-.. codeauthor::  James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
+.. codeauthor:: James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
 """
 
 import logging
-import os.path
-import numpy as np
 import os
+import numpy as np
+from tqdm import tqdm
 from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
 from .. import BaseClassifier, StellarClasses
 from .. import utilities
 
+#--------------------------------------------------------------------------------------------------
 class Classifier_obj(RandomForestClassifier):
 	"""
-	Wrapper for sklearn RandomForestClassifier
+	Wrapper for sklearn RandomForestClassifier.
 	"""
-	def __init__(self, n_estimators=1000, min_samples_split=2):
-		super(self.__class__, self).__init__(n_estimators=n_estimators,
-										min_samples_split=min_samples_split,
-										class_weight='balanced')
+	def __init__(self, n_estimators=100, min_samples_split=2):
+		super(self.__class__, self).__init__(
+			n_estimators=n_estimators,
+			min_samples_split=min_samples_split,
+			class_weight='balanced',
+			max_depth=3
+		)
 		self.trained = False
 
-class xgb_Classifier_obj(XGBClassifier):
-	"""
-	Wrapper for sklearn XGBClassifier
-
-	"""
-
-	def __init__(self,base_score=0.5, booster='gbtree', colsample_bylevel=1,
-	   colsample_bytree=1, eval_metric='mlogloss', gamma=0,
-	   learning_rate=0.1, max_delta_step=0, max_depth=13,
-	   min_child_weight=1, missing=None, n_estimators=550, n_jobs=1,
-	   nthread=None, objective='multi:softmax', random_state=0,
-	   reg_alpha=1e-05, reg_lambda=1, scale_pos_weight=1, seed=125,
-	   silent=True, subsample=1):
-
-		super(self.__class__, self).__init__(booster=booster,eval_metric=eval_metric,
-			 learning_rate=learning_rate, max_depth=max_depth,n_estimators=n_estimators,
-			 objective=objective,reg_alpha=reg_alpha)
-
-		self.trained = False
-
+#--------------------------------------------------------------------------------------------------
 class MetaClassifier(BaseClassifier):
 	"""
 	The meta-classifier.
 
-	.. codeauthor::  James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
+	.. codeauthor:: James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
 	"""
-	def __init__(self, clfile='meta_classifier.pickle', featdir='',
-					   *args, **kwargs):
+
+	def __init__(self, clfile='meta_classifier.pickle', featdir='', *args, **kwargs):
 		"""
 		Initialise the classifier object.
 
@@ -69,11 +53,15 @@ class MetaClassifier(BaseClassifier):
 		self.clfile = clfile
 		self.classifier = None
 
+		if clfile is not None:
+			self.clfile = os.path.join(self.data_dir, clfile)
+		else:
+			self.clfile = None
+
 		# Check if pre-trained classifier exists
-		if self.clfile is not None:
-			if os.path.exists(self.clfile):
-				#load pre-trained classifier
-				self.load(self.clfile)
+		if self.clfile is not None and os.path.exists(self.clfile):
+			# Load pre-trained classifier
+			self.load(self.clfile)
 
 		# Check for features TODO: THIS NEEDS TO BE CHANGED!
 		if featdir is not None:
@@ -89,7 +77,7 @@ class MetaClassifier(BaseClassifier):
 		if self.classifier is None:
 			self.classifier = Classifier_obj()
 
-
+		self.indiv_classifiers = ['rfgc', 'SLOSH', 'xgb']
 
 		self.class_keys = {}
 		self.class_keys['RRLyr/Ceph'] = StellarClasses.RRLYR_CEPHEID
@@ -97,17 +85,17 @@ class MetaClassifier(BaseClassifier):
 		self.class_keys['solar'] = StellarClasses.SOLARLIKE
 		self.class_keys['dSct/bCep'] = StellarClasses.DSCT_BCEP
 		self.class_keys['gDor/spB'] = StellarClasses.GDOR_SPB
-		self.class_keys['transient'] = StellarClasses.TRANSIENT
+		#self.class_keys['transient'] = StellarClasses.TRANSIENT
 		self.class_keys['contactEB/spots'] = StellarClasses.CONTACT_ROT
 		self.class_keys['aperiodic'] = StellarClasses.APERIODIC
 		self.class_keys['constant'] = StellarClasses.CONSTANT
-		self.class_keys['rapid'] = StellarClasses.RAPID
+		#self.class_keys['rapid'] = StellarClasses.RAPID
 
 	def save(self, outfile):
 		"""
 		Saves the classifier object with pickle.
 		"""
-		utilities.savePickle(outfile,self.classifier)
+		utilities.savePickle(outfile, self.classifier)
 
 	def load(self, infile, somfile=None):
 		"""
@@ -115,10 +103,10 @@ class MetaClassifier(BaseClassifier):
 		"""
 		self.classifier = utilities.loadPickle(infile)
 
-
-	def do_classify(self, features, recalc=False):
+	def do_classify(self, features):
 		"""
 		Classify a single lightcurve.
+
 		Assumes lightcurve time is in days
 		Assumes featdict contains ['freq1'],['freq2']...['freq6'] in units of muHz
 		Assumes featdict contains ['amp1'],['amp2'],['amp3']
@@ -143,18 +131,13 @@ class MetaClassifier(BaseClassifier):
 			logger.error('Classifier has not been trained. Exiting.')
 			raise ValueError('Classifier has not been trained. Exiting.')
 
-		# Assumes that if self.classifier.trained=True,
-		# ...then self.classifier.som is not None
+		logger.debug("Importing features...")
+		featarray = np.array(features['other_classifiers']['prob']).reshape(1,-1)
 
-		logger.info("Importing features...")
-		logger.error("Not yet implemented!")
-		sys.exit()
-		logger.info("Features imported.")
-
-		# Do the magic:
-		logger.info("We are starting the magic...")
-		classprobs = self.classifier.predict_proba(featarray)[0]
-		logger.info("Classification complete")
+		logger.debug("We are starting the magic...")
+		# Comes out with shape (1,8), but instead want shape (8,) so squeeze
+		classprobs = self.classifier.predict_proba(featarray).squeeze()
+		logger.debug("Classification complete")
 
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):
@@ -162,7 +145,7 @@ class MetaClassifier(BaseClassifier):
 			result[key] = classprobs[c]
 		return result
 
-	def train(self, features, labels, savecl=True, recalc=False, overwrite=False):
+	def train(self, tset, savecl=True, recalc=False, overwrite=False):
 		"""
 		Train the classifier.
 		Assumes lightcurve time is in days
@@ -173,29 +156,31 @@ class MetaClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		# Check for pre-calculated features
-
-		fitlabels = self.parse_labels(labels)
+		fitlabels = self.parse_labels(tset.labels())
 
 		logger.info("Importing features...")
-		logger.error("Not yet implemented!")
-		sys.exit()
-		logger.info("Features imported.")
+		# This bit is hardcoded! Not good for generalisability!
+		for idx, i in tqdm(enumerate(tset.features())):
+			if idx == 0:
+				features = np.array(i['other_classifiers']['prob'])
+				preds = np.array(i['other_classifiers']['class'])
+			else:
+				features = np.vstack((features, np.array(i['other_classifiers']['prob'])))
+				preds = np.vstack((preds, np.array(i['other_classifiers']['class'])))
 
-		try:
-			self.classifier.oob_score = True
-			self.classifier.fit(featarray, fitlabels)
-			logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
-			self.classifier.oob_score = False
-			self.classifier.trained = True
-		except:
-			logger.exception('Training Error') # add more details...
+		logger.info("Features imported. Shape = %s", np.shape(features))
+
+		self.classifier.oob_score = True
+		logger.info("Fitting model.")
+		self.classifier.fit(features, fitlabels)
+		logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
+		self.classifier.trained = True
 
 		if savecl and self.classifier.trained:
 			if self.clfile is not None:
 				if not os.path.exists(self.clfile) or overwrite or recalc:
-					logger.info('Saving pickled classifier instance to rfgc_classifier_v01.pickle')
+					logger.info('Saving pickled classifier instance to meta_classifier.pickle')
 					self.save(self.clfile)
-
 
 	def parse_labels(self,labels,removeduplicates=False):
 		"""
@@ -203,9 +188,9 @@ class MetaClassifier(BaseClassifier):
 		fitlabels = []
 		for lbl in labels:
 			if removeduplicates:
-				#is it multi-labelled? In which case, what takes priority?
-				#or duplicate it once for each label
-				if len(lbl)>1:#Priority order loosely based on signal clarity
+				# is it multi-labelled? In which case, what takes priority?
+				# or duplicate it once for each label
+				if len(lbl) > 1: # Priority order loosely based on signal clarity
 					if StellarClasses.ECLIPSE in lbl:
 						fitlabels.append('transit/eclipse')
 					elif StellarClasses.RRLYR_CEPHEID in lbl:
@@ -224,5 +209,8 @@ class MetaClassifier(BaseClassifier):
 					#then convert to str
 					fitlabels.append(lbl[0].value)
 			else:
-				fitlabels.append(lbl[0].value)
+				try:
+					fitlabels.append(lbl.value)
+				except:
+					fitlabels.append(lbl[0].value)
 		return np.array(fitlabels)

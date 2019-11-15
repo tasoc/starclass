@@ -13,14 +13,13 @@ import logging
 from timeit import default_timer
 import starclass
 
-#----------------------------------------------------------------------------------------------
-if __name__ == '__main__':
-
+#--------------------------------------------------------------------------------------------------
+def main():
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Utility function for running stellar classifiers.')
 	parser.add_argument('-c', '--classifier', help='Classifier to use.', default='rfgc', choices=('rfgc', 'slosh', 'foptics', 'xgb', 'meta'))
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
-	parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
+	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
@@ -99,7 +98,7 @@ if __name__ == '__main__':
 			lc.plot()
 
 			res = task.copy()
-			
+
 			tic_predict = default_timer()
 			res['starclass_results'] = stcl.classify(features)
 			toc_predict = default_timer()
@@ -112,3 +111,7 @@ if __name__ == '__main__':
 				'elaptime': toc_predict - tic_predict
 			})
 			tm.save_results(res)
+
+#--------------------------------------------------------------------------------------------------
+if __name__ == '__main__':
+	main()

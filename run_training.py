@@ -18,7 +18,7 @@ def main():
 	parser = argparse.ArgumentParser(description='Utility function for training stellar classifiers.')
 	parser.add_argument('-c', '--classifier', help='Classifier to train.', default='rfgc', choices=('rfgc', 'slosh', 'foptics', 'xgb', 'meta'))
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
-	parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
+	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9', choices=('tdasim', 'keplerq9', 'keplerq9-linfit'))
 	parser.add_argument('-tf', '--testfraction', help='Test-set fraction', type=float, default=0.0)
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
@@ -60,7 +60,7 @@ def main():
 
 	# Settings to be passed onto the selected training set:
 	tset_settings = {
-		'datalevel': args.datalevel,
+		'datalevel': 'corr',
 		'tf': args.testfraction,
 	}
 

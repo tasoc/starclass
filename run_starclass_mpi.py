@@ -38,7 +38,7 @@ def main():
 	parser = argparse.ArgumentParser(description='Run TESS Corrections in parallel using MPI.')
 	parser.add_argument('-c', '--classifier', help='Classifier to use.', default=None, choices=('rfgc', 'slosh', 'foptics', 'xgb', 'meta'))
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
-	parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
+	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
@@ -172,11 +172,11 @@ def main():
 
 						fname = os.path.join(input_folder, task['lightcurve'])
 						features = stcl.load_star(task, fname)
-						
+
 						tic_predict = default_timer()
 						result['starclass_results'] = stcl.classify(features)
 						toc_predict = default_timer()
-						
+
 						result['elaptime'] = toc_predict - tic_predict
 						result['status'] = starclass.STATUS.OK
 					except:

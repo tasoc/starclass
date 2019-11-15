@@ -8,8 +8,6 @@ Utility function for running classifiers.
 
 import argparse
 import logging
-import numpy as np
-import os.path
 import starclass
 
 #----------------------------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# flake8: noqa
 
 from .training_set import TrainingSet
 from .tda_simulations import tda_simulations

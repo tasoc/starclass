@@ -253,7 +253,7 @@ class BaseClassifier(object):
 		if self.classifier_key != 'meta':
 
 			# Load lightcurve file and create a TessLightCurve object:
-			if fname.endswith('.noisy') or fname.endswith('.sysnoise') or fname.endswith('.txt'):
+			if fname.endswith('.noisy') or fname.endswith('.sysnoise') or fname.endswith('.txt') or fname.endswith('.clean'):
 				data = np.loadtxt(fname)
 				if data.shape[1] == 4:
 					quality = np.asarray(data[:,3], dtype='int32')

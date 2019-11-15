@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
+Training Sets.
 
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
 import numpy as np
+from bottleneck import nanmedian, nanvar
 import os
 import requests
 import zipfile
@@ -14,7 +16,7 @@ import logging
 import tempfile
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
-from .. import BaseClassifier, TaskManager
+from .. import BaseClassifier, TaskManager, utilities
 
 #----------------------------------------------------------------------------------------------
 class TrainingSet(object):
@@ -23,8 +25,12 @@ class TrainingSet(object):
 
 		# Basic checks of input:
 		if tf < 0 or tf >= 1:
-			raise ValueError("Invalid testfraction provided")
+			raise ValueError("Invalid TESTFRACTION provided.")
 
+		if datalevel not in ('corr', 'raw', 'clean'):
+			raise ValueError("Invalid DATALEVEL provided.")
+
+		# Store input:
 		self.datalevel = datalevel
 		self.testfraction = tf
 
@@ -53,6 +59,14 @@ class TrainingSet(object):
 		# Cross Validation
 		self.fold = 0
 		self.crossval_folds = 0
+
+	#----------------------------------------------------------------------------------------------
+	def __str__(self):
+		return "<TrainingSet({key:s}, {datalevel:s}, tf={tf:.2f})>".format(
+			key=self.key,
+			datalevel=self.datalevel,
+			tf=self.testfraction
+		)
 
 	#----------------------------------------------------------------------------------------------
 	def folds(self, n_splits=5, tf=0.2):
@@ -120,6 +134,12 @@ class TrainingSet(object):
 
 		input_folder = os.path.join(INPUT_DIR, tset)
 
+		tqdm_settings = {
+			'unit': 'KB',
+			'unit_scale': True,
+			'disable': not logger.isEnabledFor(logging.INFO)
+		}
+
 		if not os.path.exists(input_folder):
 			logger.info("Downloading training set...")
 			zip_tmp = os.path.join(input_folder, tset + '.zip')
@@ -131,10 +151,11 @@ class TrainingSet(object):
 				total_size = int(res.headers.get('content-length', 0));
 				block_size = 1024
 				with open(zip_tmp, 'wb') as fid:
-					for data in tqdm(res.iter_content(block_size), total=np.ceil(total_size/block_size), unit='KB', unit_scale=True):
+					for data in tqdm(res.iter_content(block_size), total=np.ceil(total_size/block_size), **tqdm_settings):
 						fid.write(data)
 
 				# Extract ZIP file:
+				logger.info("Unpacking training set...")
 				with zipfile.ZipFile(zip_tmp, 'r') as zip:
 					zip.extractall(input_folder)
 
@@ -152,6 +173,113 @@ class TrainingSet(object):
 	#----------------------------------------------------------------------------------------------
 	def generate_todolist(self):
 		raise NotImplementedError()
+
+	#----------------------------------------------------------------------------------------------
+	def generate_todolist_structure(self, conn):
+
+		cursor = conn.cursor()
+		cursor.execute("PRAGMA foreign_keys=ON;")
+
+		cursor.execute("""CREATE TABLE todolist (
+			priority INTEGER PRIMARY KEY NOT NULL,
+			starid BIGINT NOT NULL,
+			datasource TEXT NOT NULL DEFAULT 'ffi',
+			camera INTEGER NOT NULL,
+			ccd INTEGER NOT NULL,
+			method TEXT DEFAULT NULL,
+			tmag REAL,
+			status INTEGER DEFAULT NULL,
+			corr_status INTEGER DEFAULT NULL,
+			cbv_area INTEGER NOT NULL
+		);""")
+		cursor.execute("CREATE INDEX status_idx ON todolist (status);")
+		cursor.execute("CREATE INDEX corr_status_idx ON todolist (corr_status);")
+		cursor.execute("CREATE INDEX starid_idx ON todolist (starid);")
+
+		cursor.execute("""CREATE TABLE diagnostics_corr (
+			priority INTEGER PRIMARY KEY NOT NULL,
+			lightcurve TEXT,
+			elaptime REAL,
+			worker_wait_time REAL,
+			variance REAL,
+			rms_hour REAL,
+			ptp REAL,
+			errors TEXT,
+			FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
+		);""")
+
+		cursor.execute("""CREATE TABLE datavalidation_corr (
+			priority INTEGER PRIMARY KEY NOT NULL,
+			approved BOOLEAN NOT NULL,
+			dataval INTEGER NOT NULL,
+			FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
+		);""")
+		cursor.execute("CREATE INDEX datavalidation_corr_approved_idx ON datavalidation_corr (approved);")
+
+		conn.commit()
+
+	#----------------------------------------------------------------------------------------------
+	def generate_todolist_insert(self, cursor, priority=None, starid=None, tmag=None,
+		lightcurve=None, datasource=None, variance=None, rms_hour=None, ptp=None):
+
+		if priority is None:
+			raise ValueError("priority is required")
+		if starid is None:
+			starid = priority
+
+		# Try to load the lightcurve using the BaseClassifier method.
+		# This will ensure that the lightcurve can actually be read by the system.
+		if not all([datasource, variance, rms_hour, ptp]):
+			with BaseClassifier(tset_key=self.key, features_cache=None) as bc:
+				print(os.path.join(self.input_folder, lightcurve))
+				fake_task = {
+					'priority': priority,
+					'starid': starid
+				}
+				features = bc.load_star(fake_task, os.path.join(self.input_folder, lightcurve))
+				lc = features['lightcurve']
+
+		elaptime = np.random.normal(3.14, 0.5)
+		if tmag is None:
+			tmag = -99
+		if variance is None:
+			variance = nanvar(lc.flux, ddof=1)
+		if rms_hour is None:
+			rms_hour = utilities.rms_timescale(lc)
+		if ptp is None:
+			ptp = nanmedian(np.abs(np.diff(lc.flux)))
+
+		if datasource is None:
+			if (lc.time[1] - lc.time[0])*86400 > 1000:
+				datasource = 'ffi'
+			else:
+				datasource = 'tpf'
+
+		#camera = 1
+		#if ecllat < 6+24:
+		#	camera = 1
+		#elif ecllat < 6+2*24:
+		#	camera = 2
+		#elif ecllat < 6+3*24:
+		#	camera = 3
+		#else:
+		#	camera = 4
+
+		cursor.execute("INSERT INTO todolist (priority,starid,tmag,datasource,status,corr_status,camera,ccd,cbv_area) VALUES (?,?,?,?,1,1,1,1,111);", (
+			priority,
+			starid,
+			tmag,
+			datasource
+		))
+		cursor.execute("INSERT INTO diagnostics_corr (priority,lightcurve,elaptime,variance,rms_hour,ptp) VALUES (?,?,?,?,?,?);", (
+			priority,
+			lightcurve,
+			elaptime,
+			variance,
+			rms_hour,
+			ptp
+		))
+		cursor.execute("INSERT INTO datavalidation_corr (priority,approved,dataval) VALUES (?,1,0);", (priority,))
 
 	#----------------------------------------------------------------------------------------------
 	def features(self):

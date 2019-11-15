@@ -225,79 +225,98 @@ class BaseClassifier(object):
 		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + self.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 
-
 	def load_star(self, task, fname):
-		"""Recieve a task from the TaskManager and load the lightcurve."""
+		"""
+		Recieve a task from the TaskManager, loads the lightcurve and returns derived features.
+
+		Parameters:
+			task (dict):
+			fname (string):
+
+		Returns:
+			dict: Dictionary with features.
+
+		See Also:
+			:py:func:`TaskManager.get_task`
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 
 		logger = logging.getLogger(__name__)
 
-		# Load lightcurve file and create a TessLightCurve object:
-		if fname.endswith('.noisy') or fname.endswith('.sysnoise') or fname.endswith('.txt'):
-			data = np.loadtxt(fname)
-			if data.shape[1] == 4:
-				quality = np.asarray(data[:,3], dtype='int32')
-			else:
-				quality = np.zeros(data.shape[0], dtype='int32')
+		# Define variables used below:
+		features = {}
+		save_to_cache = False
 
-			lightcurve = TessLightCurve(
-				time=data[:,0],
-				flux=data[:,1],
-				flux_err=data[:,2],
-				quality=quality,
-				time_format='jd',
-				time_scale='tdb',
-				targetid=task['starid'],
-				camera=1,
-				ccd=1,
-				sector=2,
-				#ra=0,
-				#dec=0,
-				quality_bitmask=2+8+256, # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK,
-				meta={}
-			)
+		# The Meta-classifier is only using features from the other classifiers,
+		# so there is no reason to load lightcurves and calculate/load any other classifiers:
+		if self.classifier_key != 'meta':
 
-		elif fname.endswith('.fits') or fname.endswith('.fits.gz'):
-			with fits.open(fname, mode='readonly', memmap=True) as hdu:
+			# Load lightcurve file and create a TessLightCurve object:
+			if fname.endswith('.noisy') or fname.endswith('.sysnoise') or fname.endswith('.txt'):
+				data = np.loadtxt(fname)
+				if data.shape[1] == 4:
+					quality = np.asarray(data[:,3], dtype='int32')
+				else:
+					quality = np.zeros(data.shape[0], dtype='int32')
+
 				lightcurve = TessLightCurve(
-					time=hdu['LIGHTCURVE'].data['TIME'],
-					flux=hdu['LIGHTCURVE'].data['FLUX_CORR'],
-					flux_err=hdu['LIGHTCURVE'].data['FLUX_CORR_ERR'],
-					flux_unit=cds.ppm,
-					centroid_col=hdu['LIGHTCURVE'].data['MOM_CENTR1'],
-					centroid_row=hdu['LIGHTCURVE'].data['MOM_CENTR2'],
-					quality=np.asarray(hdu['LIGHTCURVE'].data['QUALITY'], dtype='int32'),
-					cadenceno=np.asarray(hdu['LIGHTCURVE'].data['CADENCENO'], dtype='int32'),
-					time_format='btjd',
+					time=data[:,0],
+					flux=data[:,1],
+					flux_err=data[:,2],
+					quality=quality,
+					time_format='jd',
 					time_scale='tdb',
-					targetid=hdu[0].header.get('TICID'),
-					label=hdu[0].header.get('OBJECT'),
-					camera=hdu[0].header.get('CAMERA'),
-					ccd=hdu[0].header.get('CCD'),
-					sector=hdu[0].header.get('SECTOR'),
-					ra=hdu[0].header.get('RA_OBJ'),
-					dec=hdu[0].header.get('DEC_OBJ'),
-					quality_bitmask=2+8+256, # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK
+					targetid=task['starid'],
+					camera=1,
+					ccd=1,
+					sector=2,
+					#ra=0,
+					#dec=0,
+					quality_bitmask=2+8+256, # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK,
 					meta={}
 				)
 
-		else:
-			raise ValueError("Invalid file format")
+			elif fname.endswith('.fits') or fname.endswith('.fits.gz'):
+				with fits.open(fname, mode='readonly', memmap=True) as hdu:
+					lightcurve = TessLightCurve(
+						time=hdu['LIGHTCURVE'].data['TIME'],
+						flux=hdu['LIGHTCURVE'].data['FLUX_CORR'],
+						flux_err=hdu['LIGHTCURVE'].data['FLUX_CORR_ERR'],
+						flux_unit=cds.ppm,
+						centroid_col=hdu['LIGHTCURVE'].data['MOM_CENTR1'],
+						centroid_row=hdu['LIGHTCURVE'].data['MOM_CENTR2'],
+						quality=np.asarray(hdu['LIGHTCURVE'].data['QUALITY'], dtype='int32'),
+						cadenceno=np.asarray(hdu['LIGHTCURVE'].data['CADENCENO'], dtype='int32'),
+						time_format='btjd',
+						time_scale='tdb',
+						targetid=hdu[0].header.get('TICID'),
+						label=hdu[0].header.get('OBJECT'),
+						camera=hdu[0].header.get('CAMERA'),
+						ccd=hdu[0].header.get('CCD'),
+						sector=hdu[0].header.get('SECTOR'),
+						ra=hdu[0].header.get('RA_OBJ'),
+						dec=hdu[0].header.get('DEC_OBJ'),
+						quality_bitmask=2+8+256, # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK
+						meta={}
+					)
 
-		# Load features from cache file, or calculate them
-		# and put them into cache file for other classifiers
-		# to use later on:
-		features = None
-		loaded_from_cache = False
-		if self.features_cache:
-			features_file = os.path.join(self.features_cache, 'features-' + str(task['priority']) + '.pickle')
-			if os.path.exists(features_file):
-				loaded_from_cache = True
-				features = loadPickle(features_file)
+			else:
+				raise ValueError("Invalid file format")
 
-		# No features found in cache, so calculate them:
-		if features is None:
-			features = self.calc_features(lightcurve)
-			logger.debug(features)
+			# Load features from cache file, or calculate them
+			# and put them into cache file for other classifiers
+			# to use later on:
+			if self.features_cache:
+				features_file = os.path.join(self.features_cache, 'features-' + str(task['priority']) + '.pickle')
+				if os.path.exists(features_file):
+					features = loadPickle(features_file)
+
+			# No features found in cache, so calculate them:
+			if not features:
+				save_to_cache = True
+				features = self.calc_features(lightcurve)
+				logger.debug(features)
 
 		# Add the fields from the task to the list of features:
 		features['priority'] = task['priority']
@@ -307,7 +326,7 @@ class BaseClassifier(object):
 				features[key] = task[key]
 
 		# Save features in cache file for later use:
-		if self.features_cache and not loaded_from_cache:
+		if save_to_cache and self.features_cache:
 			savePickle(features_file, features)
 
 		return features

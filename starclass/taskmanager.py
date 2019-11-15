@@ -93,7 +93,7 @@ class TaskManager(object):
 		self.cursor.execute("CREATE INDEX IF NOT EXISTS corr_status_idx ON todolist (corr_status);")
 
 		# Find out if data-validation information exists:
-		self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='datavalidataion_corr';")
+		self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='datavalidation_corr';")
 		self.datavalidation_exists = (self.cursor.fetchone() is not None)
 		if not self.datavalidation_exists:
 			self.logger.warning("DATA-VALIDATION information is not available in this TODO-file. Assuming all targets are good.")

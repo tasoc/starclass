@@ -217,38 +217,6 @@ class RFGCClassifier(BaseClassifier):
 					logger.info("Saving SOM to '%s'", self.somfile)
 					self.save(self.clfile, self.somfile)
 
-
-	def parse_labels(self,labels,removeduplicates=False):
-		"""
-		"""
-		fitlabels = []
-		for lbl in labels:
-			if removeduplicates:
-				#is it multi-labelled? In which case, what takes priority?
-				#or duplicate it once for each label
-				if len(lbl)>1:#Priority order loosely based on signal clarity
-					if StellarClasses.ECLIPSE in lbl:
-						fitlabels.append('transit/eclipse')
-					elif StellarClasses.RRLYR_CEPHEID in lbl:
-						fitlabels.append('RRLyr/Ceph')
-					elif StellarClasses.CONTACT_ROT in lbl:
-						fitlabels.append('contactEB/spots')
-					elif StellarClasses.DSCT_BCEP in lbl:
-						fitlabels.append('dSct/bCep')
-					elif StellarClasses.GDOR_SPB in lbl:
-						fitlabels.append('gDor/spB')
-					elif StellarClasses.SOLARLIKE in lbl:
-						fitlabels.append('solar')
-					else:
-						fitlabels.append(lbl[0].value)
-				else:
-					#then convert to str
-					fitlabels.append(lbl[0].value)
-			else:
-				fitlabels.append(lbl[0].value)
-		return np.array(fitlabels)
-
-
 	def loadsom(self, somfile, dimx=1, dimy=400, cardinality=64):
 		"""
 		Loads a SOM, if not done at init.

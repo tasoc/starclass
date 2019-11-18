@@ -358,3 +358,33 @@ class BaseClassifier(object):
 		features.update(FliPer(psd))
 
 		return features
+
+	def parse_labels(self, labels):
+		"""
+		Convert iterator of labels into full numpy array, with only one label per star.
+
+		TODO: Make aware of self.level
+		TODO: How do we handle multiple labels better?
+		"""
+		fitlabels = []
+		for lbl in labels:
+			# Is it multi-labelled? In which case, what takes priority?
+			# Priority order loosely based on signal clarity
+			if len(lbl) > 1:
+				if StellarClasses.ECLIPSE in lbl:
+					fitlabels.append(StellarClasses.ECLIPSE.value)
+				elif StellarClasses.RRLYR_CEPHEID in lbl:
+					fitlabels.append(StellarClasses.RRLYR_CEPHEID.value)
+				elif StellarClasses.CONTACT_ROT in lbl:
+					fitlabels.append(StellarClasses.CONTACT_ROT.value)
+				elif StellarClasses.DSCT_BCEP in lbl:
+					fitlabels.append(StellarClasses.DSCT_BCEP.value)
+				elif StellarClasses.GDOR_SPB in lbl:
+					fitlabels.append(StellarClasses.GDOR_SPB.value)
+				elif StellarClasses.SOLARLIKE in lbl:
+					fitlabels.append(StellarClasses.SOLARLIKE.value)
+				else:
+					fitlabels.append(lbl[0].value)
+			else:
+				fitlabels.append(lbl[0].value)
+		return np.array(fitlabels)

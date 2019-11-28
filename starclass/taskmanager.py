@@ -150,7 +150,7 @@ class TaskManager(object):
 		# which passed the data validation:
 		if self.datavalidation_exists:
 			search_joins.append("INNER JOIN datavalidation_corr ON datavalidation_corr.priority=todolist.priority")
-			search_query.append("datavalidataion_corr.approved=1")
+			search_query.append("datavalidation_corr.approved=1")
 
 		# If a classifier is specified, constrain to only that classifier:
 		if classifier is not None:

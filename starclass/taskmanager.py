@@ -138,6 +138,10 @@ class TaskManager(object):
 		search_joins = []
 		search_query = []
 
+		# TODO: Is this right?
+		if classifier is None and priority is None:
+			raise ValueError("This will just give the same again and again")
+
 		# Build list of constrainits:
 		if priority is not None:
 			search_query.append('todolist.priority=%d' % priority)
@@ -145,8 +149,15 @@ class TaskManager(object):
 		# If data-validation information is available, only include targets
 		# which passed the data validation:
 		if self.datavalidation_exists:
-			search_joins.append("INNER JOIN datavalidation_corr ON datavalidation_corr.prioriry=todolist.priority")
+			search_joins.append("INNER JOIN datavalidation_corr ON datavalidation_corr.priority=todolist.priority")
 			search_query.append("datavalidataion_corr.approved=1")
+
+		# If a classifier is specified, constrain to only that classifier:
+		if classifier is not None:
+			search_joins.append("LEFT JOIN starclass_diagnostics ON starclass_diagnostics.priority=todolist.priority AND starclass_diagnostics.classifier='{classifier:s}'".format(
+				classifier=classifier
+			))
+			search_query.append("starclass_diagnostics.status IS NULL")
 
 		# Build query string:
 		if search_joins:
@@ -167,12 +178,10 @@ class TaskManager(object):
 				diagnostics_corr.lightcurve AS lightcurve
 			FROM
 				todolist
-				{joins:s}
 				INNER JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority
-				LEFT JOIN starclass_diagnostics ON todolist.priority=starclass_diagnostics.priority AND starclass_diagnostics.classifier='{classifier:s}'
+				{joins:s}
 			WHERE
 				todolist.corr_status=1
-				AND starclass_diagnostics.status IS NULL
 				{constraints:s}
 			ORDER BY todolist.priority LIMIT 1;""".format(
 			joins=search_joins,

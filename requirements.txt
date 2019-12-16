@@ -5,6 +5,6 @@ scikit-learn
 Bottleneck == 1.2.1
 requests
 keras
-tensorflow == 1.13.1
+tensorflow == 1.15.0
 Pillow
 xgboost

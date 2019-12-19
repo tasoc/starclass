@@ -34,8 +34,6 @@ before_install:
   - sudo apt-get update && sudo apt-get install libgomp1
 install:
   - pip install --upgrade pip
-  - pip uninstall numpy Bottleneck -y
-  - pip install numpy==1.15.4 --no-cache-dir
   - pip install -r requirements.txt
   - pip install codecov pytest-cov
 script:

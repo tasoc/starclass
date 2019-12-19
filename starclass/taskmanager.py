@@ -62,6 +62,11 @@ class TaskManager(object):
 		self.cursor.execute("PRAGMA locking_mode=EXCLUSIVE;")
 		self.cursor.execute("PRAGMA journal_mode=TRUNCATE;")
 
+		# Find out if corrections have been run:
+		self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
+		if self.cursor.fetchone() is None:
+			raise ValueError("The TODO-file does not contain diagnostics_corr. Are you sure corrections have been run?")
+
 		# Reset the status of everything for a new run:
 		if overwrite:
 			self.cursor.execute("DROP TABLE IF EXISTS starclass_diagnostics;")
@@ -108,22 +113,32 @@ class TaskManager(object):
 			try:
 				self.conn.isolation_level = None
 				self.cursor.execute("VACUUM;")
-			except:
-				raise
 			finally:
 				self.conn.isolation_level = ''
 
+	#----------------------------------------------------------------------------------------------
 	def close(self):
 		"""Close TaskManager and all associated objects."""
-		self.cursor.close()
-		self.conn.close()
+		if hasattr(self, 'cursor'):
+			try:
+				self.cursor.close()
+			except sqlite3.ProgrammingError:
+				pass
+		if hasattr(self, 'conn') and self.conn: self.conn.close()
 
+	#----------------------------------------------------------------------------------------------
+	def __del__(self):
+		self.close()
+
+	#----------------------------------------------------------------------------------------------
 	def __exit__(self, *args):
 		self.close()
 
+	#----------------------------------------------------------------------------------------------
 	def __enter__(self):
 		return self
 
+	#----------------------------------------------------------------------------------------------
 	def get_number_tasks(self):
 		"""
 		Get number of tasks due to be processed.
@@ -133,6 +148,7 @@ class TaskManager(object):
 		"""
 		raise NotImplementedError()
 
+	#----------------------------------------------------------------------------------------------
 	def _query_task(self, classifier=None, priority=None):
 
 		search_joins = []
@@ -142,7 +158,7 @@ class TaskManager(object):
 		if classifier is None and priority is None:
 			raise ValueError("This will just give the same again and again")
 
-		# Build list of constrainits:
+		# Build list of constraints:
 		if priority is not None:
 			search_query.append('todolist.priority=%d' % priority)
 
@@ -185,8 +201,7 @@ class TaskManager(object):
 				{constraints:s}
 			ORDER BY todolist.priority LIMIT 1;""".format(
 			joins=search_joins,
-			constraints=search_query,
-			classifier=classifier
+			constraints=search_query
 		))
 		task = self.cursor.fetchone()
 		if task:
@@ -217,21 +232,26 @@ class TaskManager(object):
 			return task
 		return None
 
+	#----------------------------------------------------------------------------------------------
 	def get_task(self, priority=None, classifier=None, change_classifier=True):
 		"""
 		Get next task to be processed.
 
 		Parameters:
-			classifier (string, optional): Classifier to get next task for.
-				If no tasks are available for this classifier, a task for
-				another classifier will be returned.
+			priority (integer):
+			classifier (string): Classifier to get next task for.
+				If no tasks are available for this classifier, and `change_classifier=True`,
+				a task for another classifier will be returned.
+			change_classifier (boolean): Return task for another classifier
+				if there are no more tasks for the provided classifier.
+				Default=True.
 
 		Returns:
 			dict or None: Dictionary of settings for task.
 		"""
 
 		task = None
-		task = self._query_task(classifier, priority=priority)
+		task = self._query_task(classifier=classifier, priority=priority)
 
 		# If no task is returned for the given classifier, find another
 		# classifier where tasks are available:
@@ -240,7 +260,7 @@ class TaskManager(object):
 			# task for all of them:
 			all_tasks = []
 			for cl in set(self.all_classifiers).difference([classifier]):
-				task = self._query_task(cl, priority=priority)
+				task = self._query_task(classifier=cl, priority=priority)
 				if task is not None:
 					all_tasks.append(task)
 
@@ -251,6 +271,7 @@ class TaskManager(object):
 
 		return task
 
+	#----------------------------------------------------------------------------------------------
 	def save_results(self, result):
 		"""
 		Save results and diagnostics. This will update the TODO list.
@@ -297,6 +318,7 @@ class TaskManager(object):
 			self.conn.rollback()
 			raise
 
+	#----------------------------------------------------------------------------------------------
 	def start_task(self, task):
 		"""
 		Mark a task as STARTED in the TODO-list.

@@ -16,7 +16,6 @@ def test_baseclassifier_import():
 	with BaseClassifier() as cl:
 		assert(cl.__class__.__name__ == 'BaseClassifier')
 
-
 #----------------------------------------------------------------------
 if __name__ == '__main__':
 	test_baseclassifier_import()

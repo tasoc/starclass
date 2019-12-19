@@ -73,24 +73,25 @@ def test_keplerq9linfit():
 		tset = tsets.keplerq9linfit(datalevel='nonsense')
 
 #----------------------------------------------------------------------
-def disabled_test_tdasim():
+#@pytest.mark.skip()
+@pytest.mark.parametrize('datalevel', ['corr', 'raw', 'clean'])
+def disabled_test_tdasim(datalevel):
 
-	for datalevel in ('corr', 'raw', 'clean'):
-		for testfraction in (0, 0.2):
-			tset = tsets.tda_simulations(datalevel=datalevel, tf=testfraction)
-			print(tset)
+	for testfraction in (0, 0.2):
+		tset = tsets.tda_simulations(datalevel=datalevel, tf=testfraction)
+		print(tset)
 
-			assert tset.key == 'tdasim'
-			assert tset.datalevel == datalevel
-			assert tset.testfraction == testfraction
+		assert tset.key == 'tdasim'
+		assert tset.datalevel == datalevel
+		assert tset.testfraction == testfraction
 
-		# Test-fractions which should all return in a ValueError:
-		with pytest.raises(ValueError):
-			tset = tsets.tda_simulations(datalevel=datalevel, tf=1.2)
-		with pytest.raises(ValueError):
-			tset = tsets.tda_simulations(datalevel=datalevel, tf=1.0)
-		with pytest.raises(ValueError):
-			tset = tsets.tda_simulations(datalevel=datalevel, tf=-0.2)
+	# Test-fractions which should all return in a ValueError:
+	with pytest.raises(ValueError):
+		tset = tsets.tda_simulations(datalevel=datalevel, tf=1.2)
+	with pytest.raises(ValueError):
+		tset = tsets.tda_simulations(datalevel=datalevel, tf=1.0)
+	with pytest.raises(ValueError):
+		tset = tsets.tda_simulations(datalevel=datalevel, tf=-0.2)
 
 	# Calling with invalid datalevel should throw an error as well:
 	with pytest.raises(ValueError):
@@ -100,4 +101,6 @@ def disabled_test_tdasim():
 if __name__ == '__main__':
 	test_keplerq9()
 	test_keplerq9linfit()
-	#test_tdasim()
+	#test_tdasim('corr')
+	#test_tdasim('raw')
+	#test_tdasim('clean')

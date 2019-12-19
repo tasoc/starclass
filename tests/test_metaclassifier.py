@@ -16,7 +16,6 @@ def test_metaclassifier_import():
 	with MetaClassifier() as cl:
 		assert(cl.__class__.__name__ == 'MetaClassifier')
 
-
 #----------------------------------------------------------------------
 if __name__ == '__main__':
 	test_metaclassifier_import()

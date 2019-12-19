@@ -16,7 +16,6 @@ def test_xgbclassifier_import():
 	with XGBClassifier() as cl:
 		assert(cl.__class__.__name__ == 'XGBClassifier')
 
-
 #----------------------------------------------------------------------
 if __name__ == '__main__':
 	test_xgbclassifier_import()

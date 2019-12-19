@@ -44,6 +44,7 @@ def test_keplerq9():
 		tset = tsets.keplerq9(datalevel='nonsense')
 
 #----------------------------------------------------------------------
+@pytest.mark.skip()
 def test_keplerq9linfit():
 
 	for testfraction in (0, 0.2):
@@ -73,9 +74,9 @@ def test_keplerq9linfit():
 		tset = tsets.keplerq9linfit(datalevel='nonsense')
 
 #----------------------------------------------------------------------
-#@pytest.mark.skip()
+@pytest.mark.skip()
 @pytest.mark.parametrize('datalevel', ['corr', 'raw', 'clean'])
-def disabled_test_tdasim(datalevel):
+def test_tdasim(datalevel):
 
 	for testfraction in (0, 0.2):
 		tset = tsets.tda_simulations(datalevel=datalevel, tf=testfraction)
@@ -101,6 +102,6 @@ def disabled_test_tdasim(datalevel):
 if __name__ == '__main__':
 	test_keplerq9()
 	test_keplerq9linfit()
-	#test_tdasim('corr')
-	#test_tdasim('raw')
-	#test_tdasim('clean')
+	test_tdasim('corr')
+	test_tdasim('raw')
+	test_tdasim('clean')

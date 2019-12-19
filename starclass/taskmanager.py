@@ -197,9 +197,11 @@ class TaskManager(object):
 				INNER JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority
 				{joins:s}
 			WHERE
-				todolist.corr_status=1
+				todolist.corr_status IN ({ok:d},{warning:d})
 				{constraints:s}
 			ORDER BY todolist.priority LIMIT 1;""".format(
+			ok=STATUS.OK.value,
+			warning=STATUS.WARNING.value,
 			joins=search_joins,
 			constraints=search_query
 		))

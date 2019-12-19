@@ -1,0 +1,161 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Tests of starclass.TaskManager.
+
+.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+"""
+
+import pytest
+import sys
+import os.path
+from astropy.table import Table
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from starclass import TaskManager, STATUS, StellarClasses
+
+#--------------------------------------------------------------------------------------------------
+def test_taskmanager_get_tasks():
+	"""Test of TaskManager"""
+
+	# Load the first image in the input directory:
+	INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
+
+	# Find the shape of the original image:
+	with TaskManager(INPUT_DIR, overwrite=True) as tm:
+		# Get the number of tasks:
+		with pytest.raises(NotImplementedError):
+			tm.get_number_tasks()
+		#print(numtasks)
+		#assert(numtasks == 168642)
+
+		# In STARCLASS, we have to ask with either a priority or a classifier as input:
+		with pytest.raises(ValueError):
+			tm.get_task()
+
+		# Get the first task in the TODO file:
+		task1 = tm.get_task(classifier='slosh')
+		print(task1)
+
+		# Check that it contains what we know it should:
+		# The first priority in the TODO file is the following:
+		assert task1['priority'] == 17
+		assert task1['starid'] == 29281992
+		assert task1['lightcurve'] == 'ffi/00029/tess00029281992-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz'
+		assert task1['classifier'] == 'slosh'
+
+		# Start task with priority=1:
+		tm.start_task(task1)
+
+		# Get the next task, which should be the one with priority=2:
+		task2 = tm.get_task(classifier='slosh')
+		print(task2)
+
+		assert task2['priority'] == 26
+		assert task2['starid'] == 29859905
+		assert task2['lightcurve'] == 'ffi/00029/tess00029859905-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz'
+		assert task2['classifier'] == 'slosh'
+
+		# Check that the status did actually change in the todolist:
+		tm.cursor.execute("SELECT status FROM starclass_diagnostics WHERE priority=?;", (task1['priority'],))
+		task1_status = tm.cursor.fetchone()['status']
+		print(task1_status)
+
+		assert task1_status == STATUS.STARTED.value
+
+#--------------------------------------------------------------------------------------------------
+def test_taskmanager_get_tasks_priority():
+	"""Test of TaskManager.get_tasks with priority"""
+
+	# Load the first image in the input directory:
+	INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
+
+	with TaskManager(INPUT_DIR, overwrite=True) as tm:
+		task = tm.get_task(priority=17)
+		assert task['priority'] == 17
+
+		# Call with non-existing starid:
+		task = tm.get_task(priority=-1234567890)
+		assert task is None
+
+#--------------------------------------------------------------------------------------------------
+def test_taskmanager_invalid():
+	"""Test of TaskManager with invalid TODO-file input."""
+
+	# Load the first image in the input directory:
+	INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
+
+	with pytest.raises(FileNotFoundError):
+		TaskManager(os.path.join(INPUT_DIR, 'does-not-exists'))
+
+#--------------------------------------------------------------------------------------------------
+def test_taskmanager_switch_classifier():
+	"""Test of TaskManager - Automatic switching between classifiers."""
+
+	# Load the first image in the input directory:
+	INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
+
+	# Find the shape of the original image:
+	with TaskManager(INPUT_DIR, overwrite=True) as tm:
+
+		tm.cursor.execute("INSERT INTO starclass_diagnostics (priority,classifier,status) SELECT priority,'slosh',1 FROM todolist;")
+		tm.cursor.execute("DELETE FROM starclass_diagnostics WHERE priority=17;")
+		tm.conn.commit()
+
+		# Get the first task in the TODO file:
+		task1 = tm.get_task(classifier='slosh')
+		print(task1)
+
+		# It should be the only missing task with SLOSH:
+		assert task1['priority'] == 17
+		assert task1['classifier'] == 'slosh'
+
+		# Start task with priority=1:
+		tm.start_task(task1)
+
+		# Get the next task, which should be the one with priority=2:
+		task2 = tm.get_task(classifier='slosh')
+		print(task2)
+
+		# We should now get the highest priority target, but not with SLOSH:
+		assert task2['priority'] == 17
+		assert task2['classifier'] and task2['classifier'] != 'slosh'
+
+#--------------------------------------------------------------------------------------------------
+def test_taskmanager_meta_classifier():
+	"""Test of TaskManager when running with MetaClassifier"""
+
+	# Load the first image in the input directory:
+	INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
+
+	# Find the shape of the original image:
+	with TaskManager(INPUT_DIR, overwrite=True) as tm:
+
+		tm.cursor.execute("INSERT INTO starclass_diagnostics (priority,classifier,status) VALUES (17,'slosh',1);")
+		tm.cursor.execute("INSERT INTO starclass_results (priority,classifier,class,prob) VALUES (17,'slosh',?, 0.2);", (StellarClasses.SOLARLIKE.name,))
+		tm.cursor.execute("INSERT INTO starclass_results (priority,classifier,class,prob) VALUES (17,'slosh',?, 0.1);", (StellarClasses.DSCT_BCEP.name,))
+		tm.cursor.execute("INSERT INTO starclass_results (priority,classifier,class,prob) VALUES (17,'slosh',?, 0.7);", (StellarClasses.ECLIPSE.name,))
+		tm.conn.commit()
+
+		# Get the first task in the TODO file:
+		task1 = tm.get_task(classifier='meta')
+		print(task1)
+
+		# It should be the only missing task with SLOSH:
+		assert task1['priority'] == 17
+		assert task1['classifier'] == 'meta'
+		assert isinstance(task1['other_classifiers'], Table)
+
+		tab = task1['other_classifiers']
+		print(tab)
+
+		assert tab[tab['class'] == StellarClasses.SOLARLIKE]['prob'] == 0.2
+		assert tab[tab['class'] == StellarClasses.DSCT_BCEP]['prob'] == 0.1
+		assert tab[tab['class'] == StellarClasses.ECLIPSE]['prob'] == 0.7
+
+#--------------------------------------------------------------------------------------------------
+if __name__ == '__main__':
+	test_taskmanager_get_tasks()
+	test_taskmanager_get_tasks_priority()
+	test_taskmanager_invalid()
+	test_taskmanager_switch_classifier()
+	test_taskmanager_meta_classifier()

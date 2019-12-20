@@ -27,7 +27,6 @@ jobs:
       language: shell  # 'language: python' is an error on Travis CI Windows
       before_install:
         - choco install python --version 3.6.8
-        - choco install git-lfs
         - python --version
         - python -m pip install --upgrade pip
         - git lfs pull
@@ -38,7 +37,6 @@ jobs:
       language: shell  # 'language: python' is an error on Travis CI Windows
       before_install:
         - choco install python --version 3.7.4
-        - choco install git-lfs
         - python --version
         - python -m pip install --upgrade pip
         - git lfs pull

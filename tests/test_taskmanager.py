@@ -130,13 +130,14 @@ def test_taskmanager_meta_classifier():
 	# Find the shape of the original image:
 	with TaskManager(INPUT_DIR, overwrite=True) as tm:
 
-		tm.cursor.execute("INSERT INTO starclass_diagnostics (priority,classifier,status) VALUES (17,'slosh',1);")
-		tm.cursor.execute("INSERT INTO starclass_results (priority,classifier,class,prob) VALUES (17,'slosh',?, 0.2);", (StellarClasses.SOLARLIKE.name,))
-		tm.cursor.execute("INSERT INTO starclass_results (priority,classifier,class,prob) VALUES (17,'slosh',?, 0.1);", (StellarClasses.DSCT_BCEP.name,))
-		tm.cursor.execute("INSERT INTO starclass_results (priority,classifier,class,prob) VALUES (17,'slosh',?, 0.7);", (StellarClasses.ECLIPSE.name,))
-		tm.conn.commit()
+		# Create fake results from SLOSH:
+		tm.save_results({'priority': 17, 'classifier': 'slosh', 'status': STATUS.OK, 'starclass_results': {
+			StellarClasses.SOLARLIKE: 0.2,
+			StellarClasses.DSCT_BCEP: 0.1,
+			StellarClasses.ECLIPSE: 0.7
+		}})
 
-		# Get the first task in the TODO file:
+		# Get the first task in the TODO file for the MetaClassifier:
 		task1 = tm.get_task(classifier='meta')
 		print(task1)
 

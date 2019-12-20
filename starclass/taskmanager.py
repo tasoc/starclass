@@ -25,7 +25,7 @@ class TaskManager(object):
 		Parameters:
 			todo_file (string): Path to the TODO-file.
 			cleanup (boolean): Perform cleanup/optimization of TODO-file before
-			                   during initialization. Default=False.
+				doing initialization. Default=False.
 			overwrite (boolean): Overwrite any previously calculated results. Default=False.
 
 		Raises:
@@ -176,15 +176,9 @@ class TaskManager(object):
 			search_query.append("starclass_diagnostics.status IS NULL")
 
 		# Build query string:
-		if search_joins:
-			search_joins = "\n".join(search_joins)
-		else:
-			search_joins = ''
-
-		if search_query:
-			search_query = "AND " + " AND ".join(search_query)
-		else:
-			search_query = ''
+		# Note: It is not possible for search_query to be empty!
+		search_joins = "\n".join(search_joins)
+		search_query = "AND " + " AND ".join(search_query)
 
 		self.cursor.execute("""
 			SELECT
@@ -316,7 +310,7 @@ class TaskManager(object):
 				})
 
 			self.conn.commit()
-		except:
+		except: # noqa: E722
 			self.conn.rollback()
 			raise
 
@@ -332,6 +326,6 @@ class TaskManager(object):
 				'status': STATUS.STARTED.value
 			})
 			self.conn.commit()
-		except:
+		except: # noqa: E722
 			self.conn.rollback()
 			raise

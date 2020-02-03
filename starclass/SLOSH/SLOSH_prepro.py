@@ -17,6 +17,7 @@ from keras.regularizers import l2
 from keras.optimizers import Adam
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
+from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle as sklearn_shuffle
 
 class npy_generator(keras.utils.Sequence):
@@ -26,7 +27,8 @@ class npy_generator(keras.utils.Sequence):
     to indicate which files to partition for each set.
     Written by  Marc Hon (mtyh555@uowmail.edu.au)
     """
-    def __init__(self, root, batch_size, dim, extension = '.npz', shuffle = True, indices=[]):
+    def __init__(self, root, batch_size, dim, extension = '.npz', shuffle = True, indices=[],
+                 subset=None, random_seed=42):
         self.root = root # root folder containing subfolders
         self.batch_size = batch_size
         self.extension = extension # file extension
@@ -34,18 +36,35 @@ class npy_generator(keras.utils.Sequence):
         self.subfolder_labels = [] # for binary classification
         self.shuffle = shuffle # shuffles data after every epoch
         self.dim=dim # image/2D array dimensions
+        self.subset = subset # Training subset, validation subset or none
+        self.seed = random_seed # Add random seed to ensure split for validation and training set is the same
+
 
         for dirpath, dirnames, filenames in os.walk(root):
             for file in filenames:
                 if file.endswith(extension) & dirpath[-1].isdigit(): # I infer the class label '0' or '1' according to subfolder names
                     self.filenames.append(os.path.join(dirpath, file))
                     self.subfolder_labels.append(int(dirpath[-1]))
+        # Get labels from filenames
+        labels = np.array([i.split('/')[-2] for i in self.filenames])
         if len(indices) == 0: # otherwise pass a list of training/validation indices
             self.indexes = np.arange(len(self.filenames))
         else:
             self.indexes = np.array(indices)
         if shuffle == True:
-            self.indexes = sklearn_shuffle(self.indexes, random_state=42)
+            self.indexes = sklearn_shuffle(self.indexes, random_state=self.seed)
+        
+        # This is a hacky way to do it, but the only way under the current framework
+        if subset is not None:
+            train_indices, valid_indices = train_test_split(self.indexes, test_size=0.2, stratify=labels)
+            #random_state=self.seed, stratify=labels)
+            if subset == 'train':
+                self.indexes = train_indices
+            elif subset == 'valid':
+                self.indexes = valid_indices
+            else:
+                raise ValueError("subset keyword not set properly")
+        
 
     def __len__(self):
         return int(np.ceil(len(self.indexes) / float(self.batch_size)))
@@ -109,7 +128,7 @@ def squeeze(arr, minval, maxval, axis=0):
     #array is 1D
     minvals = np.ones(arr.shape)*minval
     maxvals = np.ones(arr.shape)*maxval
-
+#
     #assure above minval first
     squeezed = np.max(np.vstack((arr,minvals)),axis=0)
     squeezed = np.min(np.vstack((squeezed,maxvals)),axis=0)
@@ -129,6 +148,17 @@ def ps_to_array(freq, power, nbins=128, supersample=1,
     if supersample == 1, result is strictly black and white (1s and 0s)
     if supersample > 1, returns grayscale image represented spectrum "image" density
     """
+    # 04/01/2020 jsk389 - added edit to scale power by subtracting mean and dividing by
+    # standard deviation
+
+    logpower = np.log10(power)
+    mean_logpower = np.mean(logpower)
+    std_logpower = np.std(logpower)
+    logpower = (logpower - mean_logpower) / std_logpower
+
+    minlogpow = -5
+    maxlogpow = 5
+
     # make sure integer inputs are integers
     nbins = int(nbins)
     supersample = int(supersample)
@@ -145,18 +175,24 @@ def ps_to_array(freq, power, nbins=128, supersample=1,
     else:  # don't supersample
         # Do everything in log space
         logfreq = np.log10(freq)
-        logpower = np.log10(power)
+        #import matplotlib
+        #matplotlib.use('TKAgg',warn=False, force=True)
+        #import matplotlib.pyplot as plt
+        #logpower = np.log10(power)
         minlogfreq = np.log10(minfreq)
         maxlogfreq = np.log10(maxfreq)
-        minlogpow = np.log10(minpow)
-        maxlogpow = np.log10(maxpow)
+        #plt.plot(logfreq, logpower)
+        #plt.show()
+        #minlogpow = np.log10(minpow)
+        #maxlogpow = np.log10(maxpow)
 
         # Define bins
 
-        xbinedges = np.linspace(np.log10(minfreq), np.log10(maxfreq), nbins + 1)
+        xbinedges = np.linspace(minlogfreq, maxlogfreq, nbins + 1)
         xbinwidth = xbinedges[1] - xbinedges[0]
-        ybinedges = np.linspace(np.log10(minpow), np.log10(maxpow), nbins + 1)
+        ybinedges = np.linspace(minlogpow, maxlogpow, nbins + 1)
         ybinwidth = ybinedges[1] - ybinedges[0]
+        #print(ybinedges)
 
         # resample at/near edges of bins and at original frequencies
 
@@ -189,6 +225,9 @@ def ps_to_array(freq, power, nbins=128, supersample=1,
                 print(minpowinds[i])
                 print(maxpowinds[i])
     # return result, flipped to match orientation of Marc's images
+    #plt.imshow(output[::-1])
+    #plt.show()
+    #sys.exit()
     return output[::-1]
 
 
@@ -234,7 +273,7 @@ def default_classifier_model():
     reg = l2(7.5E-4)
     adam = Adam(clipnorm=1.)
     input1 = Input(shape=(128, 128, 1))
-    drop0 = Dropout(0.2)(input1)
+    drop0 = Dropout(0.5)(input1)
     conv1 = Conv2D(4, kernel_size=(7, 7), padding='same', kernel_initializer='glorot_uniform',
                    kernel_regularizer=reg)(drop0)
     lrelu1 = LeakyReLU(0.1)(conv1)
@@ -249,7 +288,7 @@ def default_classifier_model():
     pool3 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu3)
 
     flat = Flatten()(pool3)
-    drop1 = Dropout(0.2)(flat)
+    drop1 = Dropout(0.5)(flat)
     dense1 = Dense(128, kernel_initializer='glorot_uniform', activation='relu', kernel_regularizer=reg)(drop1)
     output = Dense(8, kernel_initializer='glorot_uniform', activation='softmax')(dense1)
     model = Model(input1, output)

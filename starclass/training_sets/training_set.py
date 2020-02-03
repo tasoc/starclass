@@ -21,7 +21,7 @@ from .. import BaseClassifier, TaskManager, utilities
 #----------------------------------------------------------------------------------------------
 class TrainingSet(object):
 
-	def __init__(self, datalevel='corr', tf=0.0):
+	def __init__(self, datalevel='corr', tf=0.0, random_seed=42):
 
 		# Basic checks of input:
 		if tf < 0 or tf >= 1:
@@ -33,6 +33,7 @@ class TrainingSet(object):
 		# Store input:
 		self.datalevel = datalevel
 		self.testfraction = tf
+		self.random_seed = random_seed
 
 		# Define cache location where we will save common features:
 		self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)
@@ -47,15 +48,16 @@ class TrainingSet(object):
 		self.train_idx = np.arange(self.nobjects, dtype=int) # Define here because it is needed by self.labels() used below
 		self.test_idx = np.array([], dtype=int)
 		if self.testfraction > 0:
+			labels = np.array([i[0].value for i in self.labels()])
 			self.train_idx, self.test_idx = train_test_split(
 				np.arange(self.nobjects),
 				test_size=self.testfraction,
-				random_state=42,
-				stratify=self.labels()
+				random_state=self.random_seed,
+				stratify=labels, #self.labels()
 			)
-			# Have to sort as train_test_split shuffles and we don't want that
-			self.train_idx = np.sort(self.train_idx)
-			self.test_idx = np.sort(self.test_idx)
+		# Have to sort as train_test_split shuffles and we don't want that
+		self.train_idx = np.sort(self.train_idx)
+		self.test_idx = np.sort(self.test_idx)
 		# Cross Validation
 		self.fold = 0
 		self.crossval_folds = 0
@@ -86,7 +88,7 @@ class TrainingSet(object):
 		labels_test = [lbl[0].value for lbl in self.labels()]
 
 		# If keyword is true then split according to KFold cross-validation
-		skf = StratifiedKFold(n_splits=n_splits, random_state=42, shuffle=True)
+		skf = StratifiedKFold(n_splits=n_splits, random_state=self.random_seed, shuffle=True)
 		skf_splits = skf.split(self.train_idx, labels_test)
 
 		# We are doing cross-validation, so we will return a copy

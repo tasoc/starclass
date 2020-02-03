@@ -60,6 +60,7 @@ def main():
 	tset_settings = {
 		'datalevel': 'corr',
 		'tf': args.testfraction,
+		'random_seed': 2359230457,
 	}
 
 	# Pick the training set:

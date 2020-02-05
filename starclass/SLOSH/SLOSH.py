@@ -12,7 +12,6 @@ import logging
 from keras import backend as K
 from keras.models import load_model
 from keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
-
 from sklearn.metrics import classification_report
 
 from . import SLOSH_prepro as preprocessing

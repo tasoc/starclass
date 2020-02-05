@@ -175,16 +175,8 @@ def ps_to_array(freq, power, nbins=128, supersample=1,
     else:  # don't supersample
         # Do everything in log space
         logfreq = np.log10(freq)
-        #import matplotlib
-        #matplotlib.use('TKAgg',warn=False, force=True)
-        #import matplotlib.pyplot as plt
-        #logpower = np.log10(power)
         minlogfreq = np.log10(minfreq)
         maxlogfreq = np.log10(maxfreq)
-        #plt.plot(logfreq, logpower)
-        #plt.show()
-        #minlogpow = np.log10(minpow)
-        #maxlogpow = np.log10(maxpow)
 
         # Define bins
 
@@ -192,7 +184,6 @@ def ps_to_array(freq, power, nbins=128, supersample=1,
         xbinwidth = xbinedges[1] - xbinedges[0]
         ybinedges = np.linspace(minlogpow, maxlogpow, nbins + 1)
         ybinwidth = ybinedges[1] - ybinedges[0]
-        #print(ybinedges)
 
         # resample at/near edges of bins and at original frequencies
 
@@ -225,9 +216,6 @@ def ps_to_array(freq, power, nbins=128, supersample=1,
                 print(minpowinds[i])
                 print(maxpowinds[i])
     # return result, flipped to match orientation of Marc's images
-    #plt.imshow(output[::-1])
-    #plt.show()
-    #sys.exit()
     return output[::-1]
 
 

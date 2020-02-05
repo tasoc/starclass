@@ -33,6 +33,8 @@ class TrainingSet(object):
 		# Store input:
 		self.datalevel = datalevel
 		self.testfraction = tf
+		# Added a random seed - NEED TO BE CAREFUL WITH THIS!
+		# AND SET SEED RANDOMLY FOR EACH RUN
 		self.random_seed = random_seed
 
 		# Define cache location where we will save common features:

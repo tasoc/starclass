@@ -57,9 +57,9 @@ class TrainingSet(object):
 				random_state=self.random_seed,
 				stratify=labels, #self.labels()
 			)
-		# Have to sort as train_test_split shuffles and we don't want that
-		self.train_idx = np.sort(self.train_idx)
-		self.test_idx = np.sort(self.test_idx)
+			# Have to sort as train_test_split shuffles and we don't want that
+			self.train_idx = np.sort(self.train_idx)
+			self.test_idx = np.sort(self.test_idx)
 		# Cross Validation
 		self.fold = 0
 		self.crossval_folds = 0

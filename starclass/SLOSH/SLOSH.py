@@ -11,7 +11,7 @@ import os
 import logging
 from keras import backend as K
 from keras.models import load_model
-from keras.callbacks import ReduceLROnPlateau, EarlyStopping
+from keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
 
 from sklearn.metrics import classification_report
 
@@ -150,9 +150,13 @@ class SLOSHClassifier(BaseClassifier):
         else:
             logger.info('Train Images exist...')
         reduce_lr = ReduceLROnPlateau(factor=0.5, patience=5, verbose=1)
-        early_stop = EarlyStopping(monitor='val_loss', patience=7,
+        early_stop = EarlyStopping(monitor='val_loss', patience=10,
                                    restore_best_weights=True)
-        model = None
+        checkpoint = ModelCheckpoint(self.model_file, 
+                                     monitor='val_loss', 
+                                     verbose=1, save_best_only=True)
+        
+        #model = None
         model = preprocessing.default_classifier_model()
 
         train_generator = preprocessing.npy_generator(root=train_folder, batch_size=32,  
@@ -166,7 +170,7 @@ class SLOSHClassifier(BaseClassifier):
         epochs = 50
         model.fit_generator(train_generator, epochs=epochs, steps_per_epoch=len(train_generator),
                             validation_data=valid_generator, validation_steps=len(valid_generator),
-                            callbacks=[reduce_lr, early_stop], verbose=2)
+                            callbacks=[reduce_lr, early_stop, checkpoint], verbose=2)
         self.save_model(model, self.model_file)
 
     def save_model(self, model, model_file):

@@ -29,7 +29,7 @@ jobs:
       install:
         - python3 --version
         - pip3 install -U pip
-        - pip3 install -r requirements
+        - pip3 install -r requirements.txt
         - pip3 install codecov pytest-cov
       script: python3 -m pytest
       after_success: python 3 -m codecov
@@ -41,7 +41,7 @@ jobs:
       install:
         - python3 --version
         - pip3 install -U pip
-        - pip3 install -r requirements
+        - pip3 install -r requirements.txt
         - pip3 install codecov pytest-cov
       script: python3 -m pytest
       after_success: python 3 -m codecov

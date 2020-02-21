@@ -14,14 +14,10 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from starclass import TaskManager, STATUS, StellarClasses
 
 #--------------------------------------------------------------------------------------------------
-def test_taskmanager_get_tasks():
+def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
 	"""Test of TaskManager"""
 
-	# Load the first image in the input directory:
-	INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
-
-	# Find the shape of the original image:
-	with TaskManager(INPUT_DIR, overwrite=True) as tm:
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True) as tm:
 		# Get the number of tasks:
 		with pytest.raises(NotImplementedError):
 			tm.get_number_tasks()
@@ -63,13 +59,10 @@ def test_taskmanager_get_tasks():
 		assert task1_status == STATUS.STARTED.value
 
 #--------------------------------------------------------------------------------------------------
-def test_taskmanager_get_tasks_priority():
+def test_taskmanager_get_tasks_priority(PRIVATE_TODO_FILE):
 	"""Test of TaskManager.get_tasks with priority"""
 
-	# Load the first image in the input directory:
-	INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
-
-	with TaskManager(INPUT_DIR, overwrite=True) as tm:
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True) as tm:
 		task = tm.get_task(priority=17)
 		assert task['priority'] == 17
 
@@ -88,14 +81,10 @@ def test_taskmanager_invalid():
 		TaskManager(os.path.join(INPUT_DIR, 'does-not-exists'))
 
 #--------------------------------------------------------------------------------------------------
-def test_taskmanager_switch_classifier():
+def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE):
 	"""Test of TaskManager - Automatic switching between classifiers."""
 
-	# Load the first image in the input directory:
-	INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
-
-	# Find the shape of the original image:
-	with TaskManager(INPUT_DIR, overwrite=True) as tm:
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True) as tm:
 
 		tm.cursor.execute("INSERT INTO starclass_diagnostics (priority,classifier,status) SELECT priority,'slosh',1 FROM todolist;")
 		tm.cursor.execute("DELETE FROM starclass_diagnostics WHERE priority=17;")
@@ -121,14 +110,10 @@ def test_taskmanager_switch_classifier():
 		assert task2['classifier'] and task2['classifier'] != 'slosh'
 
 #--------------------------------------------------------------------------------------------------
-def test_taskmanager_meta_classifier():
+def test_taskmanager_meta_classifier(PRIVATE_TODO_FILE):
 	"""Test of TaskManager when running with MetaClassifier"""
 
-	# Load the first image in the input directory:
-	INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
-
-	# Find the shape of the original image:
-	with TaskManager(INPUT_DIR, overwrite=True) as tm:
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True) as tm:
 
 		# Create fake results from SLOSH:
 		tm.save_results({'priority': 17, 'classifier': 'slosh', 'status': STATUS.OK, 'starclass_results': {
@@ -155,8 +140,4 @@ def test_taskmanager_meta_classifier():
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
-	test_taskmanager_get_tasks()
-	test_taskmanager_get_tasks_priority()
-	test_taskmanager_invalid()
-	test_taskmanager_switch_classifier()
-	test_taskmanager_meta_classifier()
+	pytest.main([__file__])

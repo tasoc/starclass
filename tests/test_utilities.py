@@ -70,5 +70,4 @@ def test_rms_timescale():
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
-	test_pickle()
-	test_rms_timescale()
+	pytest.main([__file__])

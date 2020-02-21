@@ -100,8 +100,4 @@ def test_tdasim(datalevel):
 
 #----------------------------------------------------------------------
 if __name__ == '__main__':
-	test_keplerq9()
-	test_keplerq9linfit()
-	test_tdasim('corr')
-	test_tdasim('raw')
-	test_tdasim('clean')
+	pytest.main([__file__])

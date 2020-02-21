@@ -36,7 +36,7 @@ class tda_simulations(TrainingSet):
 
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
-		super(self.__class__, self).__init__(*args, **kwargs)
+		super().__init__(*args, **kwargs)
 
 	#----------------------------------------------------------------------------------------------
 	def generate_todolist(self):

@@ -22,6 +22,12 @@ from .. import BaseClassifier, TaskManager, utilities
 class TrainingSet(object):
 
 	def __init__(self, datalevel='corr', tf=0.0, random_seed=42):
+		"""
+		Parameters:
+			datalevel (string, optional):
+			tf (float, optional): Test-fraction. Default=0.
+			random_seed (optional): Random seed. Default=42.
+		"""
 
 		# Basic checks of input:
 		if tf < 0 or tf >= 1:
@@ -33,8 +39,6 @@ class TrainingSet(object):
 		# Store input:
 		self.datalevel = datalevel
 		self.testfraction = tf
-		# Added a random seed - NEED TO BE CAREFUL WITH THIS!
-		# AND SET SEED RANDOMLY FOR EACH RUN
 		self.random_seed = random_seed
 
 		# Define cache location where we will save common features:
@@ -50,12 +54,11 @@ class TrainingSet(object):
 		self.train_idx = np.arange(self.nobjects, dtype=int) # Define here because it is needed by self.labels() used below
 		self.test_idx = np.array([], dtype=int)
 		if self.testfraction > 0:
-			labels = np.array([i[0].value for i in self.labels()])
 			self.train_idx, self.test_idx = train_test_split(
 				np.arange(self.nobjects),
 				test_size=self.testfraction,
 				random_state=self.random_seed,
-				stratify=labels, #self.labels()
+				stratify=self.labels()
 			)
 			# Have to sort as train_test_split shuffles and we don't want that
 			self.train_idx = np.sort(self.train_idx)

@@ -60,6 +60,7 @@ def main():
 	tset_settings = {
 		'datalevel': 'corr',
 		'tf': args.testfraction,
+		'random_seed': 2359230457,
 	}
 
 	# Pick the training set:
@@ -75,7 +76,7 @@ def main():
 	if current_classifier == 'meta':
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in parallel?
-		with starclass.TaskManager(tset.input_folder, overwrite=True) as tm:
+		with starclass.TaskManager(tset.input_folder, overwrite=False) as tm:
 			for cla_key in tm.all_classifiers:
 				# Split the tset object into cross-validation folds.
 				# These are objects with exactly the same properties as the original one,
@@ -91,13 +92,14 @@ def main():
 
 	# Initialize the classifier:
 	classifier = ClassificationClass[current_classifier]
-	with classifier(level=args.level, features_cache=tset.features_cache, tset_key=tset.key) as stcl:
-		# Run the training of the classifier:
-		logger.info("Training %s...", current_classifier)
-		stcl.train(tset)
-		logger.info("Training done...")
-		logger.info("Classifying test-set using %s...", current_classifier)
-		stcl.test(tset)
+	with starclass.TaskManager(tset.input_folder, overwrite=False) as tm:
+		with classifier(level=args.level, features_cache=tset.features_cache, tset_key=tset.key) as stcl:
+			# Run the training of the classifier:
+			logger.info("Training %s...", current_classifier)
+			stcl.train(tset)
+			logger.info("Training done...")
+			logger.info("Classifying test-set using %s...", current_classifier)
+			stcl.test(tset, save=True, save_func=tm.save_results)
 
 #----------------------------------------------------------------------------------------------
 if __name__ == '__main__':

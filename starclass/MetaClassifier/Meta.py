@@ -160,7 +160,7 @@ class MetaClassifier(BaseClassifier):
 
 		logger.info("Importing features...")
 		# This bit is hardcoded! Not good for generalisability!
-		for idx, i in tqdm(enumerate(tset.features())):
+		for idx, i in enumerate(tset.features()):
 			if idx == 0:
 				features = np.array(i['other_classifiers']['prob'])
 				preds = np.array(i['other_classifiers']['class'])

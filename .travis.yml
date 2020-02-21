@@ -1,6 +1,6 @@
 language: python
 cache: pip
-sudo: required
+os: linux
 
 # We are specifying the build matix manually, since there is too little overlap
 # between the different builds:
@@ -38,7 +38,6 @@ jobs:
       before_install:
         - choco install python --version 3.7.4
         - python --version
-        - python -m pip install --upgrade pip
         - git lfs pull
       env: PATH=/c/Python37:/c/Python37/Scripts:$PATH
 
@@ -61,7 +60,7 @@ jobs:
 
 # Command to install dependencies
 install:
-  - pip install --upgrade pip
+  - python -m pip install --upgrade pip
   - pip install -r requirements.txt
   - pip install codecov pytest-cov
 script:

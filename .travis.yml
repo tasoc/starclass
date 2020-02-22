@@ -26,9 +26,12 @@ jobs:
       os: osx
       osx_image: xcode9.4 # Python 3.6.5
       language: shell
-      install:
+      before_install:
+        - brew install git-lfs
         - python3 --version
-        - pip3 install -U pip
+        - git lfs pull
+      install:
+        - pip3 install --upgrade pip
         - pip3 install -r requirements.txt
         - pip3 install codecov pytest-cov
       script: python3 -m pytest
@@ -38,9 +41,12 @@ jobs:
       os: osx
       osx_image: xcode11.2 # Python 3.7.4 running on macOS 10.14.4
       language: shell
-      install:
+      before_install:
+        - brew install git-lfs
         - python3 --version
-        - pip3 install -U pip
+        - git lfs pull
+      install:
+        - pip3 install --upgrade pip
         - pip3 install -r requirements.txt
         - pip3 install codecov pytest-cov
       script: python3 -m pytest
@@ -52,7 +58,6 @@ jobs:
       before_install:
         - choco install python --version 3.6.8
         - python --version
-        - python -m pip install --upgrade pip
         - git lfs pull
       env: PATH=/c/Python36:/c/Python36/Scripts:$PATH
 

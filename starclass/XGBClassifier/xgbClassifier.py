@@ -12,7 +12,7 @@ import json
 import numpy as np
 from xgboost import XGBClassifier as xgb
 from . import xgb_feature_calc as xgb_features
-from .. import BaseClassifier, StellarClasses, utilities
+from .. import BaseClassifier, utilities
 
 class Classifier_obj(xgb):
 	"""
@@ -156,7 +156,7 @@ class XGBClassifier(BaseClassifier):
 		class_results = {}
 
 		for c, cla in enumerate(self.classifier.classes_):
-			key = StellarClasses(cla)
+			key = self.StellarClasses(cla)
 			# Cast to float for prediction
 			class_results[key] = float(xgb_classprobs[c])
 

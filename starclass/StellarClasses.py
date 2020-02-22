@@ -27,15 +27,17 @@ class StellarClasses(enum.Enum):
 	CONSTANT = 'constant'
 	#RAPID = 'rapid'
 
+
+class StellarClassesLevel2(enum.Enum):
 	# Level 2 classes
-	#RRLYR = 'RR Lyrae'
-	#CEPHEID = 'Cepheid'
-	#GDOR = 'gamma Doradus'
-	#SPB = 'Slowly pulsating B star'
-	##DSCT = 'delta Scuti'
-	#BCEP = 'beta Cepheid'
-	#LPV = 'Long period variable'
-	#SPOTS = 'Spot modulation'
-	#ROAP = 'roAp'
-	##SDB = 'sdB'
-	#WD = 'White Dwarf'
+	RRLYR = 'RR Lyrae'
+	CEPHEID = 'Cepheid'
+	GDOR = 'gamma Doradus'
+	SPB = 'Slowly pulsating B star'
+	DSCT = 'delta Scuti'
+	BCEP = 'beta Cepheid'
+	LPV = 'Long period variable'
+	SPOTS = 'Spot modulation'
+	ROAP = 'roAp'
+	SDB = 'sdB'
+	WD = 'White Dwarf'

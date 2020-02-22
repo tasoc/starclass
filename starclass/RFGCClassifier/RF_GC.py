@@ -13,8 +13,7 @@ import os
 import copy
 from sklearn.ensemble import RandomForestClassifier
 from . import RF_GC_featcalc as fc
-from .. import BaseClassifier, StellarClasses
-from .. import utilities
+from .. import BaseClassifier, utilities
 
 class Classifier_obj(RandomForestClassifier):
 	"""
@@ -152,7 +151,7 @@ class RFGCClassifier(BaseClassifier):
 
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):
-			key = StellarClasses(cla)
+			key = self.StellarClasses(cla)
 			result[key] = classprobs[c]
 		return result
 

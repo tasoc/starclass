@@ -17,7 +17,7 @@ from astropy.io import fits
 from tqdm import tqdm
 import enum
 from sklearn.metrics import accuracy_score, confusion_matrix
-from .StellarClasses import StellarClasses
+from .StellarClasses import StellarClasses, StellarClassesLevel2
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
@@ -96,6 +96,13 @@ class BaseClassifier(object):
 			'MetaClassifier': 'meta'
 		}[self.__class__.__name__]
 
+		# Assign StellarClasses Enum depending on
+		# the classification level we are running:
+		self.StellarClasses = {
+			'L1': StellarClasses,
+			'L2': StellarClassesLevel2
+		}[level]
+
 	def __enter__(self):
 		return self
 
@@ -128,7 +135,7 @@ class BaseClassifier(object):
 		res = self.do_classify(features)
 		# Check results
 		for key, value in res.items():
-			if key not in StellarClasses:
+			if key not in self.StellarClasses:
 				raise ValueError("Classifier returned unknown stellar class: '%s'" % key)
 			if value < 0 or value > 1:
 				raise ValueError("Classifier should return probability between 0 and 1.")

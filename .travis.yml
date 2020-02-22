@@ -36,7 +36,7 @@ jobs:
         - pip3 install -r requirements.txt
         - pip3 install codecov pytest-cov
       script: python3 -m pytest
-      after_success: python 3 -m codecov
+      after_success: python3 -m codecov
 
     - name: "Python 3.7 on Mac"
       os: osx
@@ -52,7 +52,7 @@ jobs:
         - pip3 install -r requirements.txt
         - pip3 install codecov pytest-cov
       script: python3 -m pytest
-      after_success: python 3 -m codecov
+      after_success: python3 -m codecov
 
     - name: "Python 3.6 on Windows"
       os: windows

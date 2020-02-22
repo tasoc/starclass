@@ -4,6 +4,7 @@
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
+import pytest
 import sys
 import os
 import numpy as np

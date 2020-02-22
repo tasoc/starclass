@@ -88,8 +88,7 @@ class keplerq9(TrainingSet):
 					datasource='ffi',
 					variance=variance,
 					rms_hour=rms_hour,
-					ptp=ptp
-				)
+					ptp=ptp)
 
 			conn.commit()
 			cursor.close()

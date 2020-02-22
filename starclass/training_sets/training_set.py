@@ -155,7 +155,7 @@ class TrainingSet(object):
 
 				res = requests.get(url, stream=True)
 				res.raise_for_status()
-				total_size = int(res.headers.get('content-length', 0));
+				total_size = int(res.headers.get('content-length', 0))
 				block_size = 1024
 				with open(zip_tmp, 'wb') as fid:
 					for data in tqdm(res.iter_content(block_size), total=np.ceil(total_size/block_size), **tqdm_settings):

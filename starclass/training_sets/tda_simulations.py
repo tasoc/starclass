@@ -87,12 +87,11 @@ class tda_simulations(TrainingSet):
 					priority=pri,
 					starid=starid,
 					lightcurve=lightcurve,
-					tmag=tmag,
-					#datasource='ffi',
-					#variance=variance,
-					#rms_hour=rms_hour,
-					#ptp=ptp
-				)
+					tmag=tmag)
+				#datasource='ffi',
+				#variance=variance,
+				#rms_hour=rms_hour,
+				#ptp=ptp
 
 			conn.commit()
 			cursor.close()
@@ -112,13 +111,13 @@ class tda_simulations(TrainingSet):
 			translate = {
 				'Solar-like': StellarClasses.SOLARLIKE,
 				'Transit': StellarClasses.ECLIPSE,
-				'Eclipse': StellarClasses.ECLIPSE, #short period EBs should be CONTACT_ROT, not ECLIPSE
+				'Eclipse': StellarClasses.ECLIPSE, # short period EBs should be CONTACT_ROT, not ECLIPSE
 				'multi': StellarClasses.ECLIPSE,
 				'MMR': StellarClasses.ECLIPSE,
 				'RR Lyrae': StellarClasses.RRLYR_CEPHEID,
 				'RRab': StellarClasses.RRLYR_CEPHEID,
 				'RRc': StellarClasses.RRLYR_CEPHEID,
-				'RRd':  StellarClasses.RRLYR_CEPHEID,
+				'RRd': StellarClasses.RRLYR_CEPHEID,
 				'Cepheid': StellarClasses.RRLYR_CEPHEID,
 				'FM': StellarClasses.RRLYR_CEPHEID,
 				'1O': StellarClasses.RRLYR_CEPHEID,
@@ -150,7 +149,7 @@ class tda_simulations(TrainingSet):
 				'RR Lyrae': StellarClasses.RRLYR,
 				'RRab': StellarClasses.RRLYR,
 				'RRc': StellarClasses.RRLYR,
-				'RRd':  StellarClasses.RRLYR,
+				'RRd': StellarClasses.RRLYR,
 				'Cepheid': StellarClasses.CEPHEID,
 				'FM': StellarClasses.CEPHEID,
 				'1O': StellarClasses.CEPHEID,
@@ -226,13 +225,13 @@ class tda_simulations(TrainingSet):
 				translate = {
 					'Solar-like': StellarClasses.SOLARLIKE,
 					'Transit': StellarClasses.ECLIPSE,
-					'Eclipse': StellarClasses.ECLIPSE, #short period EBs should be CONTACT_ROT, not ECLIPSE
+					'Eclipse': StellarClasses.ECLIPSE, # short period EBs should be CONTACT_ROT, not ECLIPSE
 					'multi': StellarClasses.ECLIPSE,
 					'MMR': StellarClasses.ECLIPSE,
 					'RR Lyrae': StellarClasses.RRLYR_CEPHEID,
 					'RRab': StellarClasses.RRLYR_CEPHEID,
 					'RRc': StellarClasses.RRLYR_CEPHEID,
-					'RRd':  StellarClasses.RRLYR_CEPHEID,
+					'RRd': StellarClasses.RRLYR_CEPHEID,
 					'Cepheid': StellarClasses.RRLYR_CEPHEID,
 					'FM': StellarClasses.RRLYR_CEPHEID,
 					'1O': StellarClasses.RRLYR_CEPHEID,
@@ -264,7 +263,7 @@ class tda_simulations(TrainingSet):
 					'RR Lyrae': StellarClasses.RRLYR,
 					'RRab': StellarClasses.RRLYR,
 					'RRc': StellarClasses.RRLYR,
-					'RRd':  StellarClasses.RRLYR,
+					'RRd': StellarClasses.RRLYR,
 					'Cepheid': StellarClasses.CEPHEID,
 					'FM': StellarClasses.CEPHEID,
 					'1O': StellarClasses.CEPHEID,

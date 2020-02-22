@@ -38,7 +38,7 @@ def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
 			features_dict['shapiro_wilk'] = ss.shapiro(lc.flux)[0] # Shapiro-Wilk test statistic for normality
 			features_dict['eta'] = calculate_eta(lc)
 
-			forbiddenfreqs=[13.49/4.]
+			forbiddenfreqs = [13.49/4.]
 			periods, usedfreqs = checkfrequencies(obj, 6, 6, forbiddenfreqs, lc.time)
 			amp21, amp31 = freq_ampratios(obj,usedfreqs)
 			pd21, pd31 = freq_phasediffs(obj,usedfreqs)
@@ -73,7 +73,7 @@ def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
 	return featout
 
 
-def lc_norm(lc, linflatten = False):
+def lc_norm(lc, linflatten=False):
 	"""
 	Preprocess light curves using sigma clipping and normalise them with the median
 	This is is done under the assumption that missing (nan) have been removed
@@ -85,7 +85,7 @@ def lc_norm(lc, linflatten = False):
 
 	if linflatten:
 		#lc_f[:,1] = lc_f[:,1] - np.polyval(np.polyfit(lc_f[:,0],lc_f[:,1],1),lc_f[:,0]) + 1
-		lc.flux = lc.flux - np.polyval(np.polyfit(lc.time,lc.flux ,1),lc.time) + 1
+		lc.flux = lc.flux - np.polyval(np.polyfit(lc.time, lc.flux, 1), lc.time) + 1
 
 	return lc
 
@@ -161,14 +161,14 @@ def checkfrequencies(featdictrow, nfreqs, providednfreqs, forbiddenfreqs, time):
 	while len(freqs) < nfreqs:
 		freqdict = featdictrow['freq' + str(j+1)]
 		if np.isfinite(freqdict):
-			freq = 1./(freqdict*1e-6)/86400.  #convert to days
+			freq = 1./(freqdict*1e-6)/86400. # convert to days
 
 			#check to cut bad frequencies
 			cut = False
 			if (freq < 0) or (freq > np.max(time)-np.min(time)):
 				cut = True
 			for freqtocut in forbiddenfreqs:
-				for k in range(4):  #cuts 4 harmonics of frequency, within +-3% of given frequency
+				for k in range(4): # cuts 4 harmonics of frequency, within +-3% of given frequency
 					if (1./freq > (1./((k+1)*freqtocut))*(1-0.01)) & (1./freq < (1./((k+1)*freqtocut))*(1+0.01)):
 						cut = True
 			if not cut:

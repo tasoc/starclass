@@ -83,8 +83,7 @@ class keplerq9linfit(TrainingSet):
 					datasource='ffi',
 					variance=variance,
 					rms_hour=rms_hour,
-					ptp=ptp
-				)
+					ptp=ptp)
 
 			conn.commit()
 			cursor.close()

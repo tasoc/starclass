@@ -13,6 +13,7 @@ from xgboost import XGBClassifier as xgb
 from . import xgb_feature_calc as xgb_features
 from .. import BaseClassifier, utilities
 
+#--------------------------------------------------------------------------------------------------
 class Classifier_obj(xgb):
 	"""
 	Wrapper for sklearn XGBClassifier
@@ -41,18 +42,19 @@ class Classifier_obj(xgb):
 
 		#self.trained = False
 
-
+#--------------------------------------------------------------------------------------------------
 class XGBClassifier(BaseClassifier):
 	"""
 	General XGB Classification
 
 	.. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
 	"""
+
 	def __init__(self, clfile='xgb_classifier_1.pickle',
 		featdir="xgb_features", n_estimators=500, gamma=7.5,
 		min_child_weight=1, subsample=0.8, max_depth=6,
-		learning_rate = 0.1, reg_alpha=1e-5,
-		objective ='multi:softmax', colsample_bytree=0.7, random_state=154,
+		learning_rate=0.1, reg_alpha=1e-5,
+		objective='multi:softmax', colsample_bytree=0.7, random_state=154,
 		booster='gbtree', eval_metric='mlogloss', *args, **kwargs):
 		"""
 		Initialize the classifier object with optimised parameters.
@@ -107,7 +109,7 @@ class XGBClassifier(BaseClassifier):
 			)
 			self.trained = False
 
-
+	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):
 		"""
 		Save xgb classifier object with pickle
@@ -118,6 +120,7 @@ class XGBClassifier(BaseClassifier):
 		utilities.savePickle(outfile, self.classifier)
 		self.classifier = temp_classifier
 
+	#----------------------------------------------------------------------------------------------
 	def load(self, infile):
 		"""
 		Loading the xgb clasifier
@@ -125,6 +128,7 @@ class XGBClassifier(BaseClassifier):
 
 		self.classifier = utilities.loadPickle(infile)
 
+	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features):
 		"""
 		My classification that will be run on each lightcurve
@@ -161,6 +165,7 @@ class XGBClassifier(BaseClassifier):
 
 		return class_results
 
+	#----------------------------------------------------------------------------------------------
 	def train(self, tset, savecl=True, recalc=False, overwrite=False, feat_import=True):
 		"""
 		Training classifier using the ...
@@ -204,10 +209,9 @@ class XGBClassifier(BaseClassifier):
 			#logger.info('SHAPES ', str(np.shape(featarray)))
 			#logger.info('SHAPES ', str(np.shape(fit_labels)))
 			self.classifier.fit(featarray, fit_labels)
-			if feat_import == True:
+			if feat_import:
 				importances = self.classifier.feature_importances_.astype(float)
-				feature_importances = zip(list(featarray),
-										  importances)
+				feature_importances = zip(list(featarray), importances)
 				with open(self.data_dir+'/xgbClassifier_feat_import.json', 'w') as outfile:
 					json.dump(list(feature_importances), outfile)
 

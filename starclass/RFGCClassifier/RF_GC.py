@@ -3,12 +3,11 @@
 """
 The RF-GC classifier (general random forest).
 
-.. codeauthor::  David Armstrong <d.j.armstrong@warwick.ac.uk>
+.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 """
 
 import logging
 import os.path
-import numpy as np
 import os
 import copy
 from sklearn.ensemble import RandomForestClassifier
@@ -51,7 +50,7 @@ class RFGCClassifier(BaseClassifier):
 			min_samples_split (int): see sklearn.RandomForestClassifier
 		"""
 		# Initialise parent
-		super(self.__class__, self).__init__(*args, **kwargs)
+		super().__init__(*args, **kwargs)
 
 		self.classifier = None
 

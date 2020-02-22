@@ -9,7 +9,6 @@ import logging
 import os
 import copy
 import json
-import numpy as np
 from xgboost import XGBClassifier as xgb
 from . import xgb_feature_calc as xgb_features
 from .. import BaseClassifier, utilities
@@ -27,7 +26,7 @@ class Classifier_obj(xgb):
 		reg_alpha=1e-5, reg_lambda=1, scale_pos_weight=1, seed=154,
 		silent=True, subsample=0.6):
 
-		super(self.__class__, self).__init__(
+		super().__init__(
 			booster=booster,
 			eval_metric=eval_metric,
 			colsample_bytree=colsample_bytree,

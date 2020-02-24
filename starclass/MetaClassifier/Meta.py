@@ -9,10 +9,8 @@ The meta-classifier.
 import logging
 import os
 import numpy as np
-from tqdm import tqdm
 from sklearn.ensemble import RandomForestClassifier
-from .. import BaseClassifier, StellarClasses
-from .. import utilities
+from .. import BaseClassifier, utilities
 
 #--------------------------------------------------------------------------------------------------
 class Classifier_obj(RandomForestClassifier):
@@ -20,7 +18,7 @@ class Classifier_obj(RandomForestClassifier):
 	Wrapper for sklearn RandomForestClassifier.
 	"""
 	def __init__(self, n_estimators=100, min_samples_split=2):
-		super(self.__class__, self).__init__(
+		super().__init__(
 			n_estimators=n_estimators,
 			min_samples_split=min_samples_split,
 			class_weight='balanced',
@@ -45,7 +43,7 @@ class MetaClassifier(BaseClassifier):
 			featfile (str):	Filepath to pre-calculated features, if available.
 		"""
 		# Initialise parent
-		super(self.__class__, self).__init__(*args, **kwargs)
+		super().__init__(*args, **kwargs)
 
 		# Start logger:
 		logger = logging.getLogger(__name__)
@@ -79,30 +77,21 @@ class MetaClassifier(BaseClassifier):
 
 		self.indiv_classifiers = ['rfgc', 'SLOSH', 'xgb']
 
-		self.class_keys = {}
-		self.class_keys['RRLyr/Ceph'] = StellarClasses.RRLYR_CEPHEID
-		self.class_keys['transit/eclipse'] = StellarClasses.ECLIPSE
-		self.class_keys['solar'] = StellarClasses.SOLARLIKE
-		self.class_keys['dSct/bCep'] = StellarClasses.DSCT_BCEP
-		self.class_keys['gDor/spB'] = StellarClasses.GDOR_SPB
-		#self.class_keys['transient'] = StellarClasses.TRANSIENT
-		self.class_keys['contactEB/spots'] = StellarClasses.CONTACT_ROT
-		self.class_keys['aperiodic'] = StellarClasses.APERIODIC
-		self.class_keys['constant'] = StellarClasses.CONSTANT
-		#self.class_keys['rapid'] = StellarClasses.RAPID
-
+	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):
 		"""
 		Saves the classifier object with pickle.
 		"""
 		utilities.savePickle(outfile, self.classifier)
 
+	#----------------------------------------------------------------------------------------------
 	def load(self, infile, somfile=None):
 		"""
 		Loads classifier object.
 		"""
 		self.classifier = utilities.loadPickle(infile)
 
+	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features):
 		"""
 		Classify a single lightcurve.
@@ -141,10 +130,11 @@ class MetaClassifier(BaseClassifier):
 
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):
-			key = self.class_keys[cla]
+			key = self.StellarClasses(cla)
 			result[key] = classprobs[c]
 		return result
 
+	#----------------------------------------------------------------------------------------------
 	def train(self, tset, savecl=True, recalc=False, overwrite=False):
 		"""
 		Train the classifier.
@@ -173,44 +163,10 @@ class MetaClassifier(BaseClassifier):
 		self.classifier.oob_score = True
 		logger.info("Fitting model.")
 		self.classifier.fit(features, fitlabels)
-		logger.info('Trained. OOB Score = ' + str(self.classifier.oob_score_))
+		logger.info('Trained. OOB Score = %s', self.classifier.oob_score_)
 		self.classifier.trained = True
 
-		if savecl and self.classifier.trained:
-			if self.clfile is not None:
-				if not os.path.exists(self.clfile) or overwrite or recalc:
-					logger.info('Saving pickled classifier instance to meta_classifier.pickle')
-					self.save(self.clfile)
-
-	def parse_labels(self,labels,removeduplicates=False):
-		"""
-		"""
-		fitlabels = []
-		for lbl in labels:
-			if removeduplicates:
-				# is it multi-labelled? In which case, what takes priority?
-				# or duplicate it once for each label
-				if len(lbl) > 1: # Priority order loosely based on signal clarity
-					if StellarClasses.ECLIPSE in lbl:
-						fitlabels.append('transit/eclipse')
-					elif StellarClasses.RRLYR_CEPHEID in lbl:
-						fitlabels.append('RRLyr/Ceph')
-					elif StellarClasses.CONTACT_ROT in lbl:
-						fitlabels.append('contactEB/spots')
-					elif StellarClasses.DSCT_BCEP in lbl:
-						fitlabels.append('dSct/bCep')
-					elif StellarClasses.GDOR_SPB in lbl:
-						fitlabels.append('gDor/spB')
-					elif StellarClasses.SOLARLIKE in lbl:
-						fitlabels.append('solar')
-					else:
-						fitlabels.append(lbl[0].value)
-				else:
-					#then convert to str
-					fitlabels.append(lbl[0].value)
-			else:
-				try:
-					fitlabels.append(lbl.value)
-				except:
-					fitlabels.append(lbl[0].value)
-		return np.array(fitlabels)
+		if savecl and self.classifier.trained and self.clfile is not None:
+			if overwrite or recalc or not os.path.exists(self.clfile):
+				logger.info("Saving pickled classifier instance to '%s'", self.clfile)
+				self.save(self.clfile)

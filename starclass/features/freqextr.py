@@ -125,7 +125,6 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 			#plt.title(i)
 			#plt.show()
 
-
 		# Finds the frequency of the largest peak:
 		pmax_index = np.argmax(power / mean_noise)
 		nu[i,0] = ps.optimize_peak(frequency[pmax_index])
@@ -239,7 +238,6 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 			atemp, btemp = original_ps.alpha_beta(nu[i,h])
 			deviation[i,h] = (alpha[i,h]**2 + beta[i,h]**2) / (atemp**2 + btemp**2)
 
-
 		# Optimize the Noptimize nearest peaks
 		if i != 0 and Noptimize != 0:
 			for h in range(n_harmonics+1):
@@ -323,7 +321,6 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 			features['phase' + str(i+1) + '_harmonic' + str(j)] = phase[i,j]
 
 	return features
-
 
 #------------------------------------------------------------------------------
 if __name__ == '__main__':

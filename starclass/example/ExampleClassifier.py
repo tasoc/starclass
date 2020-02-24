@@ -78,5 +78,5 @@ class ExampleClassifier(BaseClassifier):
 		"""
 		# Do all the stuff needed to train the classifier here
 
-		my_classifier = do_the_training(features, labels)
+		my_classifier = do_the_training(features, labels) # noqa: F821
 		np.save('my_classifier.npy', my_classifier)

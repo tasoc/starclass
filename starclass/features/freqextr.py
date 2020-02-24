@@ -340,9 +340,9 @@ if __name__ == '__main__':
 	#flux = 10*np.sin(2*np.pi*50e-6*time*86400) #+ 2*np.sin(2*np.pi*100e-6*time*86400)
 
 	flux = 10*np.sin(2*np.pi*50e-6*time*86400) + 2*np.sin(2*np.pi*100e-6*time*86400) \
-	      + 3*np.sin(2*np.pi*89e-6*time*86400 + 0.5) \
-		  + 12*np.sin(2*np.pi*91.3e-6*time*86400 + 0.32) + 6*np.sin(2*np.pi*2*91.3e-6*time*86400 + 0.32) \
-		  + 2.4*np.random.randn(len(time))
+		+ 3*np.sin(2*np.pi*89e-6*time*86400 + 0.5) \
+		+ 12*np.sin(2*np.pi*91.3e-6*time*86400 + 0.32) + 6*np.sin(2*np.pi*2*91.3e-6*time*86400 + 0.32) \
+		+ 2.4*np.random.randn(len(time))
 
 	#flux = np.random.normal(0, 2, size=len(time))
 

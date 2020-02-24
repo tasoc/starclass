@@ -7,11 +7,13 @@ Plotting utilities for stellar classification.
 """
 
 import numpy as np
-import matplotlib
-matplotlib.use('Agg', warn=False)
 import matplotlib.pyplot as plt
 
-#------------------------------------------------------------------------------
+# Change to a non-GUI backend since this
+# should be able to run on a cluster:
+plt.switch_backend('Agg')
+
+#--------------------------------------------------------------------------------------------------
 def plotConfMatrix(confmatrix, ticklabels, ax=None, cmap='Blues'):
 	"""
 	Plot a confusion matrix. Axes size and labels are hardwired.
@@ -35,20 +37,19 @@ def plotConfMatrix(confmatrix, ticklabels, ax=None, cmap='Blues'):
 
 	ax.imshow(confmatrix, interpolation='nearest', origin='lower', cmap=cmap)
 
+	text_settings = {'va': 'center', 'ha': 'center', 'fontsize': 14}
 	for x in range(N):
 		for y in range(N):
 			if confmatrix[y,x] > 0.7:
-				ax.text(x, y, "%d"%np.round(confmatrix[y,x]*100),
-						 va='center', ha='center', color='w', fontsize=14)
+				ax.text(x, y, "%d" % np.round(confmatrix[y,x]*100), color='w', **text_settings)
 			elif confmatrix[y,x] < 0.01 and confmatrix[y,x] > 0:
-				ax.text(x, y, "<1", va='center', ha='center', fontsize=14)
+				ax.text(x, y, "<1", **text_settings)
 			elif confmatrix[y,x] > 0:
-				ax.text(x, y, "%d"%np.round(confmatrix[y,x]*100),
-						 va='center', ha='center', fontsize=14)
+				ax.text(x, y, "%d" % np.round(confmatrix[y,x]*100), **text_settings)
 
 	for x in np.arange(confmatrix.shape[0]):
-		ax.plot([x+0.5,x+0.5],[-0.5,N-0.5], ':', color='0.5', lw=0.5)
-		ax.plot([-0.5,N-0.5],[x+0.5,x+0.5], ':', color='0.5', lw=0.5)
+		ax.plot([x+0.5,x+0.5], [-0.5,N-0.5], ':', color='0.5', lw=0.5)
+		ax.plot([-0.5,N-0.5], [x+0.5,x+0.5], ':', color='0.5', lw=0.5)
 
 	ax.set_xlim(-0.5, N-0.5)
 	ax.set_ylim(-0.5, N-0.5)
@@ -59,11 +60,3 @@ def plotConfMatrix(confmatrix, ticklabels, ax=None, cmap='Blues'):
 	plt.xticks(np.arange(N), ticklabels, rotation='vertical')
 	plt.yticks(np.arange(N), ticklabels)
 	ax.tick_params(axis='both', which='major', labelsize=18)
-
-if __name__ == '__main__':
-	mat = np.identity(7)
-	mat[2,3] = 0.5
-	labels = ['test']*7
-
-	plt.figure()
-	plotConfMatrix(mat, labels)

@@ -16,7 +16,7 @@ from .. import StellarClasses
 from . import TrainingSet
 
 #----------------------------------------------------------------------------------------------
-class keplerq9(TrainingSet):
+class keplerq9v2(TrainingSet):
 	"""
 	Kepler Q9 Training Set.
 

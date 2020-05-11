@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Kepler Q9 Training Set.
+Kepler Q9 Training Set (version 2).
 
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
@@ -15,10 +15,10 @@ from tqdm import tqdm
 from .. import StellarClasses
 from . import TrainingSet
 
-#----------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 class keplerq9v2(TrainingSet):
 	"""
-	Kepler Q9 Training Set.
+	Kepler Q9 Training Set (version 2).
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
@@ -35,7 +35,11 @@ class keplerq9v2(TrainingSet):
 		self.input_folder = self.tset_datadir('keplerq9v2', 'https://tasoc.dk/pipeline/starclass_trainingsets/keplerq9v2.zip')
 
 		# Find the number of training sets:
-		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
+		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
+			dtype=None,
+			delimiter=',',
+			comments='#',
+			encoding='utf-8')
 		self.nobjects = data.shape[0]
 
 		# Initialize parent
@@ -57,8 +61,10 @@ class keplerq9v2(TrainingSet):
 
 			logger.info("Step 1: Reading file and extracting information...")
 			pri = 0
-			starlist = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), delimiter=',', dtype=None, encoding='utf-8')
-			diagnostics = np.genfromtxt(os.path.join(self.input_folder, 'diagnostics.txt'), delimiter=',', dtype=None, encoding='utf-8')
+			starlist = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
+				delimiter=',', comments='#', dtype=None, encoding='utf-8')
+			diagnostics = np.genfromtxt(os.path.join(self.input_folder, 'diagnostics.txt'),
+				delimiter=',', comments='#', dtype=None, encoding='utf-8')
 			for k, star in tqdm(enumerate(starlist), total=len(starlist)):
 				# Get starid:
 				starname = star[0]
@@ -100,7 +106,11 @@ class keplerq9v2(TrainingSet):
 
 		logger = logging.getLogger(__name__)
 
-		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
+		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
+			dtype=None,
+			delimiter=',',
+			comments='#',
+			encoding='utf-8')
 
 		# Translation of Mikkel's identifiers into the broader:
 		translate = {
@@ -144,7 +154,11 @@ class keplerq9v2(TrainingSet):
 		if self.testfraction <= 0:
 			return []
 		else:
-			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
+			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
+				dtype=None,
+				delimiter=',',
+				comments='#',
+				encoding='utf-8')
 
 			# Translation of Mikkel's identifiers into the broader:
 			translate = {

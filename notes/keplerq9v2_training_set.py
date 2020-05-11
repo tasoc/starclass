@@ -13,15 +13,15 @@ import numpy as np
 import tarfile
 from bottleneck import nanmedian, nanvar
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-# Load from photometry, since that avoids having to create a LightCurve object:
-sys.path.insert(0, os.path.abspath('../../photometry'))
-from photometry.utilities import rms_timescale
+from lightkurve import LightCurve
+sys.path.insert(0, os.path.abspath('..'))
+from starclass.utilities import rms_timescale
+#from starclass.plots import plt
 
 if __name__ == '__main__':
-	#plt.switch_backend('Qt5Agg')
-
 	# Directory where KeplerQ9 ASCII files are stored:
+	# Thic can either contain all files in this directory,
+	# or be divided into sub-directories.
 	thisdir = r'E:\keplerq9\full'
 
 	# Where output will be saved:
@@ -29,7 +29,7 @@ if __name__ == '__main__':
 
 	# Make sure directories exists:
 	os.makedirs(output_dir, exist_ok=True)
-	shutil.copy('keplerq9v2_targets_unique.txt', os.path.join(output_dir, 'targets.txt'))
+	shutil.copy('keplerq9v2_targets.txt', os.path.join(output_dir, 'targets.txt'))
 
 	starlist = np.genfromtxt(os.path.join(output_dir, 'targets.txt'), delimiter=',', dtype=None, encoding='utf-8')
 
@@ -82,13 +82,12 @@ if __name__ == '__main__':
 					os.makedirs(os.path.join(thisdir, subdir), exist_ok=True)
 					shutil.move(os.path.join(thisdir, fname), fpath)
 
-				#if not os.path.exists(fpath):
-				#	print("Extracting " + fname)
-				#	with tarfile.open(os.path.join(thisdir, 'Q09_public_ascii_20160905.tgz'), 'r') as tgz:
-				#		tgz.extract(fname, fpath)
-
 				# Load Kepler Q9 ASCII file (PDC corrected):
-				data = np.loadtxt(fpath, usecols=(0,3,4))
+				data = np.loadtxt(fpath, usecols=(0,3,4), comments='#')
+
+				# Remove anything with quality > 0:
+				indx = np.isfinite(data[:,1]) & np.isfinite(data[:,2])
+				data = data[indx, :]
 
 				# Subtract the first timestamp from all timestamps:
 				data[:, 0] -= data[0, 0]
@@ -96,27 +95,24 @@ if __name__ == '__main__':
 				# Only keep the first 27.4 days of data:
 				data = data[data[:, 0] <= 27.4, :]
 
-				# Remove anything with quality > 0:
-				indx = ~np.isfinite(data[:,1]) | ~np.isfinite(data[:,2])
-				data[indx, 1:3] = np.NaN
-
 				# Convert to ppm:
 				m = nanmedian(data[:,1])
 				data[:,1] = 1e6*(data[:,1]/m - 1)
 				data[:,2] = 1e6*data[:,2]/m
 
-				#plt.figure()
-				#plt.plot(data[:,0], data[:,1])
-				#plt.show()
-				#sys.exit()
+				#fig, ax = plt.subplots()
+				#ax.plot(data[:,0], data[:,1])
+				#fig.savefig(os.path.splitext(fpath_save)[0] + '.png', bbox_inches='tight')
+				#plt.close(fig)
 
 				# Save file:
 				os.makedirs(os.path.dirname(fpath_save), exist_ok=True)
 				np.savetxt(fpath_save, data, delimiter='  ', fmt=('%.8f', '%.16e', '%.16e'))
 
 			# Calculate diagnostics:
+			lc = LightCurve(time=data[:,0], flux=data[:,1])
 			variance = nanvar(data[:,1], ddof=1)
-			rms_hour = rms_timescale(data[:,0], data[:,1], timescale=3600/86400)
+			rms_hour = rms_timescale(lc, timescale=3600/86400)
 			ptp = nanmedian(np.abs(np.diff(data[:,1])))
 
 			# Add target to TODO-list:

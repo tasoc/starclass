@@ -10,9 +10,9 @@ import sys
 import os.path
 import shutil
 import numpy as np
-import tarfile
 from bottleneck import nanmedian, nanvar
 from tqdm import tqdm
+import requests
 from lightkurve import LightCurve
 sys.path.insert(0, os.path.abspath('..'))
 from starclass.utilities import rms_timescale
@@ -20,7 +20,7 @@ from starclass.utilities import rms_timescale
 
 if __name__ == '__main__':
 	# Directory where KeplerQ9 ASCII files are stored:
-	# Thic can either contain all files in this directory,
+	# This can either contain all files in this directory,
 	# or be divided into sub-directories.
 	thisdir = r'E:\keplerq9\full'
 
@@ -31,8 +31,11 @@ if __name__ == '__main__':
 	os.makedirs(output_dir, exist_ok=True)
 	shutil.copy('keplerq9v2_targets.txt', os.path.join(output_dir, 'targets.txt'))
 
-	starlist = np.genfromtxt(os.path.join(output_dir, 'targets.txt'), delimiter=',', dtype=None, encoding='utf-8')
+	# Load the list of KIC numbers and stellar classes:
+	starlist = np.genfromtxt(os.path.join(output_dir, 'targets.txt'),
+		delimiter=',', comments='#', dtype=None, encoding='utf-8')
 
+	# Make sure that there are not duplicate entries:
 	starlist_unique, cnt = np.unique(starlist, return_counts=True, axis=0)
 	if len(starlist) != len(starlist_unique):
 		print("Duplicate entries:")
@@ -42,7 +45,7 @@ if __name__ == '__main__':
 	# Make sure that there are not duplicate starids:
 	us, cnt = np.unique(starlist[:, 0], return_counts=True)
 	if len(starlist) != len(us):
-		print("Duplicate entries:")
+		print("Duplicate starids in multiple classes:")
 		for s in us[cnt > 1]:
 			indx = (starlist[:, 0] == s)
 			for line in starlist[indx, :]:
@@ -50,6 +53,9 @@ if __name__ == '__main__':
 
 		raise Exception("%d duplicate starids" % (len(starlist) - len(us)))
 
+	# Open the diagnostics file for writing and loop through the
+	# list of starids, load the data file, restructure the timeseries,
+	# calculate diagnostics and save these to files:
 	with open(os.path.join(output_dir, 'diagnostics.txt'), 'w') as diag:
 		for starid, sclass in tqdm(starlist):
 			sclass = sclass.upper()
@@ -60,7 +66,7 @@ if __name__ == '__main__':
 				starid = int(starid)
 				fname_save = '{starid:09d}.txt'.format(starid=starid)
 
-			# The path to the
+			# The path to save the final timeseries:
 			fpath_save = os.path.join(output_dir, sclass, fname_save)
 			#if os.path.exists(fpath_save):
 			#	continue
@@ -77,10 +83,24 @@ if __name__ == '__main__':
 				subdir = '{0:09d}'.format(starid)[:5]
 				fpath = os.path.join(thisdir, subdir, fname)
 
-				# Move file into subdir, just to not have too many files in one directory:
+				# If it doesn't exist in subdir (to not have too many files in one directory)
+				# check of it is in the root dir instead:
 				if not os.path.exists(fpath) and os.path.exists(os.path.join(thisdir, fname)):
-					os.makedirs(os.path.join(thisdir, subdir), exist_ok=True)
-					shutil.move(os.path.join(thisdir, fname), fpath)
+					fpath = os.path.join(thisdir, fname)
+
+				# Print if file does not exist, instead of failing one
+				# at a time. Making debugging a little easier:
+				if not os.path.isfile(fpath):
+					# Check if the target was actually observed in Q9:
+					r = requests.get('https://kasoc.phys.au.dk/catalog/sectors.php',
+						params={'starid': starid})
+					r.raise_for_status()
+					if 'Q9' not in r.json():
+						tqdm.write("Not observed in Q9: %d,%s" % (starid, sclass))
+					else:
+						tqdm.write("Data file does not exist: %d,%s" % (starid, sclass))
+
+					continue
 
 				# Load Kepler Q9 ASCII file (PDC corrected):
 				data = np.loadtxt(fpath, usecols=(0,3,4), comments='#')
@@ -110,7 +130,7 @@ if __name__ == '__main__':
 				np.savetxt(fpath_save, data, delimiter='  ', fmt=('%.8f', '%.16e', '%.16e'))
 
 			# Calculate diagnostics:
-			lc = LightCurve(time=data[:,0], flux=data[:,1])
+			lc = LightCurve(time=data[:,0], flux=data[:,1], flux_err=data[:,2])
 			variance = nanvar(data[:,1], ddof=1)
 			rms_hour = rms_timescale(lc, timescale=3600/86400)
 			ptp = nanmedian(np.abs(np.diff(data[:,1])))

@@ -11,3 +11,4 @@ from .XGBClassifier import XGBClassifier
 from .MetaClassifier import MetaClassifier
 from .utilities import PICKLE_DEFAULT_PROTOCOL
 from . import training_sets
+from .download_cache import download_cache

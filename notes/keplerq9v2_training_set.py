@@ -57,6 +57,13 @@ if __name__ == '__main__':
 	# list of starids, load the data file, restructure the timeseries,
 	# calculate diagnostics and save these to files:
 	with open(os.path.join(output_dir, 'diagnostics.txt'), 'w') as diag:
+		diag.write("# Kepler Q9 Training Set Targets (version 2)\n")
+		diag.write("# Pre-calculated diagnostics\n")
+		diag.write("# Column 1: Variance (ppm2)\n")
+		diag.write("# Column 2: RMS per hour (ppm2/hour)\n")
+		diag.write("# Column 3: Point-to-point scatter (ppm)\n")
+		diag.write("#-------------------------------------------\n")
+
 		for starid, sclass in tqdm(starlist):
 			sclass = sclass.upper()
 			if starid.startswith('constant_') or starid.startswith('fakerrlyr_'):
@@ -106,8 +113,9 @@ if __name__ == '__main__':
 				data = np.loadtxt(fpath, usecols=(0,3,4), comments='#')
 
 				# Remove anything with quality > 0:
-				indx = np.isfinite(data[:,1]) & np.isfinite(data[:,2])
-				data = data[indx, :]
+				indx = ~np.isfinite(data[:,1]) | ~np.isfinite(data[:,2])
+				data[indx, 1:3] = np.NaN
+				data = data[1:, :] # Just removing the first data point as it is always NaN anyway
 
 				# Subtract the first timestamp from all timestamps:
 				data[:, 0] -= data[0, 0]
@@ -141,5 +149,7 @@ if __name__ == '__main__':
 				rms_hour=rms_hour,
 				ptp=ptp
 			))
+
+		diag.write("#-------------------------------------------\n")
 
 	print("DONE")

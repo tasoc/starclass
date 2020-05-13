@@ -83,7 +83,7 @@ def main():
 			if task['classifier'] != current_classifier or stcl is None:
 				current_classifier = task['classifier']
 				if stcl: stcl.close()
-				stcl = ClassificationClass[current_classifier](level=args.level, features_cache=features_cache, tset_key='keplerq9')
+				stcl = ClassificationClass[current_classifier](level=args.level, features_cache=features_cache, tset_key='keplerq9v2')
 
 			# ----------------- This code would run on each worker ------------------------
 

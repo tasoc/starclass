@@ -1,6 +1,6 @@
 pytest
 numpy == 1.17.5
-matplotlib == 3.2.1
+matplotlib == 3.0.3
 scipy == 1.3.3
 astropy == 3.2.3
 lightkurve >= 1.7.0

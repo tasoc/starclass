@@ -14,7 +14,7 @@ from bottleneck import nanmedian, move_median
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
 
-#------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 def _move_median_central_1d(x, width_points):
 	y = move_median(x, width_points, min_count=1)
 	y = np.roll(y, -width_points//2+1)
@@ -23,26 +23,28 @@ def _move_median_central_1d(x, width_points):
 		y[-(k+1)] = nanmedian(x[-(k+2):])
 	return y
 
-#------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 def move_median_central(x, width_points, axis=0):
 	return np.apply_along_axis(_move_median_central_1d, axis, x, width_points)
 
-#------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 # TODO: Replace with ps.ls.model?
 def model(x, a, b, Freq):
 	return (a * np.sin(2 * np.pi * Freq * 1e-6 * x * 86400) +
 			b * np.cos(2 * np.pi * Freq * 1e-6 * x * 86400) )
 
-#------------------------------------------------------------------------------
-def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None, conseclim=10, harmonics_list=None):
+#--------------------------------------------------------------------------------------------------
+def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None, conseclim=10,
+	harmonics_list=None):
 	"""
 	Extract frequencies from timeseries.
 
 	Parameters:
-		lightcurve (``lightkurve.LightCurve`` object): Lightcurve to extract frequencies for.
-		numfreq (integer, optional): Number of frequencies to extract.
-		hifac (integer, optional): Nyquist factor.
-		ofac (integer, optional): Oversampling factor used for initial search for peaks in power spectrum.
+		lightcurve (:class:`lightkurve.LightCurve`): Lightcurve to extract frequencies for.
+		numfreq (int, optional): Number of frequencies to extract.
+		hifac (int, optional): Nyquist factor.
+		ofac (int, optional): Oversampling factor used for initial search for peaks
+			in power spectrum.
 		snrlim (float, optional):
 		conseclim (integer, optional):
 
@@ -185,7 +187,7 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 		# Loop through all harmonics:
 		for h in range(1, n_harmonics+1):
 			n_harmonic = harmonics_list[h-1]
-			# Don't find harmonics outside frequnecy range:
+			# Don't find harmonics outside frequency range:
 			if n_harmonic*nu[i,0] > f_max:
 				break
 
@@ -272,7 +274,7 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 						lightcurve += model(lightcurve.time, alpha[j], beta[j], nu[j])
 						ps = powerspectrum(lightcurve)
 
-						# Find the frequncy of maximum power and find alpha and beta again
+						# Find the frequency of maximum power and find alpha and beta again
 						nu[j] = ps.optimize_peak(nu[j])
 						alpha[j], beta[j] = ps.alpha_beta(nu[j])
 
@@ -321,74 +323,3 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 			features['phase' + str(i+1) + '_harmonic' + str(j)] = phase[i,j]
 
 	return features
-
-#------------------------------------------------------------------------------
-if __name__ == '__main__':
-	from lightkurve import TessLightCurve, KeplerLightCurve
-	import matplotlib.pyplot as plt
-
-	# Setup logging:
-	formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-	console = logging.StreamHandler()
-	console.setFormatter(formatter)
-	logger = logging.getLogger(__name__)
-	if not logger.hasHandlers(): logger.addHandler(console)
-	logger.setLevel(logging.DEBUG)
-
-	time = np.arange(0, 27.0, 1800/86400)
-
-	#flux = 10*np.sin(2*np.pi*50e-6*time*86400) #+ 2*np.sin(2*np.pi*100e-6*time*86400)
-
-	flux = 10*np.sin(2*np.pi*50e-6*time*86400) + 2*np.sin(2*np.pi*100e-6*time*86400) \
-		+ 3*np.sin(2*np.pi*89e-6*time*86400 + 0.5) \
-		+ 12*np.sin(2*np.pi*91.3e-6*time*86400 + 0.32) + 6*np.sin(2*np.pi*2*91.3e-6*time*86400 + 0.32) \
-		+ 2.4*np.random.randn(len(time))
-
-	#flux = np.random.normal(0, 2, size=len(time))
-
-	lc = TessLightCurve(
-		time=time,
-		flux=flux
-	)
-
-	#time, flux = np.loadtxt('kic1162345_all.dat', unpack=True, usecols=(0,1))
-	#lc = KeplerLightCurve(
-	#	time=time,
-	#	flux=flux,
-	#	targetid=1162345,
-	#	time_format='bkjd',
-	#	time_scale='tdb'
-	#)
-
-	lc = lc.remove_nans().remove_outliers()
-	lc.plot(normalize=False)
-
-	n_peaks = 5
-	n_harminics = 2
-	feat = freqextr(lc.copy(), n_peaks=n_peaks, n_harmonics=n_harminics)
-
-	print("-"*72)
-
-	ps = powerspectrum(lc)
-	frequency, power = ps.powerspectrum(oversampling=50, scale='amplitude')
-
-	plt.figure()
-	plt.plot(frequency, power, 'k-', lw=0.5)
-
-	for k in range(1, n_peaks+1):
-		f = feat['freq' + str(k)]
-		a = feat['amp' + str(k)]
-		p = feat['phase' + str(k)]
-		if np.isfinite(f):
-			plt.plot(f, a, 'ro')
-			print("0   %7.3f   %6.3f   %6.3f" % (f, a, p))
-
-		for j in range(1, n_harminics+1):
-			f = feat['freq' + str(k) + '_harmonic' + str(j)]
-			a = feat['amp' + str(k) + '_harmonic' + str(j)]
-			p = feat['phase' + str(k) + '_harmonic' + str(j)]
-			if np.isfinite(f):
-				plt.plot(f, a, 'go')
-				print("%d   %7.3f   %6.3f   %6.3f" % (j, f, a, p))
-
-	plt.show()

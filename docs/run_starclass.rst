@@ -4,8 +4,3 @@
 .. automodule:: run_starclass
 	:no-members:
 	:no-undoc-members:
-
-Command help
-------------
-
-.. program-output:: python ../starclass/run_starclass.py --help

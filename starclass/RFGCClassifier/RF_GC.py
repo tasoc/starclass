@@ -117,16 +117,14 @@ class RFGCClassifier(BaseClassifier):
 	def do_classify(self, features, recalc=False):
 		"""
 		Classify a single lightcurve.
-		Assumes lightcurve time is in days
-		Assumes featdict contains ['freq1'],['freq2']...['freq6'] in units of muHz
-		Assumes featdict contains ['amp1'],['amp2'],['amp3']
-									(amplitudes not amplitude ratios)
-		Assumes featdict contains ['phase1'],['phase2'],['phase3']
-									(phases not phase differences)
+
+		* Assumes lightcurve time is in days
+		* Assumes featdict contains ['freq1'],['freq2']...['freq6'] in units of muHz
+		* Assumes featdict contains ['amp1'],['amp2'],['amp3'] (amplitudes not amplitude ratios)
+		* Assumes featdict contains ['phase1'],['phase2'],['phase3'] (phases not phase differences)
 
 		Parameters:
-			lightcurve (``lightkurve.TessLightCurve`` object): Lightcurve.
-			featdict (dict): Dictionary of other features.
+			features (dict): Dictionary of features.
 
 		Returns:
 			dict: Dictionary of stellar classifications. -10 for NA results.
@@ -160,19 +158,19 @@ class RFGCClassifier(BaseClassifier):
 	def train(self, tset, savecl=True, recalc=False, overwrite=False):
 		"""
 		Train the classifier.
-		Assumes lightcurve time is in days
-		Assumes featdict contains ['freq1'],['freq2']...['freq6'] in units of muHz
-		Assumes featdict contains ['amp1'],['amp2'],['amp3']
-									(amplitudes not amplitude ratios)
-		Assumes featdict contains ['phase1'],['phase2'],['phase3']
-									(phases not phase differences)
+
+		* Assumes lightcurve time is in days
+		* Assumes featdict contains ['freq1'],['freq2']...['freq6'] in units of muHz
+		* Assumes featdict contains ['amp1'],['amp2'],['amp3'] (amplitudes not amplitude ratios)
+		* Assumes featdict contains ['phase1'],['phase2'],['phase3'] (phases not phase differences)
 
 		Parameters:
 			labels (ndarray, [n_objects]): labels for training set lightcurves.
 			features (iterable of dict): features, inc lightcurves
-			savecl - save classifier? (overwrite or recalc must be true for an old classifier to be overwritten)
-			overwrite reruns SOM
-			recalc recalculates features
+			savecl (bool, optional): Save classifier?
+				(``overwrite`` or ``recalc`` must be true for an old classifier to be overwritten)
+			overwrite (bool, optional): Reruns SOM
+			recalc (bool, optional): Recalculates features
 
 		"""
 		# Start a logger that should be used to output e.g. debug information:

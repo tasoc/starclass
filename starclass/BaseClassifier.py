@@ -52,7 +52,7 @@ class BaseClassifier(object):
 			Different directories will be used for each classification level.
 		classifier_key (str): Keyword/name of the current classifier.
 		StellarClasses (:class:`enum.Enum`): Enum of all possible labels the classifier
-			should be able to classifiy stars into. This will depend on the `level`
+			should be able to classify stars into. This will depend on the ``level``
 			which the classifier is run on.
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>

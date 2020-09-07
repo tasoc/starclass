@@ -64,8 +64,8 @@ class BaseClassifier(object):
 
 		Parameters:
 			tset_key (str): From which training-set should the classifier be loaded?
-			level (str, optional): Classfication-level to load. Coices are ``'L1'`` and ``'L2'``.
-				Default=``'L1'``.
+			level (str, optional): Classification-level to load. Choices are ``'L1'`` and ``'L2'``.
+				Default is ``'L1'``.
 			features_cache (str, optional): Path to director where calculated features will be
 				saved/loaded as needed.
 			plot (bool, optional): Create plots as part of the output. Default is ``False``.

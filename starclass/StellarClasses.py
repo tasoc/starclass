@@ -21,12 +21,14 @@ class StellarClasses(enum.Enum):
 	RRLYR_CEPHEID = 'RRLyr/Ceph'
 	DSCT_BCEP = 'dSct/bCep'
 	GDOR_SPB = 'gDor/spB'
-	TRANSIENT = 'transient'
+	#TRANSIENT = 'transient'
 	CONTACT_ROT = 'contactEB/spots'
 	APERIODIC = 'aperiodic'
 	CONSTANT = 'constant'
-	RAPID = 'rapid'
+	#RAPID = 'rapid'
 
+
+class StellarClassesLevel2(enum.Enum):
 	# Level 2 classes
 	RRLYR = 'RR Lyrae'
 	CEPHEID = 'Cepheid'

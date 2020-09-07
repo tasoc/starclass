@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
 """
 An example classifier.
 
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, print_function, with_statement, absolute_import
 import logging
 import numpy as np
-from .. import BaseClassifier, StellarClasses
+from .. import BaseClassifier
 
+#--------------------------------------------------------------------------------------------------
 class ExampleClassifier(BaseClassifier):
 	"""
 	An example classifier.
@@ -24,7 +25,7 @@ class ExampleClassifier(BaseClassifier):
 		"""
 		# Call the parent initializing:
 		# This will set several default settings
-		super(self.__class__, self).__init__(*args, **kwargs)
+		super().__init__(*args, **kwargs)
 
 		# Here you could do other things that needs doing
 		# when the classifier is loaded in.
@@ -32,10 +33,10 @@ class ExampleClassifier(BaseClassifier):
 		# Load stuff:
 		self.something = np.load('my_classifier.npy')
 
-
+	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features):
 		"""
-		My classification that will be run on each lightcurve
+		My classification that will be run on each lightcurve.
 
 		Parameters:
 			features (dict): Dictionary of features.
@@ -56,8 +57,8 @@ class ExampleClassifier(BaseClassifier):
 		# Dummy result where the target is 98% a solar-like
 		# and 2% classical pulsator (delta Scuti/beta Cep):
 		result = {
-			StellarClasses.SOLARLIKE: 0.98,
-			StellarClasses.DSCT_BCEP: 0.02
+			self.StellarClasses.SOLARLIKE: 0.98,
+			self.StellarClasses.DSCT_BCEP: 0.02
 		}
 
 		# If something went wrong:
@@ -66,7 +67,7 @@ class ExampleClassifier(BaseClassifier):
 
 		return result
 
-
+	#----------------------------------------------------------------------------------------------
 	def train(self, features, labels):
 		"""
 		Train the classifier.
@@ -77,5 +78,5 @@ class ExampleClassifier(BaseClassifier):
 		"""
 		# Do all the stuff needed to train the classifier here
 
-		my_classifier = do_the_training(features, labels)
+		my_classifier = do_the_training(features, labels) # noqa: F821
 		np.save('my_classifier.npy', my_classifier)

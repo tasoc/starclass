@@ -1,8 +1,5 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Spyder Editor
+# flake8: noqa
 
-This is a temporary script file.
-"""
-from __future__ import absolute_import
-from .xgbClassifier  import XGBClassifier
+from .xgbClassifier import XGBClassifier

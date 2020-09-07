@@ -1,57 +1,62 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-XGBClassifier
+General XGB Classification
+
+.. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
 """
 import logging
-#import os.path
 import os
 import copy
 import json
-import numpy as np
 from xgboost import XGBClassifier as xgb
 from . import xgb_feature_calc as xgb_features
-from .. import BaseClassifier, StellarClasses
-from .. import utilities
+from .. import BaseClassifier, utilities
 
+#--------------------------------------------------------------------------------------------------
 class Classifier_obj(xgb):
 	"""
 	Wrapper for sklearn XGBClassifier
-
 	"""
 
 	def __init__(self,base_score=0.5, booster='gbtree', colsample_bylevel=1,
-		colsample_bytree=1, eval_metric='mlogloss', gamma=0,
-		learning_rate=0.1, max_delta_step=0, max_depth=13,
-		min_child_weight=1, missing=None, n_estimators=550, n_jobs=1,
-		nthread=None, objective='multi:softmax', random_state=0,
-		reg_alpha=1e-05, reg_lambda=1, scale_pos_weight=1, seed=125,
-		silent=True, subsample=1):
+		colsample_bytree=0.7, eval_metric='mlogloss', gamma=7.5,
+		learning_rate=0.1, max_delta_step=0, max_depth=6,
+		min_child_weight=1, missing=None, n_estimators=500, n_jobs=1,
+		nthread=None, objective='multi:softmax', random_state=154,
+		reg_alpha=1e-5, reg_lambda=1, scale_pos_weight=1, seed=154,
+		silent=True, subsample=0.6):
 
-		super(self.__class__, self).__init__(booster=booster,eval_metric=eval_metric,
-			 learning_rate=learning_rate, max_depth=max_depth,n_estimators=n_estimators,
-			 objective=objective,reg_alpha=reg_alpha)
+		super().__init__(
+			booster=booster,
+			eval_metric=eval_metric,
+			colsample_bytree=colsample_bytree,
+			subsample=subsample,
+			gamma=gamma,
+			learning_rate=learning_rate,
+			max_depth=max_depth,
+			n_estimators=n_estimators,
+			objective=objective,
+			reg_alpha=reg_alpha
+		)
 
-		self.trained = False
+		#self.trained = False
 
-
+#--------------------------------------------------------------------------------------------------
 class XGBClassifier(BaseClassifier):
-
 	"""
-
 	General XGB Classification
 
 	.. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
-
 	"""
-	def __init__(self,clfile='xgb_classifier_1.pickle',
-		featdir="xgb_features",n_estimators=750,
-		max_depth=13,learning_rate = 0.1,reg_alpha=1e-5,
-		objective ='multi:softmax',
-		booster='gbtree',eval_metric='mlogloss', *args, **kwargs):
 
+	def __init__(self, clfile='xgb_classifier_1.pickle',
+		featdir="xgb_features", n_estimators=500, gamma=7.5,
+		min_child_weight=1, subsample=0.8, max_depth=6,
+		learning_rate=0.1, reg_alpha=1e-5,
+		objective='multi:softmax', colsample_bytree=0.7, random_state=154,
+		booster='gbtree', eval_metric='mlogloss', *args, **kwargs):
 		"""
-
 		Initialize the classifier object with optimised parameters.
 
 		Parameters:
@@ -67,124 +72,119 @@ class XGBClassifier(BaseClassifier):
 
 		"""
 
+		# Initialize the parent class:
 		super(self.__class__, self).__init__(*args, **kwargs)
 
-
+		# Attributes of this classifier:
 		self.classifier = None
-		#self.trained = False
+		self.classifier_file = None
+		self.featdir = None
 
 		if clfile is not None:
 			self.classifier_file = os.path.join(self.data_dir, clfile)
-		else:
-			self.classifier_file = None
 
-		if self.classifier_file is not None:
-			if os.path.exists(self.classifier_file):
-				# Load pre-trained classifier
-				self.load(self.classifier_file)
-
-		if featdir is not None:
+		if self.features_cache is not None and featdir is not None:
 			self.featdir = os.path.join(self.features_cache, featdir)
 			os.makedirs(self.featdir, exist_ok=True)
+
+		if self.classifier_file is not None and os.path.exists(self.classifier_file):
+			# Load pre-trained classifier
+			self.load(self.classifier_file)
+			self.trained = True # Assume any classifier loaded is already trained
 		else:
-			self.featdir = None
+			# Create new untrained classifier:
+			self.classifier = Classifier_obj(
+				booster=booster,
+				colsample_bytree=colsample_bytree,
+				eval_metric=eval_metric,
+				gamma=gamma,
+				learning_rate=learning_rate,
+				max_depth=max_depth,
+				min_child_weight=min_child_weight,
+				n_estimators=n_estimators,
+				objective=objective,
+				random_state=random_state,
+				reg_alpha=reg_alpha,
+				subsample=subsample
+			)
+			self.trained = False
 
-
-		if self.classifier is None:
-			self.classifier = Classifier_obj(#base_score=base_score,
-			 booster=booster,#colsample_bylevel=colsample_bylevel,
-			 #colsample_bytree=colsample_bytree,
-			 eval_metric=eval_metric,
-			 #gamma=gamma,
-			 learning_rate=learning_rate,#max_delta_step=max_delta_step,
-			 max_depth=max_depth, #min_child_weight=min_child_weight,
-			 #missing=missing,
-			 n_estimators=n_estimators,#n_jobs=n_jobs,
-			 #nthread=nthread,
-			 objective=objective,#random_state=random_state,
-			 reg_alpha=reg_alpha #reg_lambda=reg_lambda,
-			 #scale_pos_weight=scale_pos_weight, seed=seed,silent=silent,subsample=subsample
-			 )
-
-
+	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):
 		"""
-
 		Save xgb classifier object with pickle
-
 		"""
 
-		self.classifier = None
+		#self.classifier = None
 		temp_classifier = copy.deepcopy(self.classifier)
 		utilities.savePickle(outfile, self.classifier)
 		self.classifier = temp_classifier
 
-	def load(self, infile, classifier_file=None):
-
+	#----------------------------------------------------------------------------------------------
+	def load(self, infile):
 		"""
 		Loading the xgb clasifier
-
 		"""
 
 		self.classifier = utilities.loadPickle(infile)
 
+	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features):
-
 		"""
-
 		My classification that will be run on each lightcurve
 
 		Parameters:
-			lightcurve (``lightkurve.TessLightCurve`` object): Lightcurve.
 			features (dict): Dictionary of other features.
 
 		Returns:
 			dict: Dictionary of stellar classifications.
-
 		"""
 
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
 
-		if not self.classifier.trained:
+		if not self.trained:
 			logger.error('Please train classifer')
 			raise ValueError("Untrained Classifier")
 
-		## If classifer has been trained, calculate features
-		logger.info('Feature Extraction')
-		feature_results = xgb_features.feature_extract(features) ## Come back to this
-		logger.info('Feature Extraction done')
+		# If classifer has been trained, calculate features
+		logger.debug("Calculating features...")
+		feature_results = xgb_features.feature_extract(features) # TODO: Come back to this
+		#logger.info('Feature Extraction done')
 
 		# Do the magic:
-		logger.info("We are staring the magic...")
+		#logger.info("We are staring the magic...")
 		xgb_classprobs = self.classifier.predict_proba(feature_results)[0]
-		logger.info('Done')
-
+		logger.debug("Classification complete")
 		class_results = {}
 
 		for c, cla in enumerate(self.classifier.classes_):
-			key = StellarClasses(cla)
-			class_results[key] = xgb_classprobs[c]
+			key = self.StellarClasses(cla)
+			# Cast to float for prediction
+			class_results[key] = float(xgb_classprobs[c])
 
 		return class_results
 
+	#----------------------------------------------------------------------------------------------
 	def train(self, tset, savecl=True, recalc=False, overwrite=False, feat_import=True):
-
 		"""
-
 		Training classifier using the ...
-
 		"""
 
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
 
-		if self.classifier.trained:
+		if self.trained:
 			return
 
 		logger.info('Calculating/Loading Features.')
 		featarray = xgb_features.feature_extract(tset.features(), savefeat=self.featdir, recalc=recalc)
 		logger.info('Features calculated/loaded.')
+
+		#print(list(featarray))
+		#featarray = featarray.drop(['LinearTrend', 'PairSlopeTrend'], axis=1)
+		#print(list(featarray))
+		#featarray.to_csv(self.data_dir+'/features.csv', index=False)
 
 		#if self.feature is not None:
 		#	if os.path.exists(self.features_file):
@@ -209,50 +209,19 @@ class XGBClassifier(BaseClassifier):
 			#logger.info('SHAPES ', str(np.shape(featarray)))
 			#logger.info('SHAPES ', str(np.shape(fit_labels)))
 			self.classifier.fit(featarray, fit_labels)
-			if feat_import == True:
+			if feat_import:
 				importances = self.classifier.feature_importances_.astype(float)
-				feature_importances = zip(list(featarray),
-										  importances)
-				with open('xgbClassifier_feat_import.json', 'w') as outfile:
+				feature_importances = zip(list(featarray), importances)
+				with open(self.data_dir+'/xgbClassifier_feat_import.json', 'w') as outfile:
 					json.dump(list(feature_importances), outfile)
 
-			self.classifier.trained = True
+			self.trained = True
 		except:
 			logger.exception('Training error ...')
 
-		if savecl and self.classifier.trained:
+		if savecl and self.trained:
 			if self.classifier_file is not None:
 				if not os.path.exists(self.classifier_file) or overwrite:
 					logger.info('Saving pickled xgb classifier to '+self.classifier_file)
 					self.save(self.classifier_file)
 					#self.save_model(self.classifier_file)
-
-	def parse_labels(self,labels,removeduplicates=False):
-		"""
-		"""
-		fitlabels = []
-		for lbl in labels:
-			if removeduplicates:
-				#is it multi-labelled? In which case, what takes priority?
-				#or duplicate it once for each label
-				if len(lbl)>1:#Priority order loosely based on signal clarity
-					if StellarClasses.ECLIPSE in lbl:
-						fitlabels.append('transit/eclipse')
-					elif StellarClasses.RRLYR_CEPHEID in lbl:
-						fitlabels.append('RRLyr/Ceph')
-					elif StellarClasses.CONTACT_ROT in lbl:
-						fitlabels.append('contactEB/spots')
-					elif StellarClasses.DSCT_BCEP in lbl:
-						fitlabels.append('dSct/bCep')
-					elif StellarClasses.GDOR_SPB in lbl:
-						fitlabels.append('gDor/spB')
-					elif StellarClasses.SOLARLIKE in lbl:
-						fitlabels.append('solar')
-					else:
-						fitlabels.append(lbl[0].value)
-				else:
-					#then convert to str
-					fitlabels.append(lbl[0].value)
-			else:
-				fitlabels.append(lbl[0].value)
-		return np.array(fitlabels)

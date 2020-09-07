@@ -1,28 +1,120 @@
 language: python
-python:
-  - "3.5"
-  - "3.6"
+cache: pip
+os: linux
+dist: xenial
 
-# Python 3.7 has to be done a different way
-# https://github.com/travis-ci/travis-ci/issues/9069
+# Since the different OS can't agree what the executables are called,
+# we will use environment variables to store the names:
+env:
+  global:
+    - PYTHON="python" PIP="pip"
+
+# We are specifying the build matrix manually, since there is too little overlap
+# between the different builds:
 jobs:
   include:
-    - language: python
-      python: "3.7"
-      dist: xenial
-      sudo: required
+    - name: "Python 3.6 on Linux"
+      python: "3.6"
 
-# Allow some versions of Python to fail:
-#matrix:
-#  fast_finish: true
-#  allow_failures:
-#    - python: "2.7"
+    - name: "Python 3.7 on Linux"
+      python: "3.7"
+
+    - name: "Python 3.8 on Linux"
+      python: "3.8"
+
+#    - name: "Python 3.6 on Mac"
+#      os: osx
+#      osx_image: xcode9.4 # Python 3.6.5
+#      language: shell
+#      before_install:
+#        - brew install git-lfs
+#        - python3 --version
+#        - git lfs install
+#        - git lfs pull
+#      env: PYTHON="python3" PIP="sudo pip3"
+
+    - name: "Python 3.7 on Mac"
+      os: osx
+      osx_image: xcode11.2 # Python 3.7.4 running on macOS 10.14.4
+      language: shell
+      before_install:
+        - brew install git-lfs
+        - python3 --version
+        - git lfs install
+        - git lfs pull
+      env: PYTHON="python3" PIP="sudo pip3"
+
+#    - name: "Python 3.8 on Mac"
+#      os: osx
+#      osx_image: xcode11.2 # Python 3.7.4 running on macOS 10.14.4
+#      language: shell
+#      before_install:
+#        - brew install git-lfs python@3.8
+#        - python3 --version  # Actually not running Python 3.8 ???
+#        - git lfs install
+#        - git lfs pull
+#      env: PYTHON="python3" PIP="sudo pip3"
+
+    - name: "Python 3.6 on Windows"
+      os: windows
+      language: shell  # 'language: python' is an error on Travis CI Windows
+      before_install:
+        - choco install python --version 3.6.8
+        - python --version
+        - git lfs pull
+      env:
+        - PATH=/c/Python36:/c/Python36/Scripts:$PATH
+
+    - name: "Python 3.7 on Windows"
+      os: windows
+      language: shell  # 'language: python' is an error on Travis CI Windows
+      before_install:
+        - choco install python --version 3.7.4
+        - python --version
+        - git lfs pull
+      env:
+        - PATH=/c/Python37:/c/Python37/Scripts:$PATH
+
+    - name: "Python 3.8 on Windows"
+      os: windows
+      language: shell  # 'language: python' is an error on Travis CI Windows
+      before_install:
+        - choco install python --version 3.8.2
+        - python --version
+        - git lfs pull
+      env:
+        - PATH=/c/Python38:/c/Python38/Scripts:$PATH
+
+    - name: "Flake8"
+      python: "3.6"
+      git:
+        lfs_skip_smudge: true
+      install:
+        - pip install flake8
+      script:
+        - flake8
+
+  # Allow some newer versions of Python to fail for now
+  # This will be changed once the required packages starts
+  # supporting the newer versions of Python:
+  fast_finish: true
+  allow_failures:
+    - name: "Flake8"
+    - os: windows
+    - os: osx
+    - python: "3.8"
 
 # Command to install dependencies
 install:
-  - pip install -r requirements.txt
+  - $PYTHON -m pip install --upgrade pip
+  - $PIP install -r requirements.txt
+  - $PIP install codecov pytest-cov
+  - travis_wait $PYTHON run_download_cache.py -q
 script:
-  - pytest
+  - $PYTHON -m pytest --cov=starclass/
+after_success:
+  - $PYTHON -m codecov
+
 branches:
   only:
     - master

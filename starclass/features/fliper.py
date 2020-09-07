@@ -10,7 +10,6 @@ from 0.2 ,0.7, 7, 20 and 50 muHz.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-from __future__ import division, print_function, with_statement, absolute_import
 import numpy as np
 
 # def _APODIZATION(star_tab_psd):
@@ -54,10 +53,10 @@ def FliPer(psd):
 
 	return {
 		'Fp07': _region(star_tab_psd, 0.7, end) - noise,
-		'Fp7' : _region(star_tab_psd, 7, end)   - noise,
-		'Fp20': _region(star_tab_psd, 20, end)  - noise,
-		'Fp50': _region(star_tab_psd, 50, end)  - noise,
+		'Fp7': _region(star_tab_psd, 7, end) - noise,
+		'Fp20': _region(star_tab_psd, 20, end) - noise,
+		'Fp50': _region(star_tab_psd, 50, end) - noise,
 		'FpWhite': noise,
-		'Fphi': _region(star_tab_psd, 0, 28)    - noise,
+		'Fphi': _region(star_tab_psd, 0, 28) - noise,
 		'Fplo': _region(star_tab_psd, 250, end) - noise
 	}

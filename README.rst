@@ -3,6 +3,11 @@ The TASOC Stellar Classification module
 =======================================
 .. image:: https://travis-ci.org/tasoc/starclass.svg?branch=devel
     :target: https://travis-ci.org/tasoc/starclass
+.. image:: https://img.shields.io/codecov/c/github/tasoc/starclass
+    :target: https://codecov.io/github/tasoc/starclass
+.. image:: https://hitsofcode.com/github/tasoc/starclass?branch=devel
+    :alt: Hits-of-Code
+    :target: https://hitsofcode.com/view/github/tasoc/starclass?branch=devel
 .. image:: https://img.shields.io/github/license/tasoc/starclass.svg
     :alt: license
     :target: https://github.com/tasoc/starclass/blob/devel/LICENSE

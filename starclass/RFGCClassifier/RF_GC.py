@@ -3,31 +3,31 @@
 """
 The RF-GC classifier (general random forest).
 
-.. codeauthor::  David Armstrong <d.j.armstrong@warwick.ac.uk>
+.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 """
 
 import logging
 import os.path
-import numpy as np
 import os
 import copy
 from sklearn.ensemble import RandomForestClassifier
 from . import RF_GC_featcalc as fc
-from .. import BaseClassifier, StellarClasses
-from .. import utilities
+from .. import BaseClassifier, utilities
 
+#--------------------------------------------------------------------------------------------------
 class Classifier_obj(RandomForestClassifier):
 	"""
 	Wrapper for sklearn RandomForestClassifier with attached SOM.
 	"""
 	def __init__(self, n_estimators=1000, max_features=4, min_samples_split=2):
-		super(self.__class__, self).__init__(n_estimators=n_estimators,
-										max_features=max_features,
-										min_samples_split=min_samples_split,
-										class_weight='balanced', max_depth=15)
+		super().__init__(n_estimators=n_estimators,
+			max_features=max_features,
+			min_samples_split=min_samples_split,
+			class_weight='balanced', max_depth=15)
 		self.trained = False
 		self.som = None
 
+#--------------------------------------------------------------------------------------------------
 class RFGCClassifier(BaseClassifier):
 	"""
 	General Random Forest
@@ -52,7 +52,7 @@ class RFGCClassifier(BaseClassifier):
 			min_samples_split (int): see sklearn.RandomForestClassifier
 		"""
 		# Initialise parent
-		super(self.__class__, self).__init__(*args, **kwargs)
+		super().__init__(*args, **kwargs)
 
 		self.classifier = None
 
@@ -74,30 +74,30 @@ class RFGCClassifier(BaseClassifier):
 
 		if self.clfile is not None:
 			if os.path.exists(self.clfile):
-				#load pre-trained classifier
+				# load pre-trained classifier
 				self.load(self.clfile, self.somfile)
 
 		if self.classifier is None:
 			self.classifier = Classifier_obj(n_estimators=n_estimators, max_features=max_features, min_samples_split=min_samples_split)
 			if self.classifier.som is None and self.somfile is not None:
-				#load som
+				# load som
 				if os.path.exists(self.somfile):
 					self.classifier.som = fc.loadSOM(self.somfile)
 
-
+	#----------------------------------------------------------------------------------------------
 	def save(self, outfile, somoutfile='som.txt'):
 		"""
 		Saves the classifier object with pickle.
 
 		som object saved as this MUST be the one used to train the classifier.
 		"""
-		fc.kohonenSave(self.classifier.som.K,os.path.join(self.data_dir,somoutfile)) #overwrites
+		fc.kohonenSave(self.classifier.som.K,os.path.join(self.data_dir, somoutfile)) # overwrites
 		tempsom = copy.deepcopy(self.classifier.som)
 		self.classifier.som = None
 		utilities.savePickle(outfile, self.classifier)
 		self.classifier.som = tempsom
 
-
+	#----------------------------------------------------------------------------------------------
 	def load(self, infile, somfile=None):
 		"""
 		Loads classifier object.
@@ -111,9 +111,9 @@ class RFGCClassifier(BaseClassifier):
 				self.classifier.som = fc.loadSOM(somfile)
 
 		if self.classifier.som is None:
-		    self.classifier.trained = False
+			self.classifier.trained = False
 
-
+	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features, recalc=False):
 		"""
 		Classify a single lightcurve.
@@ -152,11 +152,11 @@ class RFGCClassifier(BaseClassifier):
 
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):
-			key = StellarClasses(cla)
+			key = self.StellarClasses(cla)
 			result[key] = classprobs[c]
 		return result
 
-
+	#----------------------------------------------------------------------------------------------
 	def train(self, tset, savecl=True, recalc=False, overwrite=False):
 		"""
 		Train the classifier.
@@ -217,38 +217,7 @@ class RFGCClassifier(BaseClassifier):
 					logger.info("Saving SOM to '%s'", self.somfile)
 					self.save(self.clfile, self.somfile)
 
-
-	def parse_labels(self,labels,removeduplicates=False):
-		"""
-		"""
-		fitlabels = []
-		for lbl in labels:
-			if removeduplicates:
-				#is it multi-labelled? In which case, what takes priority?
-				#or duplicate it once for each label
-				if len(lbl)>1:#Priority order loosely based on signal clarity
-					if StellarClasses.ECLIPSE in lbl:
-						fitlabels.append('transit/eclipse')
-					elif StellarClasses.RRLYR_CEPHEID in lbl:
-						fitlabels.append('RRLyr/Ceph')
-					elif StellarClasses.CONTACT_ROT in lbl:
-						fitlabels.append('contactEB/spots')
-					elif StellarClasses.DSCT_BCEP in lbl:
-						fitlabels.append('dSct/bCep')
-					elif StellarClasses.GDOR_SPB in lbl:
-						fitlabels.append('gDor/spB')
-					elif StellarClasses.SOLARLIKE in lbl:
-						fitlabels.append('solar')
-					else:
-						fitlabels.append(lbl[0].value)
-				else:
-					#then convert to str
-					fitlabels.append(lbl[0].value)
-			else:
-				fitlabels.append(lbl[0].value)
-		return np.array(fitlabels)
-
-
+	#----------------------------------------------------------------------------------------------
 	def loadsom(self, somfile, dimx=1, dimy=400, cardinality=64):
 		"""
 		Loads a SOM, if not done at init.

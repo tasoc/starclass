@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# flake8: noqa
 
-from __future__ import absolute_import
-from .RF_GC  import RFGCClassifier
+from .RF_GC import RFGCClassifier

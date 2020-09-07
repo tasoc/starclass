@@ -46,6 +46,15 @@ class BaseClassifier(object):
 	The basic stellar classifier class for the TASOC pipeline.
 	All other specific stellar classification algorithms will inherit from BaseClassifier.
 
+	Attributes:
+		plot (bool): Indicates wheter plotting is enabled.
+		data_dir (str): Path to directory where classifiers store auxiliary data.
+			Different directories will be used for each classification level.
+		classifier_key (str): Keyword/name of the current classifier.
+		StellarClasses (:class:enum.Enum): Enum of all possible labels the classifier
+			should be able to classifiy stars into. This will depend on the `level`
+			which the classifier is run on.
+
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
@@ -60,15 +69,6 @@ class BaseClassifier(object):
 			features_cache (str, optional): Path to director where calculated features will be
 				saved/loaded as needed.
 			plot (bool, optional): Create plots as part of the output. Default is ``False``.
-
-		Attributes:
-			plot (bool): Indicates wheter plotting is enabled.
-			data_dir (str): Path to directory where classifiers store auxiliary data.
-				Different directories will be used for each classification level.
-			classifier_key (str): Keyword/name of the current classifier.
-			StellarClasses (:class:enum.Enum): Enum of all possible labels the classifier
-				should be able to classifiy stars into. This will depend on the `level`
-				which the classifier is run on.
 		"""
 
 		# Check the input:
@@ -193,8 +193,8 @@ class BaseClassifier(object):
 		Test classifier using training-set, which has been created with a test-fraction.
 
 		Parameters:
-			tset (``TrainingSet`` object): Training-set to run testing on.
-			save (boolean, optional): Save results of test-predictions?
+			tset (:class:`TrainingSet`): Training-set to run testing on.
+			save (bool, optional): Save results of test-predictions?
 			save_func (callable, optional): Function to call for saving test-predictions.
 		"""
 
@@ -207,7 +207,7 @@ class BaseClassifier(object):
 			logger.info("Test-fraction is zero, so no testing is performed.")
 			return
 
-		# TODO: Only include classes from the current level
+		# All available labels in the current lavel (values):
 		all_classes = [lbl.value for lbl in self.StellarClasses]
 
 		# Classify test set (has to be one by one unless we change classifiers)
@@ -360,7 +360,17 @@ class BaseClassifier(object):
 
 	#----------------------------------------------------------------------------------------------
 	def calc_features(self, lightcurve):
-		"""Calculate other derived features from the lightcurve."""
+		"""
+		Calculate common derived features from the lightcurve.
+
+		Parameters:
+			lightcurve (:class:`TessLightCurve`): Lightcurve object to claculate features from.
+
+		Returns:
+			dict: Dictionary of features.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 
 		# We start out with an empty list of features:
 		features = {}

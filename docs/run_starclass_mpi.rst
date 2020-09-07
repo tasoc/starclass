@@ -2,6 +2,5 @@
 ===========================================
 
 .. automodule:: run_starclass_mpi
-    :members:
-    :undoc-members:
-    :show-inheritance:
+	:no-members:
+	:no-undoc-members:

@@ -17,7 +17,7 @@ Command-line Utilities
 ======================
 
 .. toctree::
-	:maxdepth: 4
+	:maxdepth: 1
 
 	run_training
 	run_starclass

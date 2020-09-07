@@ -6,6 +6,13 @@ General Features (``starclass.features``)
     :undoc-members:
     :show-inheritance:
 
+Power spectrum (``starclass.features.powerspectrum``)
+-----------------------------------------------------
+.. automodule:: starclass.features.powerspectrum
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 Frequency Extraction (``starclass.features.freqextr``)
 ------------------------------------------------------
 .. automodule:: starclass.features.freqextr
@@ -16,13 +23,6 @@ Frequency Extraction (``starclass.features.freqextr``)
 FliPer (``starclass.features.fliper``)
 --------------------------------------
 .. automodule:: starclass.features.fliper
-    :members:
-    :undoc-members:
-    :show-inheritance:
-	
-Power spectrum (``starclass.features.powerspectrum``)
------------------------------------------------------
-.. automodule:: starclass.features.powerspectrum
     :members:
     :undoc-members:
     :show-inheritance:

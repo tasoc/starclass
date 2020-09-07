@@ -96,16 +96,8 @@ class MetaClassifier(BaseClassifier):
 		"""
 		Classify a single lightcurve.
 
-		Assumes lightcurve time is in days
-		Assumes featdict contains ['freq1'],['freq2']...['freq6'] in units of muHz
-		Assumes featdict contains ['amp1'],['amp2'],['amp3']
-									(amplitudes not amplitude ratios)
-		Assumes featdict contains ['phase1'],['phase2'],['phase3']
-									(phases not phase differences)
-
 		Parameters:
-			lightcurve (``lightkurve.TessLightCurve`` object): Lightcurve.
-			featdict (dict): Dictionary of other features.
+			features (dict): Dictionary of features.
 
 		Returns:
 			dict: Dictionary of stellar classifications. -10 for NA results.

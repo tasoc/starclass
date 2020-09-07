@@ -2,6 +2,10 @@
 ======================================
 
 .. automodule:: run_training
-    :members:
-    :undoc-members:
-    :show-inheritance:
+	:no-members:
+	:no-undoc-members:
+
+Command help
+------------
+
+.. program-output:: python ../starclass/run_training.py --help

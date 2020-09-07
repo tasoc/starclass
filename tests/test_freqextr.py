@@ -6,11 +6,9 @@ Tests of Frequency extraction.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 import pytest
-import sys
-import os.path
 import numpy as np
 import lightkurve as lk
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import conftest # noqa: F401
 from starclass.features.freqextr import freqextr
 from starclass.features.powerspectrum import powerspectrum
 from starclass.plots import plt

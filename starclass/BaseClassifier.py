@@ -51,7 +51,7 @@ class BaseClassifier(object):
 		data_dir (str): Path to directory where classifiers store auxiliary data.
 			Different directories will be used for each classification level.
 		classifier_key (str): Keyword/name of the current classifier.
-		StellarClasses (:class:enum.Enum): Enum of all possible labels the classifier
+		StellarClasses (:class:`enum.Enum`): Enum of all possible labels the classifier
 			should be able to classifiy stars into. This will depend on the `level`
 			which the classifier is run on.
 

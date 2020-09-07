@@ -8,9 +8,7 @@ Tests of plotting utilities for stellar classification.
 
 import pytest
 import numpy as np
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+import conftest # noqa: F401
 from starclass.plots import plt, plotConfMatrix
 
 def test_plots_confmatrix():

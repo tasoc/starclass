@@ -7,10 +7,9 @@ Tests of starclass.TaskManager.
 """
 
 import pytest
-import sys
 import os.path
 from astropy.table import Table
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+import conftest # noqa: F401
 from starclass import TaskManager, STATUS, StellarClasses
 
 #--------------------------------------------------------------------------------------------------

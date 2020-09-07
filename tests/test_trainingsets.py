@@ -7,9 +7,7 @@ Tests of Training Sets.
 """
 
 import pytest
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+import conftest # noqa: F401
 import starclass.training_sets as tsets
 
 #--------------------------------------------------------------------------------------------------

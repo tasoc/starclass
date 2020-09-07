@@ -6,11 +6,10 @@ Tests of BaseClassifier.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-import sys
 import os.path
 from lightkurve import TessLightCurve
 import numpy as np
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+import conftest # noqa: F401
 from starclass import BaseClassifier
 from starclass.features.powerspectrum import powerspectrum
 

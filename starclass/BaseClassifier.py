@@ -54,15 +54,21 @@ class BaseClassifier(object):
 		Initialize the classifier object.
 
 		Parameters:
-			tset_key (string): From which training-set should the classifier be loaded?
-			level (string, optional): Classfication-level to load. Coices are ``'L1'`` and ``'L2'``. Default='L1'.
-			features_cache (string, optional): Path to director where calculated features will be saved/loaded as needed.
-			plot (boolean, optional): Create plots as part of the output. Default is ``False``.
+			tset_key (str): From which training-set should the classifier be loaded?
+			level (str, optional): Classfication-level to load. Coices are ``'L1'`` and ``'L2'``.
+				Default=``'L1'``.
+			features_cache (str, optional): Path to director where calculated features will be
+				saved/loaded as needed.
+			plot (bool, optional): Create plots as part of the output. Default is ``False``.
 
 		Attributes:
-			plot (boolean): Indicates wheter plotting is enabled.
-			data_dir (string): Path to directory where classifiers store auxiliary data.
+			plot (bool): Indicates wheter plotting is enabled.
+			data_dir (str): Path to directory where classifiers store auxiliary data.
 				Different directories will be used for each classification level.
+			classifier_key (str): Keyword/name of the current classifier.
+			StellarClasses (:class:enum.Enum): Enum of all possible labels the classifier
+				should be able to classifiy stars into. This will depend on the `level`
+				which the classifier is run on.
 		"""
 
 		# Check the input:
@@ -103,16 +109,20 @@ class BaseClassifier(object):
 			'L2': StellarClassesLevel2
 		}[level]
 
+	#----------------------------------------------------------------------------------------------
 	def __enter__(self):
 		return self
 
+	#----------------------------------------------------------------------------------------------
 	def __exit__(self, *args):
 		self.close()
 
+	#----------------------------------------------------------------------------------------------
 	def close(self):
 		"""Close the classifier."""
 		pass
 
+	#----------------------------------------------------------------------------------------------
 	def classify(self, features):
 		"""
 		Classify a star from the lightcurve and other features.
@@ -142,33 +152,42 @@ class BaseClassifier(object):
 
 		return res
 
+	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features):
 		"""
+		Classify a star from the lightcurve and other features.
+
 		This method should be overwritten by child classes.
 
 		Parameters:
 			features (dict): Dictionary of features of star, including the lightcurve itself.
 
 		Returns:
-			dict: Dictionary where the keys should be from ``StellarClasses`` and the
+			dict: Dictionary where the keys should be from :class:`StellarClasses` and the
 			corresponding values indicate the probability of the star belonging to
 			that class.
 
 		Raises:
-			NotImplementedError
+			NotImplementedError: If classifier has not implemented this subroutine.
 		"""
 		raise NotImplementedError()
 
+	#----------------------------------------------------------------------------------------------
 	def train(self, tset):
 		"""
+		Train classifier on training set.
+
+		This method should be overwritten by child classes.
+
 		Parameters:
-			tset (``TrainingSet`` object): Training-set to train classifier on.
+			tset (:class:`TrainingSet`): Training-set to train classifier on.
 
 		Raises:
-			NotImplementedError
+			NotImplementedError: If classifier has not implemented this subroutine.
 		"""
 		raise NotImplementedError()
 
+	#----------------------------------------------------------------------------------------------
 	def test(self, tset, save=False, save_func=None):
 		"""
 		Test classifier using training-set, which has been created with a test-fraction.
@@ -189,7 +208,7 @@ class BaseClassifier(object):
 			return
 
 		# TODO: Only include classes from the current level
-		all_classes = [lbl.value for lbl in StellarClasses]
+		all_classes = [lbl.value for lbl in self.StellarClasses]
 
 		# Classify test set (has to be one by one unless we change classifiers)
 		y_pred = []
@@ -232,13 +251,14 @@ class BaseClassifier(object):
 		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + self.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 
+	#----------------------------------------------------------------------------------------------
 	def load_star(self, task, fname):
 		"""
 		Recieve a task from the TaskManager, loads the lightcurve and returns derived features.
 
 		Parameters:
-			task (dict):
-			fname (string):
+			task (dict): Task dictionary as returned by :func:`TaskManager.get_task`.
+			fname (str): Path to lightcurve file associated with task.
 
 		Returns:
 			dict: Dictionary with features.
@@ -338,6 +358,7 @@ class BaseClassifier(object):
 
 		return features
 
+	#----------------------------------------------------------------------------------------------
 	def calc_features(self, lightcurve):
 		"""Calculate other derived features from the lightcurve."""
 
@@ -366,11 +387,11 @@ class BaseClassifier(object):
 
 		return features
 
+	#----------------------------------------------------------------------------------------------
 	def parse_labels(self, labels):
 		"""
 		Convert iterator of labels into full numpy array, with only one label per star.
 
-		TODO: Make aware of self.level
 		TODO: How do we handle multiple labels better?
 		"""
 		fitlabels = []
@@ -378,18 +399,18 @@ class BaseClassifier(object):
 			# Is it multi-labelled? In which case, what takes priority?
 			# Priority order loosely based on signal clarity
 			if len(lbl) > 1:
-				if StellarClasses.ECLIPSE in lbl:
-					fitlabels.append(StellarClasses.ECLIPSE.value)
-				elif StellarClasses.RRLYR_CEPHEID in lbl:
-					fitlabels.append(StellarClasses.RRLYR_CEPHEID.value)
-				elif StellarClasses.CONTACT_ROT in lbl:
-					fitlabels.append(StellarClasses.CONTACT_ROT.value)
-				elif StellarClasses.DSCT_BCEP in lbl:
-					fitlabels.append(StellarClasses.DSCT_BCEP.value)
-				elif StellarClasses.GDOR_SPB in lbl:
-					fitlabels.append(StellarClasses.GDOR_SPB.value)
-				elif StellarClasses.SOLARLIKE in lbl:
-					fitlabels.append(StellarClasses.SOLARLIKE.value)
+				if self.StellarClasses.ECLIPSE in lbl:
+					fitlabels.append(self.StellarClasses.ECLIPSE.value)
+				elif self.StellarClasses.RRLYR_CEPHEID in lbl:
+					fitlabels.append(self.StellarClasses.RRLYR_CEPHEID.value)
+				elif self.StellarClasses.CONTACT_ROT in lbl:
+					fitlabels.append(self.StellarClasses.CONTACT_ROT.value)
+				elif self.StellarClasses.DSCT_BCEP in lbl:
+					fitlabels.append(self.StellarClasses.DSCT_BCEP.value)
+				elif self.StellarClasses.GDOR_SPB in lbl:
+					fitlabels.append(self.StellarClasses.GDOR_SPB.value)
+				elif self.StellarClasses.SOLARLIKE in lbl:
+					fitlabels.append(self.StellarClasses.SOLARLIKE.value)
 				else:
 					fitlabels.append(lbl[0].value)
 			else:

@@ -19,4 +19,6 @@ Command-line Utilities
 .. toctree::
 	:maxdepth: 4
 
+	run_training
 	run_starclass
+	run_starclass_mpi

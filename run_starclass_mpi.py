@@ -32,7 +32,7 @@ import itertools
 import starclass
 from timeit import default_timer
 
-#------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 def main():
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run TESS Corrections in parallel using MPI.')
@@ -214,5 +214,6 @@ def main():
 		finally:
 			comm.send(None, dest=0, tag=tags.EXIT)
 
+#--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	main()

@@ -60,16 +60,16 @@ class XGBClassifier(BaseClassifier):
 		Initialize the classifier object with optimised parameters.
 
 		Parameters:
-			clfile (str): svaed classifier file.
-			#xgbclassifier_features (str):	Features
-			n_estimators (int): number of boosted trees in the ensemble
-			max_depth (int): maximum depth of each tree in the ensemble
-			learning_rate=boosting learning rate
-			reg_alpha=L1 regulaarization on the features
-			objective =learning objective of the algorithm
-			booster=booster used in the tree,
-			eval_metric=Evaluation metric
+			clfile (str): saved classifier file.
+			n_estimators (int): number of boosted trees in the ensemble.
+			max_depth (int): maximum depth of each tree in the ensemble.
+			learning_rate: boosting learning rate.
+			reg_alpha: L1 regularization on the features.
+			objective: learning objective of the algorithm.
+			booster: booster used in the tree.
+			eval_metric: Evaluation metric.
 
+		.. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
 		"""
 
 		# Initialize the parent class:

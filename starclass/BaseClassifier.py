@@ -69,6 +69,8 @@ class BaseClassifier(object):
 			features_cache (str, optional): Path to director where calculated features will be
 				saved/loaded as needed.
 			plot (bool, optional): Create plots as part of the output. Default is ``False``.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
 		# Check the input:

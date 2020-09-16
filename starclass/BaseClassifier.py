@@ -353,6 +353,9 @@ class BaseClassifier(object):
 		for key in ('tmag', 'variance', 'rms_hour', 'ptp', 'other_classifiers'):
 			if key in task.keys():
 				features[key] = task[key]
+			else:
+				logger.warning("Key '%s' not found in task.", key)
+				features[key] = np.NaN
 
 		# Save features in cache file for later use:
 		if save_to_cache and self.features_cache:

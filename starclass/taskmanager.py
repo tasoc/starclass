@@ -185,7 +185,10 @@ class TaskManager(object):
 				todolist.priority,
 				todolist.starid,
 				todolist.tmag,
-				diagnostics_corr.lightcurve AS lightcurve
+				diagnostics_corr.lightcurve AS lightcurve,
+				diagnostics_corr.variance,
+				diagnostics_corr.rms_hour,
+				diagnostics_corr.ptp
 			FROM
 				todolist
 				INNER JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority
@@ -224,6 +227,8 @@ class TaskManager(object):
 					rows=rows,
 					names=('classifier', 'class', 'prob'),
 				)
+			else:
+				task['other_classifiers'] = None
 
 			return task
 		return None

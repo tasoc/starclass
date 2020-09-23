@@ -14,7 +14,7 @@ import starclass
 def main():
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Utility function for training stellar classifiers.')
-	parser.add_argument('-c', '--classifier', help='Classifier to train.', default='rfgc', choices=('rfgc', 'slosh', 'foptics', 'xgb', 'meta'))
+	parser.add_argument('-c', '--classifier', help='Classifier to train.', default='rfgc', choices=('rfgc', 'slosh', 'foptics', 'xgb', 'sortinghat', 'meta'))
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9', choices=('tdasim', 'keplerq9', 'keplerq9-linfit', 'keplerq9v2'))
@@ -53,6 +53,7 @@ def main():
 		'slosh': starclass.SLOSHClassifier,
 		#'foptics': starclass.FOPTICSClassifier,
 		'xgb': starclass.XGBClassifier,
+		'sortinghat': starclass.SORTINGHATClassifier,
 		'meta': starclass.MetaClassifier
 	}
 

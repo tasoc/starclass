@@ -75,7 +75,7 @@ class MetaClassifier(BaseClassifier):
 		if self.classifier is None:
 			self.classifier = Classifier_obj()
 
-		self.indiv_classifiers = ['rfgc', 'SLOSH', 'xgb']
+		self.indiv_classifiers = ['rfgc', 'SLOSH', 'xgb', 'sortinghat']
 
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):

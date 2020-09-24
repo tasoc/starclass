@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Extract frequencies from timeseries.
-
 .. codeauthor:: Kristine Kousholt Mikkelsen <201505068@post.au.dk>
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
@@ -29,32 +28,37 @@ def move_median_central(x, width_points, axis=0):
 
 #--------------------------------------------------------------------------------------------------
 # TODO: Replace with ps.ls.model?
-def model(x, a, b, Freq):
-	return (a * np.sin(2 * np.pi * Freq * 1e-6 * x * 86400) +
-			b * np.cos(2 * np.pi * Freq * 1e-6 * x * 86400) )
+def model(x, a, b, freq):
+	omegax = 0.1728 * np.pi * freq * x # Strange factor is 2 * 86400 * 1e-6
+	return a * np.sin(omegax) + b * np.cos(omegax)
 
 #--------------------------------------------------------------------------------------------------
-def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None, conseclim=10,
-	harmonics_list=None):
+def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None, snr_width=None,
+	faplim=1-0.9973, conseclim=10, harmonics_list=None):
 	"""
 	Extract frequencies from timeseries.
-
 	Parameters:
 		lightcurve (:class:`lightkurve.LightCurve`): Lightcurve to extract frequencies for.
-		numfreq (int, optional): Number of frequencies to extract.
+		n_peaks (int, optional): Number of frequencies to extract.
+		n_harmonics (int, optional): Number of harmonics to extract for each frequency.
 		hifac (int, optional): Nyquist factor.
 		ofac (int, optional): Oversampling factor used for initial search for peaks
 			in power spectrum.
-		snrlim (float, optional):
-		conseclim (integer, optional):
-
+		snrlim (float, optional): Limit on local signal-to-noise ratio above which peaks are
+			considered significant. If set to `None` no limit is enforced. Default is to not
+			enforce a limit.
+		snr_width (float, optional): Width in uHz around each peak to estimate signal-to-noise from.
+			Default is 15 frequency steps on either side of the peak.
+		faplim (float, optional): False alarm probability limit. Peaks with a f.a.p. below this
+			limit are considerd significant. If set to `None` no limit is enforced.
+			Default is 1-0.9973=0.0027.
+		conseclim (int, optional): Stop after this number of consecutive failed peaks.
+			Default is 10.
 	Returns:
 		dict: Features
-
 	Note:
-		If the hight of the peak of one of the harmonics are close to being insignificant,
+		If the height of the peak of one of the harmonics are close to being insignificant,
 		the harmonic may not be found as an harmonic, but will be found later as a peak in it self.
-
 	.. codeauthor:: Kristine Kousholt Mikkelsen <201505068@post.au.dk>
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
@@ -63,10 +67,10 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None
 
 	# Default value for different parameters
 	# TODO: Add these as inputs
-	faplim = 1 - 0.9973
 	alphadev = 0.50 # 0.75
 	Noptimize = 10 # Optimize all peaks = -1
 	optim_max_diff = 10 # uHz
+	estimate_noise = True
 
 	# If no list of harmonics is given, do the simple one:
 	if harmonics_list is None:
@@ -75,13 +79,16 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None
 	# Constants:
 	power_median_to_mean = (1 - 1/9)**-3
 	mean_noise = 1
-	estimate_noise = True
 
 	# Store original lightcurve and powerspectrum for later use:
 	original_lightcurve = lightcurve.copy()
 	original_ps = powerspectrum(original_lightcurve)
 	f_max = original_ps.nyquist*hifac*1e6
 	df = original_ps.df*1e6
+
+	# Defaults that depend on the power spectrum parameters:
+	if snr_width is None:
+		snr_width = 15*df
 
 	# Create lists for frequencies, alpha, beta and deviations:
 	# Create as 2D array, which as main-frequency number for rows, and harmonic number for columns.
@@ -97,10 +104,15 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None
 		ps = powerspectrum(lightcurve)
 		frequency, power = ps.powerspectrum(oversampling=ofac, nyquist_factor=hifac, scale='power')
 
+		# Estimate a frequency-dependent noise-floor by binning the power spectrum.
 		if estimate_noise:
-			bins = np.logspace(np.floor(np.log10(df)), np.ceil(np.log10(f_max)), 20)
+			# Create bins to estimate noise level in:
+			#bins = np.logspace(np.floor(np.log10(df)), np.ceil(np.log10(f_max)), 20)
 			bins = np.linspace(df, f_max, 20)
 
+			# Calculate the median in the bins.
+			# Make sure we have at least 20 frequencies in each bin,
+			# otherwise combine adjacent bins until this is the case:
 			for _ in range(100):
 				mean_noise, bins, binindx = binned_statistic(frequency, power, bins=bins, statistic='median')
 
@@ -134,7 +146,6 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None
 		logger.debug('Fundamental frequency: %f', nu[i,0])
 
 		# Stop if significance becomes too low (lombscargle significance)
-
 		if faplim is not None:
 			FAP = ps.false_alarm_probability(nu[i,0])
 			if FAP > faplim:
@@ -146,8 +157,9 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None
 
 		# Stop if significance becomes too low (SNR ratio)
 		if snrlim is not None:
+			# Calculate SNR by estimating noise level locally around peak:
 			# TODO: Subtract peak first?
-			noise = np.sqrt(power_median_to_mean * np.median(power[(frequency > (nu[i,0] - 15*df)) & (frequency < (nu[i,0] + 15*df))]))
+			noise = np.sqrt(power_median_to_mean * np.median(power[(frequency > (nu[i,0] - snr_width)) & (frequency < (nu[i,0] + snr_width))]))
 			amp = np.sqrt(alpha[i,0]**2 + beta[i,0]**2)
 			snr = amp / noise
 			logger.debug("SNR: %f", snr)
@@ -158,8 +170,8 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None
 			#plt.plot(frequency[pmax_index], np.sqrt(power[pmax_index]), 'go')
 			#plt.plot(nu[i,0], ps.powerspectrum(nu[i,0]*1e-6, scale='amplitude')[1], 'ro')
 			#plt.axhline(noise)
-			#plt.axvline(nu[i,0] - 15*df)
-			#plt.axvline(nu[i,0] + 15*df)
+			#plt.axvline(nu[i,0] - snr_width)
+			#plt.axvline(nu[i,0] + snr_width)
 
 			if snr < snrlim:
 				logger.debug("Stopped from SNR")
@@ -210,8 +222,9 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None
 
 			# Stop if significance becomes too low (SNR ratio):
 			if snrlim is not None:
+				# Calculate SNR by estimating noise level locally around peak:
 				# TODO: Subtract peak first?
-				noise = np.sqrt(power_median_to_mean * np.median(power[(frequency > (nu[i,0] - 15*df)) & (frequency < (nu[i,0] + 15*df))]))
+				noise = np.sqrt(power_median_to_mean * np.median(power[(frequency > (nu[i,0] - snr_width)) & (frequency < (nu[i,0] + snr_width))]))
 				amp = np.sqrt(alpha[i,0]**2 + beta[i,0]**2)
 				snr = amp / noise
 				logger.debug("SNR: %f", snr)
@@ -222,8 +235,8 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None
 				#plt.plot(frequency[pmax_index], np.sqrt(power[pmax_index]), 'go')
 				#plt.plot(nu[i,0], ps.powerspectrum(nu[i,0]*1e-6, scale='amplitude')[1], 'ro')
 				#plt.axhline(noise)
-				#plt.axvline(nu[i,0] - 15*df)
-				#plt.axvline(nu[i,0] + 15*df)
+				#plt.axvline(nu[i,0] - snr_width)
+				#plt.axvline(nu[i,0] + snr_width)
 
 				if snr < snrlim:
 					logger.debug("Stopped from SNR")

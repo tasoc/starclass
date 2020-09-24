@@ -17,12 +17,13 @@ class Classifier_obj(RandomForestClassifier):
 	"""
 	Wrapper for sklearn RandomForestClassifier.
 	"""
-	def __init__(self, n_estimators=100, min_samples_split=2):
+	def __init__(self, n_estimators=100, min_samples_split=2, random_state=None):
 		super().__init__(
 			n_estimators=n_estimators,
 			min_samples_split=min_samples_split,
 			class_weight='balanced',
-			max_depth=3
+			max_depth=3,
+			random_state=random_state
 		)
 		self.trained = False
 
@@ -36,13 +37,13 @@ class MetaClassifier(BaseClassifier):
 
 	def __init__(self, clfile='meta_classifier.pickle', featdir='', *args, **kwargs):
 		"""
-		Initialise the classifier object.
+		Initialize the classifier object.
 
 		Parameters:
 			clfile (str): Filepath to previously pickled Classifier_obj
 			featfile (str):	Filepath to pre-calculated features, if available.
 		"""
-		# Initialise parent
+		# Initialize parent
 		super().__init__(*args, **kwargs)
 
 		# Start logger:
@@ -73,7 +74,7 @@ class MetaClassifier(BaseClassifier):
 
 		# Set up classifier
 		if self.classifier is None:
-			self.classifier = Classifier_obj()
+			self.classifier = Classifier_obj(random_state=self.random_state)
 
 		self.indiv_classifiers = ['rfgc', 'SLOSH', 'xgb']
 
@@ -85,7 +86,7 @@ class MetaClassifier(BaseClassifier):
 		utilities.savePickle(outfile, self.classifier)
 
 	#----------------------------------------------------------------------------------------------
-	def load(self, infile, somfile=None):
+	def load(self, infile):
 		"""
 		Loads classifier object.
 		"""

@@ -19,11 +19,12 @@ class Classifier_obj(RandomForestClassifier):
 	"""
 	Wrapper for sklearn RandomForestClassifier with attached SOM.
 	"""
-	def __init__(self, n_estimators=1000, max_features=4, min_samples_split=2):
+	def __init__(self, n_estimators=1000, max_features=4, min_samples_split=2, random_state=None):
 		super().__init__(n_estimators=n_estimators,
 			max_features=max_features,
 			min_samples_split=min_samples_split,
-			class_weight='balanced', max_depth=15)
+			class_weight='balanced', max_depth=15,
+			random_state=random_state)
 		self.trained = False
 		self.som = None
 
@@ -35,8 +36,8 @@ class RFGCClassifier(BaseClassifier):
 	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 	"""
 	def __init__(self, clfile='rfgc_classifier_v01.pickle', somfile='rfgc_som.txt',
-					dimx=1, dimy=400, cardinality=64, n_estimators=1000,
-					max_features=4, min_samples_split=2, *args, **kwargs):
+		dimx=1, dimy=400, cardinality=64, n_estimators=1000,
+		max_features=4, min_samples_split=2, *args, **kwargs):
 		"""
 		Initialize the classifier object.
 
@@ -78,7 +79,10 @@ class RFGCClassifier(BaseClassifier):
 				self.load(self.clfile, self.somfile)
 
 		if self.classifier is None:
-			self.classifier = Classifier_obj(n_estimators=n_estimators, max_features=max_features, min_samples_split=min_samples_split)
+			self.classifier = Classifier_obj(n_estimators=n_estimators,
+				max_features=max_features,
+				min_samples_split=min_samples_split,
+				random_state=self.random_state)
 			if self.classifier.som is None and self.somfile is not None:
 				# load som
 				if os.path.exists(self.somfile):

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Extract frequencies from timeseries.
+
 .. codeauthor:: Kristine Kousholt Mikkelsen <201505068@post.au.dk>
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
@@ -37,6 +38,7 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None
 	faplim=1-0.9973, conseclim=10, harmonics_list=None):
 	"""
 	Extract frequencies from timeseries.
+
 	Parameters:
 		lightcurve (:class:`lightkurve.LightCurve`): Lightcurve to extract frequencies for.
 		n_peaks (int, optional): Number of frequencies to extract.
@@ -54,11 +56,14 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None
 			Default is 1-0.9973=0.0027.
 		conseclim (int, optional): Stop after this number of consecutive failed peaks.
 			Default is 10.
+
 	Returns:
 		dict: Features
+
 	Note:
 		If the height of the peak of one of the harmonics are close to being insignificant,
 		the harmonic may not be found as an harmonic, but will be found later as a peak in it self.
+
 	.. codeauthor:: Kristine Kousholt Mikkelsen <201505068@post.au.dk>
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""

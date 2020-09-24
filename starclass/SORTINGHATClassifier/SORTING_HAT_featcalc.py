@@ -6,7 +6,6 @@ Utilities for the SORTING-HAT classifier.
 .. codeauthor:: Jeroen Audenaert <jeroen.audenaert@kuleuven.be>
 
 """
-
 import pandas as pd
 import numpy as np
 import math
@@ -14,11 +13,11 @@ import os
 import logging
 from tqdm import tqdm
 import scipy.stats as stat
-from pyentrp import entropy as ent
 import statistics as stats
-import npeet.entropy_estimators as npeet
-import nolds
-from ..RFGCClassifier import RF_GC_featcalc
+from . import npeet_entropy_estimators as npeet
+from . import pyentropy as ent
+
+#import nolds
 
 #--------------------------------------------------------------------------------------------------
 def featcalc(features, providednfreqs=6, nfrequencies=3, forbiddenfreqs=[13.49/4.],
@@ -395,7 +394,7 @@ def compute_differential_entropy(flux):
 	return entr
 
 #--------------------------------------------------------------------------------------------------
-def compute_max_lyapunov_exponent(flux):
+#def compute_max_lyapunov_exponent(flux):
 	"""
 	Returns the maximum Lyapunov exponent calculated through the algortihm by Eckmann et al. (1986) 
 	
@@ -409,9 +408,9 @@ def compute_max_lyapunov_exponent(flux):
 		lyap_exp: float
 	"""
     #lyap_exp = nolds.lyap_r(flux, emb_dim=10, lag=None, min_tsep=None)
-	lyap_exp = max(nolds.lyap_e(flux, emb_dim=10, matrix_dim=4, min_nb=None, min_tsep=0, tau=1, debug_plot=False, debug_data=False, plot_file=None))
+	#lyap_exp = max(nolds.lyap_e(flux, emb_dim=10, matrix_dim=4, min_nb=None, min_tsep=0, tau=1, debug_plot=False, debug_data=False, plot_file=None))
 	
-	return lyap_exp
+	#return lyap_exp
 
 #--------------------------------------------------------------------------------------------------
 def compute_flux_ratio(flux):

@@ -47,7 +47,7 @@ class SLOSHClassifier(BaseClassifier):
 
 		# Set the global random seeds:
 		np.random.seed(self.random_seed)
-		tf.set_random_seed(self.random_seed)
+		tf.compat.v1.set_random_seed(self.random_seed)
 
 		# Find model file
 		if clfile is not None:

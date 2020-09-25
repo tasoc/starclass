@@ -9,7 +9,7 @@ import os.path
 import numpy as np
 import tempfile
 import warnings
-from lightkurve import LightCurve
+from lightkurve import LightCurve, LightkurveWarning
 import conftest # noqa: F401
 from starclass.utilities import savePickle, loadPickle, rms_timescale
 

@@ -14,35 +14,6 @@ from . import xgb_feature_calc as xgb_features
 from .. import BaseClassifier, utilities
 
 #--------------------------------------------------------------------------------------------------
-class Classifier_obj(xgb):
-	"""
-	Wrapper for sklearn XGBClassifier
-	"""
-
-	def __init__(self,base_score=0.5, booster='gbtree', colsample_bylevel=1,
-		colsample_bytree=0.7, eval_metric='mlogloss', gamma=7.5,
-		learning_rate=0.1, max_delta_step=0, max_depth=6,
-		min_child_weight=1, missing=None, n_estimators=500, n_jobs=1,
-		nthread=None, objective='multi:softmax', random_state=154,
-		reg_alpha=1e-5, reg_lambda=1, scale_pos_weight=1, seed=154,
-		silent=True, subsample=0.6):
-
-		super().__init__(
-			booster=booster,
-			eval_metric=eval_metric,
-			colsample_bytree=colsample_bytree,
-			subsample=subsample,
-			gamma=gamma,
-			learning_rate=learning_rate,
-			max_depth=max_depth,
-			n_estimators=n_estimators,
-			objective=objective,
-			reg_alpha=reg_alpha
-		)
-
-		#self.trained = False
-
-#--------------------------------------------------------------------------------------------------
 class XGBClassifier(BaseClassifier):
 	"""
 	General XGB Classification
@@ -50,12 +21,7 @@ class XGBClassifier(BaseClassifier):
 	.. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
 	"""
 
-	def __init__(self, clfile='xgb_classifier_1.pickle',
-		featdir="xgb_features", n_estimators=500, gamma=7.5,
-		min_child_weight=1, subsample=0.8, max_depth=6,
-		learning_rate=0.1, reg_alpha=1e-5,
-		objective='multi:softmax', colsample_bytree=0.7, random_state=154,
-		booster='gbtree', eval_metric='mlogloss', *args, **kwargs):
+	def __init__(self, clfile='xgb_classifier_1.pickle', *args, **kwargs):
 		"""
 		Initialize the classifier object with optimised parameters.
 
@@ -73,7 +39,7 @@ class XGBClassifier(BaseClassifier):
 		"""
 
 		# Initialize the parent class:
-		super(self.__class__, self).__init__(*args, **kwargs)
+		super().__init__(*args, **kwargs)
 
 		# Attributes of this classifier:
 		self.classifier = None
@@ -83,8 +49,8 @@ class XGBClassifier(BaseClassifier):
 		if clfile is not None:
 			self.classifier_file = os.path.join(self.data_dir, clfile)
 
-		if self.features_cache is not None and featdir is not None:
-			self.featdir = os.path.join(self.features_cache, featdir)
+		if self.features_cache is not None:
+			self.featdir = os.path.join(self.features_cache, 'xgb_features')
 			os.makedirs(self.featdir, exist_ok=True)
 
 		if self.classifier_file is not None and os.path.exists(self.classifier_file):
@@ -93,19 +59,19 @@ class XGBClassifier(BaseClassifier):
 			self.trained = True # Assume any classifier loaded is already trained
 		else:
 			# Create new untrained classifier:
-			self.classifier = Classifier_obj(
-				booster=booster,
-				colsample_bytree=colsample_bytree,
-				eval_metric=eval_metric,
-				gamma=gamma,
-				learning_rate=learning_rate,
-				max_depth=max_depth,
-				min_child_weight=min_child_weight,
-				n_estimators=n_estimators,
-				objective=objective,
-				random_state=random_state,
-				reg_alpha=reg_alpha,
-				subsample=subsample
+			self.classifier = xgb(
+				booster='gbtree',
+				colsample_bytree=0.7,
+				eval_metric='mlogloss',
+				gamma=7.5,
+				learning_rate=0.1,
+				max_depth=6,
+				min_child_weight=1,
+				n_estimators=500,
+				objective='multi:softmax',
+				random_state=self.random_state,
+				reg_alpha=1e-5,
+				subsample=0.8
 			)
 			self.trained = False
 
@@ -212,7 +178,7 @@ class XGBClassifier(BaseClassifier):
 			if feat_import:
 				importances = self.classifier.feature_importances_.astype(float)
 				feature_importances = zip(list(featarray), importances)
-				with open(self.data_dir+'/xgbClassifier_feat_import.json', 'w') as outfile:
+				with open(os.path.join(self.data_dir, 'xgbClassifier_feat_import.json'), 'w') as outfile:
 					json.dump(list(feature_importances), outfile)
 
 			self.trained = True
@@ -222,6 +188,6 @@ class XGBClassifier(BaseClassifier):
 		if savecl and self.trained:
 			if self.classifier_file is not None:
 				if not os.path.exists(self.classifier_file) or overwrite:
-					logger.info('Saving pickled xgb classifier to '+self.classifier_file)
+					logger.info('Saving pickled xgb classifier to %s', self.classifier_file)
 					self.save(self.classifier_file)
 					#self.save_model(self.classifier_file)

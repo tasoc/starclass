@@ -84,6 +84,7 @@ class BaseClassifier(object):
 		self.plot = plot
 		self.level = level
 		self.features_cache = features_cache
+		self._random_seed = 2187
 
 		if tset_key is not None:
 			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level, tset_key))
@@ -123,6 +124,16 @@ class BaseClassifier(object):
 	def close(self):
 		"""Close the classifier."""
 		pass
+
+	#----------------------------------------------------------------------------------------------
+	@property
+	def random_seed(self):
+		return self._random_seed
+
+	#----------------------------------------------------------------------------------------------
+	@property
+	def random_state(self):
+		return np.random.RandomState(self._random_seed)
 
 	#----------------------------------------------------------------------------------------------
 	def classify(self, features):

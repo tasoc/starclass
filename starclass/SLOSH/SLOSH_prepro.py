@@ -9,7 +9,7 @@ Utilities for SLOSH (2D deep learning methods).
 import os
 import numpy as np
 import tensorflow as tf
-from tf.keras.layers import InputLayer, Dropout, MaxPool2D, Flatten, Conv2D, LeakyReLU, Dense
+from tf.keras.layers import Dropout, MaxPool2D, Flatten, Conv2D, LeakyReLU, Dense
 from tf.keras.regularizers import l2
 from tf.keras.optimizers import Adam
 from scipy.stats import binned_statistic
@@ -261,7 +261,7 @@ def default_classifier_model():
 	'''
 	reg = l2(7.5E-4)
 	adam = Adam(clipnorm=1.)
-	input1 = InputLayer(input_shape=(128, 128, 1))
+	input1 = tf.keras.Input(shape=(128, 128, 1))
 	drop0 = Dropout(0.5)(input1)
 	conv1 = Conv2D(4, kernel_size=(7, 7), padding='same', kernel_initializer='glorot_uniform',
 		kernel_regularizer=reg)(drop0)
@@ -292,7 +292,7 @@ def default_regressor_model():
 	:return: model: untrained regressor model
 	'''
 	reg = l2(7.5E-4)
-	input1 = InputLayer(input_shape=(128, 128, 1))
+	input1 = tf.keras.Input(shape=(128, 128, 1))
 	drop0 = Dropout(0.25)(input1)
 	conv1 = Conv2D(4, kernel_size=(5, 5), padding='same', kernel_initializer='glorot_uniform',
 		kernel_regularizer=reg)(drop0)

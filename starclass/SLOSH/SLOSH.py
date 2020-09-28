@@ -14,11 +14,13 @@ import logging
 from keras import backend as K
 from keras.models import load_model
 from keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
+import tensorflow as tf
 from sklearn.metrics import classification_report
 
 from . import SLOSH_prepro as preprocessing
 from .. import BaseClassifier, StellarClasses
 
+#--------------------------------------------------------------------------------------------------
 class SLOSHClassifier(BaseClassifier):
 	"""
 	Solar-like Oscillation Shape Hunter (SLOSH) Classifier
@@ -43,6 +45,10 @@ class SLOSHClassifier(BaseClassifier):
 		#self.classifier = None
 		self.mc_iterations = mc_iterations
 
+		# Set the global random seeds:
+		np.random.seed(self.random_seed)
+		tf.compat.v1.set_random_seed(self.random_seed)
+
 		# Find model file
 		if clfile is not None:
 			self.model_file = os.path.join(self.data_dir, clfile)
@@ -59,6 +65,7 @@ class SLOSHClassifier(BaseClassifier):
 			logger.info('No saved models provided. Predict functions are disabled.')
 			self.predictable = False
 
+	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features):
 		"""
 		Prediction for a star, producing output determining if it is a solar-like oscillator.
@@ -100,6 +107,7 @@ class SLOSHClassifier(BaseClassifier):
 
 		return result
 
+	#----------------------------------------------------------------------------------------------
 	def train(self, tset):
 		'''
 		Trains a fresh classifier using a default NN architecture and parameters as of the Hon et al. (2018) paper.
@@ -172,6 +180,7 @@ class SLOSHClassifier(BaseClassifier):
 			callbacks=[reduce_lr, early_stop, checkpoint], verbose=2)
 		self.save_model(model, self.model_file)
 
+	#----------------------------------------------------------------------------------------------
 	def save_model(self, model, model_file):
 		'''
 		Saves out trained model
@@ -185,6 +194,7 @@ class SLOSHClassifier(BaseClassifier):
 		# Set predictable to true so can predict
 		self.predictable = True
 
+	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):
 		'''
 		Saves all loaded classifier models.
@@ -197,6 +207,7 @@ class SLOSHClassifier(BaseClassifier):
 			for i in range(len(self.classifier_list)):
 				self.classifier_list[i].save(outfile + '-%s.h5' % i)
 
+	#----------------------------------------------------------------------------------------------
 	def load(self, infile):
 		'''
 		Loads a classifier model and adds it to the list of classifiers.
@@ -207,6 +218,7 @@ class SLOSHClassifier(BaseClassifier):
 		self.classifier_list.append(load_model(infile))
 		self.predictable = True
 
+	#----------------------------------------------------------------------------------------------
 	def clear_model_list(self):
 		'''
 		Helper function to clear classifiers in the classifier list.
@@ -215,6 +227,7 @@ class SLOSHClassifier(BaseClassifier):
 		del self.classifier_list[:]
 		self.predictable = False
 
+#--------------------------------------------------------------------------------------------------
 class TestCallback(keras.callbacks.Callback):
 
 	def __init__(self, val_data):

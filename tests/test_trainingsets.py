@@ -11,6 +11,7 @@ import conftest # noqa: F401
 import starclass.training_sets as tsets
 
 #--------------------------------------------------------------------------------------------------
+#@pytest.mark.skipif(not tsets.tset_available('keplerq9'), reason='TrainingSet not available')
 def test_keplerq9():
 
 	for testfraction in (0, 0.2):
@@ -42,6 +43,7 @@ def test_keplerq9():
 		tset = tsets.keplerq9(datalevel='nonsense')
 
 #--------------------------------------------------------------------------------------------------
+#@pytest.mark.skipif(not tsets.tset_available('keplerq9v2'), reason='TrainingSet not available')
 def test_keplerq9v2():
 
 	for testfraction in (0, 0.2):
@@ -73,7 +75,7 @@ def test_keplerq9v2():
 		tset = tsets.keplerq9v2(datalevel='nonsense')
 
 #--------------------------------------------------------------------------------------------------
-@pytest.mark.skip()
+@pytest.mark.skipif(not tsets.tset_available('keplerq9-linfit'), reason='TrainingSet not available')
 def test_keplerq9linfit():
 
 	for testfraction in (0, 0.2):
@@ -126,6 +128,33 @@ def test_tdasim(datalevel):
 	# Calling with invalid datalevel should throw an error as well:
 	with pytest.raises(ValueError):
 		tset = tsets.tda_simulations(datalevel='nonsense')
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('tsetclass', [
+	tsets.keplerq9v2,
+	tsets.keplerq9,
+	pytest.param(tsets.keplerq9linfit, marks=pytest.mark.skipif(not tsets.tset_available('keplerq9linfit'), reason='TrainingSet not available'))
+])
+def test_trainingset_labels(tsetclass):
+
+	tset = tsetclass(tf=0)
+	print(tset)
+	lbls = tset.labels()
+	lbls_test = tset.labels_test()
+	print(tset.nobjects)
+	print(len(lbls), len(lbls_test))
+
+	assert len(lbls) == tset.nobjects
+	assert len(lbls_test) == 0
+
+	tset = tsetclass(tf=0.2)
+	print(tset)
+	lbls = tset.labels()
+	lbls_test = tset.labels_test()
+	print(tset.nobjects)
+	print(len(lbls), len(lbls_test))
+
+	assert len(lbls) + len(lbls_test) == tset.nobjects
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

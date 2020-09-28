@@ -8,7 +8,8 @@ scikit-learn == 0.23
 Bottleneck == 1.3.2
 requests
 setuptools >= 41.0.0 # Required by tensorflow 1.15
-tensorflow == 1.15.2
+tensorflow == 1.15.4
 keras == 2.3.1
 Pillow
 xgboost == 0.90
+tqdm

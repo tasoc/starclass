@@ -112,31 +112,11 @@ class keplerq9v2(TrainingSet):
 			comments='#',
 			encoding='utf-8')
 
-		# Translation of Mikkel's identifiers into the broader:
-		translate = {
-			'SOLARLIKE': StellarClasses.SOLARLIKE,
-			'ECLIPSE': StellarClasses.ECLIPSE,
-			'RRLYR_CEPHEID': StellarClasses.RRLYR_CEPHEID,
-			'GDOR_SPB': StellarClasses.GDOR_SPB,
-			'DSCT_BCEP': StellarClasses.DSCT_BCEP,
-			'CONTACT_ROT': StellarClasses.CONTACT_ROT,
-			'APERIODIC': StellarClasses.APERIODIC,
-			'CONSTANT': StellarClasses.CONSTANT
-		}
-
 		# Create list of all the classes for each star:
 		lookup = []
 		for rowidx,row in enumerate(data):
-			#starid = int(row[0][4:])
 			labels = row[1].strip().split(';')
-			lbls = []
-			for lbl in labels:
-				lbl = lbl.strip()
-				c = translate.get(lbl.strip())
-				if c is None:
-					logger.error("Unknown label: %s", lbl)
-				else:
-					lbls.append(c)
+			lbls = [StellarClasses[lbl.strip()] for lbl in labels]
 
 			if self.testfraction > 0:
 				if rowidx in self.train_idx:
@@ -153,38 +133,19 @@ class keplerq9v2(TrainingSet):
 
 		if self.testfraction <= 0:
 			return []
-		else:
-			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
-				dtype=None,
-				delimiter=',',
-				comments='#',
-				encoding='utf-8')
 
-			# Translation of Mikkel's identifiers into the broader:
-			translate = {
-				'SOLARLIKE': StellarClasses.SOLARLIKE,
-				'ECLIPSE': StellarClasses.ECLIPSE,
-				'RRLYR_CEPHEID': StellarClasses.RRLYR_CEPHEID,
-				'GDOR_SPB': StellarClasses.GDOR_SPB,
-				'DSCT_BCEP': StellarClasses.DSCT_BCEP,
-				'CONTACT_ROT': StellarClasses.CONTACT_ROT,
-				'APERIODIC': StellarClasses.APERIODIC,
-				'CONSTANT': StellarClasses.CONSTANT
-			}
+		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
+			dtype=None,
+			delimiter=',',
+			comments='#',
+			encoding='utf-8')
 
-			# Create list of all the classes for each star:
-			lookup = []
-			for rowidx, row in enumerate(data):
+		# Create list of all the classes for each star:
+		lookup = []
+		for rowidx, row in enumerate(data):
+			if rowidx in self.test_idx:
 				labels = row[1].strip().split(';')
-				lbls = []
-				for lbl in labels:
-					lbl = lbl.strip()
-					c = translate.get(lbl.strip())
-					if c is None:
-						logger.error("Unknown label: %s", lbl)
-					else:
-						lbls.append(c)
+				lbls = [StellarClasses[lbl.strip()] for lbl in labels]
+				lookup.append(tuple(set(lbls)))
 
-				if rowidx in self.test_idx:
-					lookup.append(tuple(set(lbls)))
-			return tuple(lookup)
+		return tuple(lookup)

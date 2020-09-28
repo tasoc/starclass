@@ -13,3 +13,6 @@ from .MetaClassifier import MetaClassifier
 from .utilities import PICKLE_DEFAULT_PROTOCOL
 from . import training_sets
 from .download_cache import download_cache
+from .version import get_version
+
+__version__ = get_version()

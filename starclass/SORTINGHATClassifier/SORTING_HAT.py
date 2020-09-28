@@ -19,11 +19,12 @@ class Classifier_obj(RandomForestClassifier):
 	"""
 	Wrapper for sklearn RandomForestClassifier.
 	"""
-	def __init__(self, n_estimators=1000, max_features='auto', min_samples_split=2):
+	def __init__(self, n_estimators=1000, max_features='auto', min_samples_split=2, random_state=None):
 		super().__init__(n_estimators=n_estimators,
 			max_features=max_features,
 			min_samples_split=min_samples_split,
-			class_weight='balanced', criterion='gini', max_depth=15)
+			class_weight='balanced', criterion='gini', max_depth=15,
+			random_state=random_state)
 		self.trained = False
 
 #--------------------------------------------------------------------------------------------------
@@ -66,7 +67,7 @@ class SORTINGHATClassifier(BaseClassifier):
 
 		if self.classifier is None:
 			# Create new untrained classifier
-			self.classifier = Classifier_obj(n_estimators=n_estimators, max_features=max_features, min_samples_split=min_samples_split)
+			self.classifier = Classifier_obj(n_estimators=n_estimators, max_features=max_features, min_samples_split=min_samples_split, random_state=self.random_state)
 	
 
 	#----------------------------------------------------------------------------------------------

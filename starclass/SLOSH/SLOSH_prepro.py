@@ -8,20 +8,17 @@ Utilities for SLOSH (2D deep learning methods).
 
 import os
 import numpy as np
-import keras.backend as K
-import keras.utils
-from keras.layers import Input, Dropout, MaxPooling2D, Flatten, Conv2D, LeakyReLU, concatenate
-from keras.models import Model
-from keras.layers.core import Dense
-from keras.regularizers import l2
-from keras.optimizers import Adam
+import tensorflow as tf
+from tf.keras.layers import InputLayer, Dropout, MaxPool2D, Flatten, Conv2D, LeakyReLU, Dense
+from tf.keras.regularizers import l2
+from tf.keras.optimizers import Adam
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle as sklearn_shuffle
 
 #--------------------------------------------------------------------------------------------------
-class npy_generator(keras.utils.Sequence):
+class npy_generator(tf.keras.utils.Sequence):
 	"""
 	Generator that loads numpy arrays from a folder for training a deep learning model. This version has been tailored
 	for a classifier, with #the training labels taken from the subfolder. Indices of training/validation can be passed
@@ -78,7 +75,7 @@ class npy_generator(keras.utils.Sequence):
 		batch_labels = [self.subfolder_labels[k] for k in batch_indices]
 		# Generate data
 		X, y = self.__data_generation(batch_filenames, batch_labels)
-		return X, keras.utils.to_categorical(y, num_classes=8)
+		return X, tf.keras.utils.to_categorical(y, num_classes=8)
 
 	#----------------------------------------------------------------------------------------------
 	def on_epoch_end(self):
@@ -264,26 +261,26 @@ def default_classifier_model():
 	'''
 	reg = l2(7.5E-4)
 	adam = Adam(clipnorm=1.)
-	input1 = Input(shape=(128, 128, 1))
+	input1 = InputLayer(input_shape=(128, 128, 1))
 	drop0 = Dropout(0.5)(input1)
 	conv1 = Conv2D(4, kernel_size=(7, 7), padding='same', kernel_initializer='glorot_uniform',
 		kernel_regularizer=reg)(drop0)
 	lrelu1 = LeakyReLU(0.1)(conv1)
-	pool1 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu1)
+	pool1 = MaxPool2D(pool_size=(2, 2), padding='valid')(lrelu1)
 	conv2 = Conv2D(8, kernel_size=(5, 5), padding='same', kernel_initializer='glorot_uniform',
 		kernel_regularizer=reg)(pool1)
 	lrelu2 = LeakyReLU(0.1)(conv2)
-	pool2 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu2)
+	pool2 = MaxPool2D(pool_size=(2, 2), padding='valid')(lrelu2)
 	conv3 = Conv2D(16, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform',
 		kernel_regularizer=reg)(pool2)
 	lrelu3 = LeakyReLU(0.1)(conv3)
-	pool3 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu3)
+	pool3 = MaxPool2D(pool_size=(2, 2), padding='valid')(lrelu3)
 
 	flat = Flatten()(pool3)
 	drop1 = Dropout(0.5)(flat)
 	dense1 = Dense(128, kernel_initializer='glorot_uniform', activation='relu', kernel_regularizer=reg)(drop1)
 	output = Dense(8, kernel_initializer='glorot_uniform', activation='softmax')(dense1)
-	model = Model(input1, output)
+	model = tf.keras.Model(input1, output)
 
 	model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['accuracy'])
 	return model
@@ -295,84 +292,30 @@ def default_regressor_model():
 	:return: model: untrained regressor model
 	'''
 	reg = l2(7.5E-4)
-	input1 = Input(shape=(128, 128, 1))
+	input1 = InputLayer(input_shape=(128, 128, 1))
 	drop0 = Dropout(0.25)(input1)
 	conv1 = Conv2D(4, kernel_size=(5, 5), padding='same', kernel_initializer='glorot_uniform',
 		kernel_regularizer=reg)(drop0)
 	lrelu1 = LeakyReLU(0.1)(conv1)
-	pool1 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu1)
+	pool1 = MaxPool2D(pool_size=(2, 2), padding='valid')(lrelu1)
 	conv2 = Conv2D(8, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform',
 		kernel_regularizer=reg)(pool1)
 	lrelu2 = LeakyReLU(0.1)(conv2)
-	pool2 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu2)
+	pool2 = MaxPool2D(pool_size=(2, 2), padding='valid')(lrelu2)
 	conv3 = Conv2D(16, kernel_size=(2, 2), padding='same', kernel_initializer='glorot_uniform',
 		kernel_regularizer=reg)(pool2)
 	lrelu3 = LeakyReLU(0.1)(conv3)
-	pool3 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu3)
+	pool3 = MaxPool2D(pool_size=(2, 2), padding='valid')(lrelu3)
 	flat = Flatten()(pool3)
 	drop1 = Dropout(0.5)(flat)
 
 	dense1 = Dense(1024, kernel_initializer='glorot_uniform', activation='relu', kernel_regularizer=reg)(drop1)
 	dense2 = Dense(128, kernel_regularizer=reg, kernel_initializer='glorot_uniform', activation='relu')(dense1)
 	output = Dense(1, kernel_initializer='glorot_uniform')(dense2)
-	model = Model(input1, output)
-	# 1024-128-1 has 5 mse
-	# 1024-1 had 7 mse
+	model = tf.keras.Model(input1, output)
+
 	model.compile(optimizer='Nadam', loss=weighted_mean_squared_error, metrics=['mae'])
 	return model
-
-#--------------------------------------------------------------------------------------------------
-def default_regressor_model_aleatoric():
-	'''
-	Default prototype regressor model architecture that uses aleatoric loss.
-	:return: model: untrained regressor model
-	'''
-	reg = l2(7.5E-4)
-	input1 = Input(shape=(128, 128, 1))
-	# pad = ZeroPadding2D(8)(input1)
-	drop0 = Dropout(0.25)(input1)
-	conv1 = Conv2D(4, kernel_size=(5, 5), padding='same', kernel_initializer='glorot_uniform',
-		kernel_regularizer=reg)(drop0)
-	lrelu1 = LeakyReLU(0.1)(conv1)
-	pool1 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu1)
-	conv2 = Conv2D(8, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform',
-		kernel_regularizer=reg)(pool1)
-	lrelu2 = LeakyReLU(0.1)(conv2)
-	pool2 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu2)
-	conv3 = Conv2D(16, kernel_size=(2, 2), padding='same', kernel_initializer='glorot_uniform',
-		kernel_regularizer=reg)(pool2)
-	lrelu3 = LeakyReLU(0.1)(conv3)
-	pool3 = MaxPooling2D(pool_size=(2, 2), padding='valid')(lrelu3)
-	flat = Flatten()(pool3)
-	drop1 = Dropout(0.5)(flat)
-
-	dense1 = Dense(1024, kernel_initializer='glorot_uniform', activation='relu', kernel_regularizer=reg)(drop1)
-	dense2 = Dense(128, kernel_regularizer=reg, kernel_initializer='glorot_uniform', activation='relu')(dense1)
-	output = Dense(1, kernel_initializer='glorot_uniform', name='prediction')(dense2)
-	output_var = Dense(1, kernel_initializer='glorot_uniform', name='variance')(dense2)
-	pred_var = concatenate([output, output_var], name='pred_var')
-
-	model = Model(input1, [output, pred_var])
-	# 1024-128-1 has 5 mse
-	# 1024-1 had 7 mse
-	model.compile(optimizer='Nadam',
-		loss={'prediction': weighted_mean_squared_error, 'pred_var': aleatoric_loss},
-		metrics={'prediction': 'mae'},
-		loss_weights={'prediction': 1., 'pred_var': .2})
-	return model
-
-#--------------------------------------------------------------------------------------------------
-def aleatoric_loss(y_true, pred_var):
-	'''
-	Aleatoric loss function for heteroscedatic noise estimation in deep learning models. Needed for model imports.
-	:param y_true: Ground truth
-	:param pred_var: Prediction appended with variance
-	:return: Aleatoric Loss
-	'''
-	y_pred = pred_var[:, 0] # here pred_var should be [prediction, variance], y_true is true numax
-	log_var = pred_var[:, 1]
-	loss = (K.abs(y_true - y_pred)) * (K.exp(-log_var)) + log_var
-	return K.mean(loss)
 
 #--------------------------------------------------------------------------------------------------
 def weighted_mean_squared_error(y_true, y_pred):
@@ -382,4 +325,4 @@ def weighted_mean_squared_error(y_true, y_pred):
 	:param y_pred: Model predicted value
 	:return: Weighted MSE loss
 	'''
-	return K.mean((K.square(y_pred - y_true))*K.square(y_true-64), axis=-1)
+	return tf.reduce_mean((tf.square(y_pred - y_true))*tf.square(y_true-64), axis=-1)

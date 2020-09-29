@@ -2,4 +2,4 @@
 # -*- coding: utf-8 -*-
 # flake8: noqa
 
-from .SORTING_HAT import SORTINGHATClassifier
+from .Sorting_Hat import SortingHatClassifier

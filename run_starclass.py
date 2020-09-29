@@ -63,7 +63,7 @@ def main():
 		'slosh': starclass.SLOSHClassifier,
 		#'foptics': starclass.FOPTICSClassifier,
 		'xgb': starclass.XGBClassifier,
-		'sortinghat': starclass.SORTINGHATClassifier,
+		'sortinghat': starclass.SortingHatClassifier,
 		'meta': starclass.MetaClassifier
 	}
 	stcl = None

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # flake8: noqa
 
-from .StellarClasses import StellarClasses
+from .StellarClasses import StellarClasses, StellarClassesLevel2
 from .BaseClassifier import BaseClassifier, STATUS
 from .taskmanager import TaskManager
 from .RFGCClassifier import RFGCClassifier

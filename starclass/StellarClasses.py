@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Enum of all the possible stellar classes.
+
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
@@ -9,9 +10,11 @@ import enum
 
 __docformat__ = 'restructuredtext'
 
+#--------------------------------------------------------------------------------------------------
 class StellarClasses(enum.Enum):
 	"""
-	Enum of all the possible stellar classes.
+	Enum of all the possible Level-1 stellar classes.
+
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
@@ -27,8 +30,14 @@ class StellarClasses(enum.Enum):
 	CONSTANT = 'constant'
 	#RAPID = 'rapid'
 
-
+#--------------------------------------------------------------------------------------------------
 class StellarClassesLevel2(enum.Enum):
+	"""
+	Enum of all the possible Level-2 stellar classes.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
+
 	# Level 2 classes
 	RRLYR = 'RR Lyrae'
 	CEPHEID = 'Cepheid'
@@ -41,3 +50,4 @@ class StellarClassesLevel2(enum.Enum):
 	ROAP = 'roAp'
 	SDB = 'sdB'
 	WD = 'White Dwarf'
+	FLARE = 'Flare'

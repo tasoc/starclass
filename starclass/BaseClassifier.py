@@ -102,6 +102,7 @@ class BaseClassifier(object):
 			'RFGCClassifier': 'rfgc',
 			'SLOSHClassifier': 'slosh',
 			'XGBClassifier': 'xgb',
+			'SortingHatClassifier': 'sortinghat',
 			'MetaClassifier': 'meta'
 		}[self.__class__.__name__]
 

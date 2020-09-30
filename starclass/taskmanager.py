@@ -41,7 +41,7 @@ class TaskManager(object):
 		self.readonly = readonly
 
 		# Keep a list of all the possible classifiers here:
-		self.all_classifiers = ('rfgc', 'slosh', 'xgb')
+		self.all_classifiers = ('rfgc', 'slosh', 'xgb', 'sortinghat')
 
 		# Setup logging:
 		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')

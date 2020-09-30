@@ -34,7 +34,7 @@ def model(x, a, b, freq):
 	return a * np.sin(omegax) + b * np.cos(omegax)
 
 #--------------------------------------------------------------------------------------------------
-def freqextr(lightcurve, n_peaks=6, n_harmonics=10, hifac=1, ofac=4, snrlim=None, snr_width=None,
+def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None, snr_width=None,
 	faplim=1-0.9973, conseclim=10, harmonics_list=None):
 	"""
 	Extract frequencies from timeseries.

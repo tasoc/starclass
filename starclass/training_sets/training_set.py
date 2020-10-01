@@ -19,18 +19,6 @@ from sklearn.model_selection import train_test_split, StratifiedKFold
 from .. import BaseClassifier, TaskManager, utilities
 
 #--------------------------------------------------------------------------------------------------
-def tset_available(tset_key):
-
-	# Point this to the directory where the TDA simulations are stored
-	INPUT_DIR = os.environ.get('STARCLASS_TSETS')
-	if INPUT_DIR is None:
-		INPUT_DIR = os.path.join(os.path.dirname(__file__), 'data')
-	elif not os.path.exists(INPUT_DIR) or not os.path.isdir(INPUT_DIR):
-		raise IOError("The environment variable STARCLASS_TSETS is set, but points to a non-existent directory.")
-
-	return os.path.isfile(os.path.join(INPUT_DIR, tset_key, 'todo.sqlite'))
-
-#--------------------------------------------------------------------------------------------------
 class TrainingSet(object):
 
 	def __init__(self, datalevel='corr', tf=0.0, random_seed=42):

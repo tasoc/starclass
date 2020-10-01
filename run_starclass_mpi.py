@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Scheduler using MPI for running the TASOC classification
@@ -36,7 +36,7 @@ from timeit import default_timer
 def main():
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run TESS Corrections in parallel using MPI.')
-	parser.add_argument('-c', '--classifier', help='Classifier to use.', default=None, choices=('rfgc', 'slosh', 'foptics', 'xgb', 'meta'))
+	parser.add_argument('-c', '--classifier', help='Classifier to use.', default=None, choices=starclass.classifier_list)
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
@@ -82,7 +82,7 @@ def main():
 					if k >= num_workers: break
 					initial_classifiers.append(c)
 
-				print(initial_classifiers)
+				tm.logger.info("Initial classifiers: %s", initial_classifiers)
 
 				# Start the master loop that will assign tasks
 				# to the workers:
@@ -139,13 +139,6 @@ def main():
 		logger.setLevel(logging.WARNING)
 
 		# Get the class for the selected method:
-		ClassificationClass = {
-			'rfgc': starclass.RFGCClassifier,
-			'slosh': starclass.SLOSHClassifier,
-			#'foptics': starclass.FOPTICSClassifier,
-			'xgb': starclass.XGBClassifier,
-			'meta': starclass.MetaClassifier
-		}
 		current_classifier = None
 		stcl = None
 
@@ -168,7 +161,8 @@ def main():
 						if task['classifier'] != current_classifier or stcl is None:
 							current_classifier = task['classifier']
 							if stcl: stcl.close()
-							stcl = ClassificationClass[current_classifier](level=args.level, features_cache=None, tset_key='keplerq9v2')
+							stcl = starclass.get_classifier(current_classifier)
+							stcl = stcl(level=args.level, features_cache=None, tset_key='keplerq9v2')
 
 						fname = os.path.join(input_folder, task['lightcurve'])
 						features = stcl.load_star(task, fname)

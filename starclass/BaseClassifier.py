@@ -407,7 +407,18 @@ class BaseClassifier(object):
 		features['powerspectrum'] = psd
 
 		# Extract primary frequencies from lightcurve and add to features:
-		features.update(freqextr(lightcurve))
+		features['frequencies'] = freqextr(lc, n_peaks=6, n_harmonics=0, initps=psd)
+
+		# Add these for backward compatibility:
+		for row in features['frequencies']:
+			if row['harmonic'] == 0:
+				key = '{0:d}'.format(row['num'])
+			else:
+				key = '{0:d}_harmonic{1:d}'.format(row['num'], row['harmonic'])
+
+			features['freq' + key] = row['frequency']
+			features['amp' + key] = row['amplitude']
+			features['phase' + key] = row['phase']
 
 		# Calculate FliPer features:
 		features.update(FliPer(psd))

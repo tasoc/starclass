@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import lightkurve
 import os.path
+from copy import deepcopy
 try:
 	from astropy.timeseries import LombScargle
 except ImportError:
@@ -30,6 +31,7 @@ class powerspectrum(object):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
+	#----------------------------------------------------------------------------------------------
 	def __init__(self, lightcurve, fit_mean=False):
 		"""
 		Parameters:
@@ -68,7 +70,11 @@ class powerspectrum(object):
 		self.standard[1] *= self.normfactor/(self.df*1e6)
 		self.standard = tuple(self.standard)
 
-	#------------------------------------------------------------------------------
+	#----------------------------------------------------------------------------------------------
+	def copy(self):
+		return deepcopy(self)
+
+	#----------------------------------------------------------------------------------------------
 	def fundamental_spacing_minimum(self):
 		"""Estimate fundamental spacing using the first minimum spectral window function."""
 
@@ -86,7 +92,7 @@ class powerspectrum(object):
 		df = res.x
 		return df
 
-	#------------------------------------------------------------------------------
+	#----------------------------------------------------------------------------------------------
 	def fundamental_spacing_integral(self):
 		"""Estimate fundamental spacing using the integral of the spectral window function."""
 		# Integrate the windowfunction
@@ -94,7 +100,7 @@ class powerspectrum(object):
 		df = simps(window, freq)
 		return df*1e-6
 
-	#------------------------------------------------------------------------------
+	#----------------------------------------------------------------------------------------------
 	def powerspectrum(self, freq=None, oversampling=1, nyquist_factor=1, scale='power'):
 		"""
 		Calculate power spectrum for time series.
@@ -141,7 +147,7 @@ class powerspectrum(object):
 
 		return freq, power
 
-	#------------------------------------------------------------------------------
+	#----------------------------------------------------------------------------------------------
 	def windowfunction(self, width=None, oversampling=10):
 		"""Spectral window function.
 
@@ -168,7 +174,7 @@ class powerspectrum(object):
 		freq *= 1e6
 		return freq, power
 
-	#------------------------------------------------------------------------------
+	#----------------------------------------------------------------------------------------------
 	def plot(self, ax=None, xlabel='Frequency (muHz)', ylabel=None, style='powerspectrum'):
 
 		if ylabel is None:
@@ -192,7 +198,7 @@ class powerspectrum(object):
 			ax.set_ylabel(ylabel)
 			ax.set_xlim(self.standard[0][0], self.standard[0][-1])
 
-	#------------------------------------------------------------------------------
+	#----------------------------------------------------------------------------------------------
 	def optimize_peak(self, fmax):
 		"""
 		Optimize frequency to nearest peak.
@@ -234,7 +240,7 @@ class powerspectrum(object):
 
 		return res.x
 
-	#------------------------------------------------------------------------------
+	#----------------------------------------------------------------------------------------------
 	def alpha_beta(self, freq):
 
 		"""
@@ -266,7 +272,13 @@ class powerspectrum(object):
 
 		return alpha, beta
 
-	#------------------------------------------------------------------------------
+	#----------------------------------------------------------------------------------------------
+	# TODO: Replace with ps.ls.model?
+	def model(a, b, freq):
+		omegax = 0.1728 * np.pi * freq * self.ls.t # Strange factor is 2 * 86400 * 1e-6
+		return a * np.sin(omegax) + b * np.cos(omegax)
+
+	#----------------------------------------------------------------------------------------------
 	def false_alarm_probability(self, freq):
 		"""
 		Calculate Lomb-Scargle false alarm probability for given frequency.
@@ -281,8 +293,8 @@ class powerspectrum(object):
 		p_harmonic = self.ls.power(freq*1e-6, method='fast')
 		return self.ls.false_alarm_probability(p_harmonic)
 
-	#------------------------------------------------------------------------------
-	def replace_lightcurve(self, lightcurve):
+	#----------------------------------------------------------------------------------------------
+	def replace_lightcurve(self, flux):
 		# Create LombScargle object of timeseries, where time is in seconds:
 		indx = np.isfinite(lightcurve.flux)
 		self.ls = LombScargle(lightcurve.time[indx]*86400, lightcurve.flux[indx], center_data=True, fit_mean=self.fit_mean)

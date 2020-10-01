@@ -104,9 +104,6 @@ def test_trainingset_generate_todolist(monkeypatch, tsetkey):
 		assert tset.input_folder == tsetdir
 		assert os.path.isfile(os.path.join(tsetdir, 'todo.sqlite'))
 
-	#assert False
-
-
 #--------------------------------------------------------------------------------------------------
 #@pytest.mark.skipif(not trainingset_available('keplerq9'), reason='TrainingSet not available')
 def test_keplerq9():

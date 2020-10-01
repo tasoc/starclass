@@ -10,8 +10,8 @@ import numpy as np
 import math
 import os
 import scipy.stats as stat
+import pyentrp.entropy as ent
 from . import npeet_entropy_estimators as npeet
-from . import pyentropy as ent
 
 #--------------------------------------------------------------------------------------------------
 def featcalc(features, providednfreqs=6, nfrequencies=3, forbiddenfreqs=[13.49/4.],

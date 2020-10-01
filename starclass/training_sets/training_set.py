@@ -168,7 +168,7 @@ class TrainingSet(object):
 					for fileName in tqdm(zip.namelist(), disable=not logger.isEnabledFor(logging.INFO)):
 						zip.extract(fileName, input_folder)
 
-			except:
+			except: # noqa: E722, pragma: no cover
 				if os.path.exists(input_folder):
 					shutil.rmtree(input_folder)
 				raise

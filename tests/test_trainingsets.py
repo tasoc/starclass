@@ -7,23 +7,25 @@ Tests of Training Sets.
 """
 
 import pytest
-import warnings
+import os
+import shutil
+import tempfile
 import conftest # noqa: F401
 import starclass.training_sets as tsets
 from starclass import trainingset_available, get_trainingset
 
-#--------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize('tsetkey', [
+AVAILABLE_TSETS = [
 	'keplerq9v2',
 	'keplerq9',
 	pytest.param('keplerq9-linfit', marks=pytest.mark.skipif(not trainingset_available('keplerq9-linfit'), reason='TrainingSet not available')),
 	pytest.param('tdasim', marks=pytest.mark.skip),
 	pytest.param('tdasim-raw', marks=pytest.mark.skip),
 	pytest.param('tdasim-clean', marks=pytest.mark.skip)
-])
-def test_trainingset(tsetkey):
+]
 
-	warnings.filterwarnings('error')
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
+def test_trainingset(tsetkey):
 
 	# Get training set class using conv. function:
 	tsetclass = get_trainingset(tsetkey)
@@ -66,6 +68,44 @@ def test_trainingset(tsetkey):
 	print(len(lbls), len(lbls_test))
 
 	assert len(lbls) + len(lbls_test) == tset.nobjects
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
+def test_trainingset_generate_todolist(monkeypatch, tsetkey):
+
+	# Get training set class using conv. function:
+	tsetclass = get_trainingset(tsetkey)
+
+
+	with tempfile.TemporaryDirectory(prefix='pytest-private-tsets-') as tmpdir:
+
+		tset = tsetclass()
+		input_folder = tset.input_folder
+
+		print(input_folder)
+
+		#
+		tsetdir = os.path.join(tmpdir, tsetkey)
+		os.makedirs(tsetdir)
+		for f in os.listdir(input_folder):
+			fpath = os.path.join(input_folder, f)
+			if os.path.isdir(fpath) or f == 'todo.sqlite':
+				continue
+			shutil.copy(fpath, tsetdir)
+
+
+		monkeypatch.setenv("STARCLASS_TSETS", tmpdir)
+
+		print(os.environ['STARCLASS_TSETS'])
+
+		# When we now initialize the trainingset it should run generate_todo automatically:
+		tset = tsetclass()
+
+		assert tset.input_folder == tsetdir
+		assert os.path.isfile(os.path.join(tsetdir, 'todo.sqlite'))
+
+	#assert False
+
 
 #--------------------------------------------------------------------------------------------------
 #@pytest.mark.skipif(not trainingset_available('keplerq9'), reason='TrainingSet not available')

@@ -72,6 +72,7 @@ class keplerq9v2(TrainingSet):
 					starid = -20000 - int(starname[10:])
 				else:
 					starid = int(starname)
+					starname = '{0:011d}'.format(starid)
 
 				# Path to lightcurve:
 				lightcurve = starclass + '/' + starname + '.txt'

@@ -17,7 +17,7 @@ def entropy(x, k=3, base=2):
 	x should be a list of vectors, e.g. x = [[1.3], [3.7], [5.1], [2.4]]
 	if x is a one-dimensional scalar and we have four samples
 	"""
-	if k <= len(x) - 1:
+	if k > len(x) - 1:
 		raise ValueError("Set k smaller than num. samples - 1")
 	x = np.asarray(x)
 	n_elements, n_features = x.shape

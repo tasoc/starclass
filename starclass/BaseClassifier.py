@@ -74,7 +74,8 @@ class BaseClassifier(object):
 		"""
 
 		# Check the input:
-		assert level in ('L1', 'L2'), "Invalid level"
+		if level not in ('L1', 'L2'):
+			raise ValueError("Invalid level")
 
 		# Start logger:
 		logger = logging.getLogger(__name__)
@@ -112,6 +113,10 @@ class BaseClassifier(object):
 			'L1': StellarClasses,
 			'L2': StellarClassesLevel2
 		}[level]
+
+		# Just for catching all those places random numbers are used without explicitly requesting
+		# a random_state:
+		np.random.seed(self._random_seed)
 
 	#----------------------------------------------------------------------------------------------
 	def __enter__(self):

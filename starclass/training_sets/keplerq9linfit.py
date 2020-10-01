@@ -11,10 +11,9 @@ from contextlib import closing
 import sqlite3
 import logging
 from tqdm import tqdm
-from .. import StellarClasses
 from . import TrainingSet
 
-#----------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 class keplerq9linfit(TrainingSet):
 
 	def __init__(self, *args, datalevel='corr', **kwargs):
@@ -26,10 +25,11 @@ class keplerq9linfit(TrainingSet):
 		self.key = 'keplerq9-linfit'
 
 		# Point this to the directory where the TDA simulations are stored
-		self.input_folder = self.tset_datadir('keplerq9-linfit', 'https://tasoc.dk/pipeline/starclass_trainingsets/keplerq9-linfit.zip')
+		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/keplerq9-linfit.zip')
 
-		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
-		self.nobjects = data.shape[0]
+		self.starlist = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
+			dtype='str', delimiter=',', encoding='utf-8')
+		self.nobjects = self.starlist.shape[0]
 
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
@@ -48,18 +48,18 @@ class keplerq9linfit(TrainingSet):
 			# Create the basic file structure of a TODO-list:
 			self.generate_todolist_structure(conn)
 
-			logger.info("Step 1: Reading file and extracting information...")
+			logger.info("Step 3: Reading file and extracting information...")
 			pri = 0
-			starlist = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), delimiter=',', dtype=None, encoding='utf-8')
-			diagnostics = np.genfromtxt(os.path.join(self.input_folder, 'diagnostics.txt'), delimiter=',', dtype=None, encoding='utf-8')
-			for k, star in tqdm(enumerate(starlist), total=len(starlist)):
+			diagnostics = np.genfromtxt(os.path.join(self.input_folder, 'diagnostics.txt'),
+				delimiter=',', dtype=None, encoding='utf-8')
+			for k, star in tqdm(enumerate(self.starlist), total=len(self.starlist)):
 				# Get starid:
 				starname = star[0]
 				starclass = star[1]
 				if starname.startswith('constant_'):
-					starid = -1
+					starid = -10000 - int(starname[9:])
 				elif starname.startswith('fakerrlyr_'):
-					starid = -1
+					starid = -20000 - int(starname[10:])
 				else:
 					starid = int(starname)
 
@@ -88,87 +88,4 @@ class keplerq9linfit(TrainingSet):
 			conn.commit()
 			cursor.close()
 
-		logger.info("DONE.")
-
-	#----------------------------------------------------------------------------------------------
-	def labels(self, level='L1'):
-
-		logger = logging.getLogger(__name__)
-
-		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
-
-		# Translation of Mikkel's identifiers into the broader:
-		translate = {
-			'SOLARLIKE': StellarClasses.SOLARLIKE,
-			'ECLIPSE': StellarClasses.ECLIPSE,
-			'RRLYR_CEPHEID': StellarClasses.RRLYR_CEPHEID,
-			'GDOR_SPB': StellarClasses.GDOR_SPB,
-			'DSCT_BCEP': StellarClasses.DSCT_BCEP,
-			'CONTACT_ROT': StellarClasses.CONTACT_ROT,
-			'APERIODIC': StellarClasses.APERIODIC,
-			'CONSTANT': StellarClasses.CONSTANT
-		}
-
-		# Create list of all the classes for each star:
-		lookup = []
-		for rowidx,row in enumerate(data):
-			#starid = int(row[0][4:])
-			labels = row[1].strip().split(';')
-			lbls = []
-			for lbl in labels:
-				lbl = lbl.strip()
-				c = translate.get(lbl.strip())
-				if c is None:
-					logger.error("Unknown label: %s", lbl)
-				else:
-					lbls.append(c)
-
-			if self.testfraction > 0:
-				if rowidx in self.train_idx:
-					lookup.append(tuple(set(lbls)))
-			else:
-				lookup.append(tuple(set(lbls)))
-
-		return tuple(lookup)
-
-	#----------------------------------------------------------------------------------------------
-	def labels_test(self, level='L1'):
-
-		logger = logging.getLogger(__name__)
-
-		if self.testfraction == 0:
-			return []
-		else:
-
-			data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'), dtype=None, delimiter=',', encoding='utf-8')
-
-			# Translation of Mikkel's identifiers into the broader:
-			translate = {
-				'SOLARLIKE': StellarClasses.SOLARLIKE,
-				'ECLIPSE': StellarClasses.ECLIPSE,
-				'RRLYR_CEPHEID': StellarClasses.RRLYR_CEPHEID,
-				'GDOR_SPB': StellarClasses.GDOR_SPB,
-				'DSCT_BCEP': StellarClasses.DSCT_BCEP,
-				'CONTACT_ROT': StellarClasses.CONTACT_ROT,
-				'APERIODIC': StellarClasses.APERIODIC,
-				'CONSTANT': StellarClasses.CONSTANT
-			}
-
-			# Create list of all the classes for each star:
-			lookup = []
-			for rowidx,row in enumerate(data):
-				#starid = int(row[0][4:])
-				labels = row[1].strip().split(';')
-				lbls = []
-				for lbl in labels:
-					lbl = lbl.strip()
-					c = translate.get(lbl.strip())
-					if c is None:
-						logger.error("Unknown label: %s", lbl)
-					else:
-						lbls.append(c)
-
-				if rowidx in self.test_idx:
-					lookup.append(tuple(set(lbls)))
-
-			return tuple(lookup)
+		logger.info("%s training set successfully built.", self.key)

@@ -16,7 +16,7 @@ import logging
 import tempfile
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
-from .. import BaseClassifier, TaskManager, utilities
+from .. import BaseClassifier, TaskManager, utilities, StellarClasses
 
 #--------------------------------------------------------------------------------------------------
 class TrainingSet(object):
@@ -116,12 +116,11 @@ class TrainingSet(object):
 			yield newtset
 
 	#----------------------------------------------------------------------------------------------
-	def tset_datadir(self, tset, url):
+	def tset_datadir(self, url):
 		"""
 		Setup TrainingSet data directory. If the directory doesn't already exist,
 
 		Parameters:
-			tset (string): Name of TrainingSet folder.
 			url (string): URL from where to download the training-set if it doesn't already exist.
 
 		Returns:
@@ -131,6 +130,8 @@ class TrainingSet(object):
 		"""
 
 		logger = logging.getLogger(__name__)
+		if not hasattr(self, 'key'):
+			raise ValueError("Trainingset does not have a defined key")
 
 		# Point this to the directory where the TDA simulations are stored
 		INPUT_DIR = os.environ.get('STARCLASS_TSETS')
@@ -139,17 +140,17 @@ class TrainingSet(object):
 		elif not os.path.exists(INPUT_DIR) or not os.path.isdir(INPUT_DIR):
 			raise IOError("The environment variable STARCLASS_TSETS is set, but points to a non-existent directory.")
 
-		input_folder = os.path.join(INPUT_DIR, tset)
+		input_folder = os.path.join(INPUT_DIR, self.key)
 
 		tqdm_settings = {
-			'unit': 'KB',
+			'unit': 'B',
 			'unit_scale': True,
 			'disable': not logger.isEnabledFor(logging.INFO)
 		}
 
 		if not os.path.exists(input_folder):
-			logger.info("Downloading training set...")
-			zip_tmp = os.path.join(input_folder, tset + '.zip')
+			logger.info("Step 1: Downloading %s training set...", self.key)
+			zip_tmp = os.path.join(input_folder, self.key + '.zip')
 			try:
 				os.makedirs(input_folder)
 
@@ -162,9 +163,10 @@ class TrainingSet(object):
 						fid.write(data)
 
 				# Extract ZIP file:
-				logger.info("Unpacking training set...")
+				logger.info("Step 2: Unpacking %s training set...", self.key)
 				with zipfile.ZipFile(zip_tmp, 'r') as zip:
-					zip.extractall(input_folder)
+					for fileName in tqdm(zip.namelist(), disable=not logger.isEnabledFor(logging.INFO)):
+						zip.extract(fileName, input_folder)
 
 			except:
 				if os.path.exists(input_folder):
@@ -238,7 +240,6 @@ class TrainingSet(object):
 		# This will ensure that the lightcurve can actually be read by the system.
 		if not all([datasource, variance, rms_hour, ptp]):
 			with BaseClassifier(tset_key=self.key, features_cache=None) as bc:
-				print(os.path.join(self.input_folder, lightcurve))
 				fake_task = {
 					'priority': priority,
 					'starid': starid
@@ -371,8 +372,33 @@ class TrainingSet(object):
 
 	#----------------------------------------------------------------------------------------------
 	def labels(self, level='L1'):
-		raise NotImplementedError()
+
+		# Create list of all the classes for each star:
+		lookup = []
+		for rowidx, row in enumerate(self.starlist):
+			labels = row[1].strip().split(';')
+			lbls = [StellarClasses[lbl.strip()] for lbl in labels]
+
+			if self.testfraction > 0:
+				if rowidx in self.train_idx:
+					lookup.append(tuple(set(lbls)))
+			else:
+				lookup.append(tuple(set(lbls)))
+
+		return tuple(lookup)
 
 	#----------------------------------------------------------------------------------------------
 	def labels_test(self, level='L1'):
-		raise NotImplementedError()
+
+		if self.testfraction <= 0:
+			return []
+
+		# Create list of all the classes for each star:
+		lookup = []
+		for rowidx, row in enumerate(self.starlist):
+			if rowidx in self.test_idx:
+				labels = row[1].strip().split(';')
+				lbls = [StellarClasses[lbl.strip()] for lbl in labels]
+				lookup.append(tuple(set(lbls)))
+
+		return tuple(lookup)

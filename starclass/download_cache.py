@@ -11,7 +11,7 @@ from astropy.utils.iers import IERS_Auto
 from .constants import trainingset_list
 from .convenience import get_trainingset
 
-def download_cache(all_trainingsets=True):
+def download_cache(all_trainingsets=False):
 	"""
 	Download any missing data files to cache.
 

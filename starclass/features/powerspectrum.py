@@ -274,7 +274,7 @@ class powerspectrum(object):
 
 	#----------------------------------------------------------------------------------------------
 	# TODO: Replace with ps.ls.model?
-	def model(a, b, freq):
+	def model(self, a, b, freq):
 		omegax = 0.1728 * np.pi * freq * self.ls.t # Strange factor is 2 * 86400 * 1e-6
 		return a * np.sin(omegax) + b * np.cos(omegax)
 
@@ -294,7 +294,7 @@ class powerspectrum(object):
 		return self.ls.false_alarm_probability(p_harmonic)
 
 	#----------------------------------------------------------------------------------------------
-	def replace_lightcurve(self, flux):
+	def replace_lightcurve(self, lightcurve):
 		# Create LombScargle object of timeseries, where time is in seconds:
 		indx = np.isfinite(lightcurve.flux)
 		self.ls = LombScargle(lightcurve.time[indx]*86400, lightcurve.flux[indx], center_data=True, fit_mean=self.fit_mean)

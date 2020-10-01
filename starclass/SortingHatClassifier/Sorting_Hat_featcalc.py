@@ -1,23 +1,17 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Utilities for the SORTING-HAT classifier.
 
 .. codeauthor:: Jeroen Audenaert <jeroen.audenaert@kuleuven.be>
-
 """
-import pandas as pd
+
 import numpy as np
 import math
 import os
-import logging
-from tqdm import tqdm
 import scipy.stats as stat
-import statistics as stats
 from . import npeet_entropy_estimators as npeet
 from . import pyentropy as ent
-
-#import nolds
 
 #--------------------------------------------------------------------------------------------------
 def featcalc(features, providednfreqs=6, nfrequencies=3, forbiddenfreqs=[13.49/4.],
@@ -58,7 +52,6 @@ def featcalc(features, providednfreqs=6, nfrequencies=3, forbiddenfreqs=[13.49/4
 			objfeatures[nfrequencies+6:nfrequencies+10] = compute_multiscale_entropy(lc.flux)
 			#objfeatures[nfrequencies+10:nfrequencies+11] = compute_max_lyapunov_exponent(lc.flux)
 
-
 			if savefeat is not None:
 				np.savetxt(featfile,objfeatures, delimiter=',')
 		featout = np.vstack((featout,objfeatures))
@@ -92,8 +85,6 @@ def prepLCs(lc, linflatten=False, detrending_coeff=1):
 	#variance = np.sqrt(np.sum(lc.flux - mean)**2 / (len(lc.flux) - 1))
 
 	return lc
-
-
 
 #--------------------------------------------------------------------------------------------------
 def EBperiod(time, flux, per, cut_outliers=0, linflatten=True):
@@ -333,7 +324,7 @@ def compute_varrat(featdictrow,n_harmonics=10):
 		if not np.isnan(amp):
 			amps = np.append(amps,amp)
 			significant_harmonics += 1
-	
+
 	varrat = (featdictrow['variance'] - np.sum(amps ** 2 / 2)) / featdictrow['variance']
 	if np.isnan(varrat):
 		varrat = 1
@@ -347,7 +338,7 @@ def compute_multiscale_entropy(flux):
 
 	Inputs
 	-----------------
-	flux: 
+	flux:
 		flux data
 
 	Returns
@@ -372,18 +363,18 @@ def compute_multiscale_entropy(flux):
 
 #--------------------------------------------------------------------------------------------------
 def helper_extract_digits(lst):
-    return list(map(lambda el:[el], lst))
+	return list(map(lambda el:[el], lst))
 
 #--------------------------------------------------------------------------------------------------
 def compute_differential_entropy(flux):
 	"""
 	Returns the differential entropy
-	
+
 	Inputs
 	-----------------
-	flux: 
+	flux:
 		flux data
-	
+
 	Returns
 	-----------------
 		entr: float
@@ -396,32 +387,32 @@ def compute_differential_entropy(flux):
 #--------------------------------------------------------------------------------------------------
 #def compute_max_lyapunov_exponent(flux):
 	"""
-	Returns the maximum Lyapunov exponent calculated through the algortihm by Eckmann et al. (1986) 
-	
+	Returns the maximum Lyapunov exponent calculated through the algortihm by Eckmann et al. (1986)
+
 	Inputs
 	-----------------
-	flux: 
+	flux:
 		flux data
-	
+
 	Returns
 	-----------------
 		lyap_exp: float
 	"""
-    #lyap_exp = nolds.lyap_r(flux, emb_dim=10, lag=None, min_tsep=None)
+	#lyap_exp = nolds.lyap_r(flux, emb_dim=10, lag=None, min_tsep=None)
 	#lyap_exp = max(nolds.lyap_e(flux, emb_dim=10, matrix_dim=4, min_nb=None, min_tsep=0, tau=1, debug_plot=False, debug_data=False, plot_file=None))
-	
+
 	#return lyap_exp
 
 #--------------------------------------------------------------------------------------------------
 def compute_flux_ratio(flux):
 	"""
 	Returns the ratio of fluxes that are either larger than or smaller than the mean flux (Kim & Bailer-Jones, 2016)
-	
+
 	Inputs
 	-----------------
-	flux: 
+	flux:
 		flux data
-	
+
 	Returns
 	-----------------
 		flux_ratio: float
@@ -438,7 +429,6 @@ def compute_flux_ratio(flux):
 	higher_flux = flux[index]
 
 	higher_sum = np.sum((mean - higher_flux) ** 2) / len(higher_flux)
-	
+
 	# Return flux ratio
 	return np.log(np.sqrt(lower_sum / higher_sum))
-

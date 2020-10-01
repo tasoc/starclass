@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 The Sorting-Hat Classifier (Supervised randOm foRest variabiliTy classIfier using high-resolution pHotometry Attributtes in TESS data).
@@ -9,7 +9,6 @@ The Sorting-Hat Classifier (Supervised randOm foRest variabiliTy classIfier usin
 import logging
 import os.path
 import os
-import copy
 from sklearn.ensemble import RandomForestClassifier
 from . import Sorting_Hat_featcalc as fc
 from .. import BaseClassifier, utilities
@@ -67,8 +66,11 @@ class SortingHatClassifier(BaseClassifier):
 
 		if self.classifier is None:
 			# Create new untrained classifier
-			self.classifier = Classifier_obj(n_estimators=n_estimators, max_features=max_features, min_samples_split=min_samples_split, random_state=self.random_state)
-	
+			self.classifier = Classifier_obj(
+				n_estimators=n_estimators,
+				max_features=max_features,
+				min_samples_split=min_samples_split,
+				random_state=self.random_state)
 
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):
@@ -90,7 +92,7 @@ class SortingHatClassifier(BaseClassifier):
 		Classify a single lightcurve.
 		Assumes lightcurve time is in days
 		Assumes featdict contains ['logf1'],['logf2'],['logf3'], in units of muHz
-		Assumes featdict contains ['varrat'],['number_significantharmonic'] 
+		Assumes featdict contains ['varrat'],['number_significantharmonic']
 		Assumes featdict contains ['skewness'],['flux_ratio']
 		Assumes featdict contains ['mse_mean'],['mse_max'],['mse_std'],['mse_power']
 		Assumes featdict contains ['diff_entropy_lc'],['diff_entropy_as']
@@ -132,7 +134,7 @@ class SortingHatClassifier(BaseClassifier):
 		Train the classifier.
 		Assumes lightcurve time is in days
 		Assumes featdict contains ['logf1'],['logf2'],['logf3'], in units of muHz
-		Assumes featdict contains ['varrat'],['number_significantharmonic'] 
+		Assumes featdict contains ['varrat'],['number_significantharmonic']
 		Assumes featdict contains ['skewness'],['flux_ratio']
 		Assumes featdict contains ['mse_mean'],['mse_max'],['mse_std'],['mse_power']
 		Assumes featdict contains ['diff_entropy_lc'],['diff_entropy_as']
@@ -159,15 +161,12 @@ class SortingHatClassifier(BaseClassifier):
 		featarray = fc.featcalc(tset.features(), savefeat=self.featdir, recalc=recalc)
 		logger.info('Features calculated/loaded.')
 
-		try:
-			self.classifier.oob_score = True
-			self.classifier.fit(featarray, fitlabels)
-			logger.info('Trained. OOB Score = %f', self.classifier.oob_score_)
-			#logger.info([estimator.tree_.max_depth for estimator in self.classifier.estimators_])
-			self.classifier.oob_score = False
-			self.classifier.trained = True
-		except:
-			logger.exception('Training Error') # add more details...
+		self.classifier.oob_score = True
+		self.classifier.fit(featarray, fitlabels)
+		logger.info('Trained. OOB Score = %f', self.classifier.oob_score_)
+		#logger.info([estimator.tree_.max_depth for estimator in self.classifier.estimators_])
+		self.classifier.oob_score = False
+		self.classifier.trained = True
 
 		if savecl and self.classifier.trained:
 			if self.clfile is not None:

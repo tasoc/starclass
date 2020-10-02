@@ -161,6 +161,7 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 				mean_noise_func = interp1d(bins[indx], mean_noise[indx], kind='linear', fill_value='extrapolate', assume_sorted=True)
 				mean_noise = power_median_to_mean * mean_noise_func(frequency)
 				mean_noise = np.clip(mean_noise, 0, None)
+				mean_noise += 1 # Add one to avoid DivideByZero errors - only used for finding max
 			else:
 				mean_noise = 1
 

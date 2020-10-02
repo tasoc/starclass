@@ -7,9 +7,10 @@ Utilities for the SORTING-HAT classifier.
 """
 
 import numpy as np
-import math
 import os
+from bottleneck import nansum
 import scipy.stats as stat
+import astropy.units as u
 import pyentrp.entropy as ent
 from . import npeet_entropy_estimators as npeet
 
@@ -64,22 +65,12 @@ def prepLCs(lc, linflatten=False, detrending_coeff=1):
 	Optionally removes ith polynomial trend (=detrending_coeff).
 	Assumes LCs come in normalised ppm with median zero.
 	"""
-	nancut = (lc.flux == 0) | np.isnan(lc.flux)
-
-	#norm = np.median(lc.flux[~nancut])
-	#lc.flux /= norm
-	#lc.flux_err /= norm
-
-	lc.time = lc.time[~nancut]
-	lc.flux = lc.flux[~nancut]
-	lc.flux_err = lc.flux_err[~nancut]
-
-	lc.flux *= 1e-6
-	lc.flux_err *= 1e-6
-	lc.flux += 1
+	lc = lc.remove_nans()
+	lc = 1e-6*lc + 1
+	lc.flux_unit = u.dimensionless_unscaled
 
 	if linflatten:
-		lc.flux = lc.flux - np.polyval(np.polyfit(lc.time, lc.flux, detrending_coeff), lc.time) + 1
+		lc = lc - np.polyval(np.polyfit(lc.time, lc.flux, detrending_coeff), lc.time) + 1
 
 	#mean = np.mean(lc.flux)
 	#variance = np.sqrt(np.sum(lc.flux - mean)**2 / (len(lc.flux) - 1))
@@ -285,28 +276,20 @@ def compute_lpf1pa11(featdictrow):
 		log10(((amp11**2+amp12**2+amp13**2+amp14**2)/amp11**2)-1)
 
 	"""
-
-	#TODO: check and adapt the calculation to 10 harmonics
-
-	amp11 = featdictrow['amp' + str(1) + '_harmonic' + str(1)]
-	amp12 = featdictrow['amp' + str(1) + '_harmonic' + str(2)]
-	amp13 = featdictrow['amp' + str(1) + '_harmonic' + str(3)]
-	amp14 = featdictrow['amp' + str(1) + '_harmonic' + str(4)]
-	lpf1pa11 = math.log10(((amp11**2+amp12**2+amp13**2+amp14**2)/amp11)-1)
-
-	return lpf1pa11
+	tab = featdictrow['frequencies']
+	peak1 = tab.loc[1]
+	amp11 = peak1['amplitude'][peak1['harmonic'] == 1]
+	amps = peak1['amplitude'][peak1['harmonic'] > 0]
+	return np.log10(nansum(amps**2)/amp11 - 1)
 
 #--------------------------------------------------------------------------------------------------
-def compute_varrat(featdictrow,n_harmonics=10):
+def compute_varrat(featdictrow):
 	"""
-	Returns the variance ratio and number of signficiant harmonics
+	Returns the variance ratio and number of significant harmonics
 
 	Inputs
 	-----------------
 	featdictrow:
-
-	n_harmonics:
-		Number of harmonics that got calculated
 
 	Returns
 	-----------------
@@ -316,16 +299,13 @@ def compute_varrat(featdictrow,n_harmonics=10):
 	significant_harmonics: int
 		number of harmonics of f1 that is not nan
 	"""
-	significant_harmonics = 0
-	amps = np.array(featdictrow['amp1'])
+	tab = featdictrow['frequencies']
+	peak1 = tab.loc[1]
 
-	for i in range(n_harmonics):
-		amp = featdictrow['amp1_harmonic' + str(i + 1)]
-		if not np.isnan(amp):
-			amps = np.append(amps,amp)
-			significant_harmonics += 1
+	amps = np.array(peak1['amplitude'])
+	significant_harmonics = int(np.sum((peak1['harmonic'] > 0) & ~np.isnan(peak1['amplitude'])))
 
-	varrat = (featdictrow['variance'] - np.sum(amps ** 2 / 2)) / featdictrow['variance']
+	varrat = (featdictrow['variance'] - nansum(amps**2 / 2)) / featdictrow['variance']
 	if np.isnan(varrat):
 		varrat = 1
 

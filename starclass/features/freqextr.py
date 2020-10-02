@@ -386,7 +386,7 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 	tab['beta'].unit = lightcurve.flux_unit
 
 	# Add index to peak number and harmonic for easy lookup:
-	#tab.add_index(['num', 'harmonic'], unique=True)
+	tab.add_index('num')
 
 	# Add meta data to table on how the list was created:
 	tab.meta['n_peaks'] = n_peaks

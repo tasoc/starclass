@@ -259,7 +259,7 @@ def default_classifier_model():
 	Default classifier model architecture
 	:return: model: untrained classifier model
 	'''
-	reg = l2(7.5E-4)
+	reg = l2(2.5E-3)
 	adam = Adam(clipnorm=1.)
 	input1 = tf.keras.Input(shape=(128, 128, 1))
 	drop0 = Dropout(0.5)(input1)

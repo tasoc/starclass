@@ -8,7 +8,7 @@ Utilities for SLOSH (2D deep learning methods).
 
 import os
 import numpy as np
-import tensorflow as tf
+import tensorflow
 from tf.keras.layers import Dropout, MaxPool2D, Flatten, Conv2D, LeakyReLU, Dense
 from tf.keras.regularizers import l2
 from tf.keras.optimizers import Adam
@@ -18,7 +18,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle as sklearn_shuffle
 
 #--------------------------------------------------------------------------------------------------
-class npy_generator(tf.keras.utils.Sequence):
+class npy_generator(tensorflow.keras.utils.Sequence):
 	"""
 	Generator that loads numpy arrays from a folder for training a deep learning model. This version has been tailored
 	for a classifier, with #the training labels taken from the subfolder. Indices of training/validation can be passed
@@ -75,7 +75,7 @@ class npy_generator(tf.keras.utils.Sequence):
 		batch_labels = [self.subfolder_labels[k] for k in batch_indices]
 		# Generate data
 		X, y = self.__data_generation(batch_filenames, batch_labels)
-		return X, tf.keras.utils.to_categorical(y, num_classes=8)
+		return X, tensorflow.keras.utils.to_categorical(y, num_classes=8)
 
 	#----------------------------------------------------------------------------------------------
 	def on_epoch_end(self):
@@ -259,7 +259,7 @@ def default_classifier_model():
 	'''
 	reg = l2(2.5E-3)
 	adam = Adam(clipnorm=1.)
-	input1 = tf.keras.Input(shape=(128, 128, 1))
+	input1 = tensorflow.keras.Input(shape=(128, 128, 1))
 	drop0 = Dropout(0.5)(input1)
 	conv1 = Conv2D(4, kernel_size=(7, 7), padding='same', kernel_initializer='glorot_uniform',
 		kernel_regularizer=reg)(drop0)
@@ -278,7 +278,7 @@ def default_classifier_model():
 	drop1 = Dropout(0.5)(flat)
 	dense1 = Dense(128, kernel_initializer='glorot_uniform', activation='relu', kernel_regularizer=reg)(drop1)
 	output = Dense(8, kernel_initializer='glorot_uniform', activation='softmax')(dense1)
-	model = tf.keras.Model(input1, output)
+	model = tensorflow.keras.Model(input1, output)
 
 	model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['accuracy'])
 	return model
@@ -290,7 +290,7 @@ def default_regressor_model():
 	:return: model: untrained regressor model
 	'''
 	reg = l2(7.5E-4)
-	input1 = tf.keras.Input(shape=(128, 128, 1))
+	input1 = tensorflow.keras.Input(shape=(128, 128, 1))
 	drop0 = Dropout(0.25)(input1)
 	conv1 = Conv2D(4, kernel_size=(5, 5), padding='same', kernel_initializer='glorot_uniform',
 		kernel_regularizer=reg)(drop0)
@@ -310,7 +310,7 @@ def default_regressor_model():
 	dense1 = Dense(1024, kernel_initializer='glorot_uniform', activation='relu', kernel_regularizer=reg)(drop1)
 	dense2 = Dense(128, kernel_regularizer=reg, kernel_initializer='glorot_uniform', activation='relu')(dense1)
 	output = Dense(1, kernel_initializer='glorot_uniform')(dense2)
-	model = tf.keras.Model(input1, output)
+	model = tensorflow.keras.Model(input1, output)
 
 	model.compile(optimizer='Nadam', loss=weighted_mean_squared_error, metrics=['mae'])
 	return model

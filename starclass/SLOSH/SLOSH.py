@@ -10,7 +10,7 @@ The SLOSH method for detecting solar-like oscillations (2D deep learning methods
 import numpy as np
 import os
 import logging
-import tensorflow as tf
+import tensorflow
 from sklearn.metrics import classification_report
 
 from . import SLOSH_prepro as preprocessing
@@ -43,7 +43,7 @@ class SLOSHClassifier(BaseClassifier):
 
 		# Set the global random seeds:
 		np.random.seed(self.random_seed)
-		tf.random.set_seed(self.random_seed)
+		tensorflow.random.set_seed(self.random_seed)
 
 		# Find model file
 		if clfile is not None:
@@ -55,8 +55,8 @@ class SLOSHClassifier(BaseClassifier):
 			logger.info("Loading pre-trained model...")
 			# load pre-trained classifier
 			self.predictable = True
-			tf.keras.backend.set_learning_phase(1)
-			self.classifier_list.append(tf.keras.models.load_model(self.model_file))
+			tensorflow.keras.backend.set_learning_phase(1)
+			self.classifier_list.append(tensorflow.keras.models.load_model(self.model_file))
 		else:
 			logger.info('No saved models provided. Predict functions are disabled.')
 			self.predictable = False
@@ -155,9 +155,9 @@ class SLOSHClassifier(BaseClassifier):
 		else:
 			logger.info('Train Images exist...')
 
-		reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=5, verbose=1)
-		early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-		checkpoint = tf.keras.callbacks.ModelCheckpoint(self.model_file,
+		reduce_lr = tensorflow.keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=5, verbose=1)
+		early_stop = tensorflow.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+		checkpoint = tensorflow.keras.callbacks.ModelCheckpoint(self.model_file,
 			monitor='val_loss', verbose=1, save_best_only=True)
 
 		#model = None
@@ -210,8 +210,8 @@ class SLOSHClassifier(BaseClassifier):
 		:param infile: Path to trained model
 		:return: None
 		'''
-		tf.keras.backend.set_learning_phase(1)
-		self.classifier_list.append(tf.keras.models.load_model(infile))
+		tensorflow.keras.backend.set_learning_phase(1)
+		self.classifier_list.append(tensorflow.keras.models.load_model(infile))
 		self.predictable = True
 
 	#----------------------------------------------------------------------------------------------
@@ -224,7 +224,7 @@ class SLOSHClassifier(BaseClassifier):
 		self.predictable = False
 
 #--------------------------------------------------------------------------------------------------
-class TestCallback(tf.keras.callbacks.Callback):
+class TestCallback(tensorflow.keras.callbacks.Callback):
 
 	def __init__(self, val_data):
 		self.validation_data = val_data

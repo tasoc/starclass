@@ -12,7 +12,6 @@ from contextlib import closing
 import sqlite3
 import logging
 from tqdm import tqdm
-from .. import StellarClasses
 from . import TrainingSet
 
 #--------------------------------------------------------------------------------------------------
@@ -32,15 +31,15 @@ class keplerq9v2(TrainingSet):
 		self.key = 'keplerq9v2'
 
 		# Point this to the directory where the TDA simulations are stored
-		self.input_folder = self.tset_datadir('keplerq9v2', 'https://tasoc.dk/pipeline/starclass_trainingsets/keplerq9v2.zip')
+		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/keplerq9v2.zip')
 
 		# Find the number of training sets:
-		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
-			dtype=None,
+		self.starlist = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
+			dtype='str',
 			delimiter=',',
 			comments='#',
 			encoding='utf-8')
-		self.nobjects = data.shape[0]
+		self.nobjects = self.starlist.shape[0]
 
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
@@ -59,22 +58,21 @@ class keplerq9v2(TrainingSet):
 			# Create the basic file structure of a TODO-list:
 			self.generate_todolist_structure(conn)
 
-			logger.info("Step 1: Reading file and extracting information...")
+			logger.info("Step 3: Reading file and extracting information...")
 			pri = 0
-			starlist = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
-				delimiter=',', comments='#', dtype=None, encoding='utf-8')
 			diagnostics = np.genfromtxt(os.path.join(self.input_folder, 'diagnostics.txt'),
 				delimiter=',', comments='#', dtype=None, encoding='utf-8')
-			for k, star in tqdm(enumerate(starlist), total=len(starlist)):
+			for k, star in tqdm(enumerate(self.starlist), total=len(self.starlist)):
 				# Get starid:
 				starname = star[0]
 				starclass = star[1]
 				if starname.startswith('constant_'):
-					starid = -1
+					starid = -10000 - int(starname[9:])
 				elif starname.startswith('fakerrlyr_'):
-					starid = -1
+					starid = -20000 - int(starname[10:])
 				else:
 					starid = int(starname)
+					starname = '{0:09d}'.format(starid)
 
 				# Path to lightcurve:
 				lightcurve = starclass + '/' + starname + '.txt'
@@ -99,53 +97,4 @@ class keplerq9v2(TrainingSet):
 			conn.commit()
 			cursor.close()
 
-		logger.info("DONE.")
-
-	#----------------------------------------------------------------------------------------------
-	def labels(self, level='L1'):
-
-		logger = logging.getLogger(__name__)
-
-		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
-			dtype=None,
-			delimiter=',',
-			comments='#',
-			encoding='utf-8')
-
-		# Create list of all the classes for each star:
-		lookup = []
-		for rowidx,row in enumerate(data):
-			labels = row[1].strip().split(';')
-			lbls = [StellarClasses[lbl.strip()] for lbl in labels]
-
-			if self.testfraction > 0:
-				if rowidx in self.train_idx:
-					lookup.append(tuple(set(lbls)))
-			else:
-				lookup.append(tuple(set(lbls)))
-
-		return tuple(lookup)
-
-	#----------------------------------------------------------------------------------------------
-	def labels_test(self, level='L1'):
-
-		logger = logging.getLogger(__name__)
-
-		if self.testfraction <= 0:
-			return []
-
-		data = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
-			dtype=None,
-			delimiter=',',
-			comments='#',
-			encoding='utf-8')
-
-		# Create list of all the classes for each star:
-		lookup = []
-		for rowidx, row in enumerate(data):
-			if rowidx in self.test_idx:
-				labels = row[1].strip().split(';')
-				lbls = [StellarClasses[lbl.strip()] for lbl in labels]
-				lookup.append(tuple(set(lbls)))
-
-		return tuple(lookup)
+		logger.info("%s training set successfully built.", self.key)

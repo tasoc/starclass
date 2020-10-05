@@ -8,9 +8,10 @@ Download any missing data files to cache.
 
 import logging
 from astropy.utils.iers import IERS_Auto
-from .training_sets import keplerq9, keplerq9v2
+from .constants import trainingset_list
+from .convenience import get_trainingset
 
-def download_cache():
+def download_cache(all_trainingsets=False):
 	"""
 	Download any missing data files to cache.
 
@@ -19,6 +20,9 @@ def download_cache():
 	It can be a good idea to call this function before starting the photometry
 	in parallel on many machines sharing the same cache, in which case the processes
 	will all attempt to download the cache files and may conflict with each other.
+
+	Parameters:
+		all_trainingsets (bool, optional):
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
@@ -30,10 +34,11 @@ def download_cache():
 	logger.info("Downloading IERS data...")
 	IERS_Auto().open()
 
-	logger.info("Downloading KeplerQ9 training set...")
-	keplerq9()
-
-	logger.info("Downloading KeplerQ9v2 training set...")
-	keplerq9v2()
+	# Download trainingsets:
+	download_tsets = trainingset_list if all_trainingsets else ['keplerq9v2', 'keplerq9']
+	for tskey in download_tsets:
+		logger.info("Downloading %s training set...", tskey)
+		tset = get_trainingset(tskey)
+		tset()
 
 	logger.info("All cache data downloaded.")

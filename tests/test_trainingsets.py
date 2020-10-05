@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Tests of Training Sets.
@@ -7,135 +7,48 @@ Tests of Training Sets.
 """
 
 import pytest
+import os
+import shutil
+import tempfile
 import conftest # noqa: F401
 import starclass.training_sets as tsets
+from starclass import trainingset_available, get_trainingset
+
+AVAILABLE_TSETS = [
+	'keplerq9v2',
+	'keplerq9',
+	pytest.param('keplerq9-linfit', marks=pytest.mark.skipif(not trainingset_available('keplerq9-linfit'), reason='TrainingSet not available')),
+	pytest.param('tdasim', marks=pytest.mark.skip),
+	pytest.param('tdasim-raw', marks=pytest.mark.skip),
+	pytest.param('tdasim-clean', marks=pytest.mark.skip)
+]
 
 #--------------------------------------------------------------------------------------------------
-#@pytest.mark.skipif(not tsets.tset_available('keplerq9'), reason='TrainingSet not available')
-def test_keplerq9():
+@pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
+def test_trainingset(tsetkey):
+
+	# Get training set class using conv. function:
+	tsetclass = get_trainingset(tsetkey)
 
 	for testfraction in (0, 0.2):
-		tset = tsets.keplerq9(tf=testfraction)
+		tset = tsetclass(tf=testfraction)
 		print(tset)
 
-		assert tset.key == 'keplerq9'
+		assert tset.key == tsetkey
 		assert tset.datalevel == 'corr'
 		assert tset.testfraction == testfraction
 
 	# Test-fractions which should all return in a ValueError:
 	with pytest.raises(ValueError):
-		tset = tsets.keplerq9(tf=1.2)
-
+		tset = tsetclass(tf=1.2)
 	with pytest.raises(ValueError):
-		tset = tsets.keplerq9(tf=1.0)
-
+		tset = tsetclass(tf=1.0)
 	with pytest.raises(ValueError):
-		tset = tsets.keplerq9(tf=-0.2)
-
-	# KeplerQ9 does not support anything other than datalevel=corr
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9(datalevel='raw')
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9(datalevel='clean')
-
-	# Calling with invalid datalevel should throw an error as well:
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9(datalevel='nonsense')
-
-#--------------------------------------------------------------------------------------------------
-#@pytest.mark.skipif(not tsets.tset_available('keplerq9v2'), reason='TrainingSet not available')
-def test_keplerq9v2():
-
-	for testfraction in (0, 0.2):
-		tset = tsets.keplerq9v2(tf=testfraction)
-		print(tset)
-
-		assert tset.key == 'keplerq9v2'
-		assert tset.datalevel == 'corr'
-		assert tset.testfraction == testfraction
-
-	# Test-fractions which should all return in a ValueError:
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9v2(tf=1.2)
-
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9v2(tf=1.0)
-
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9v2(tf=-0.2)
-
-	# KeplerQ9 does not support anything other than datalevel=corr
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9v2(datalevel='raw')
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9v2(datalevel='clean')
-
-	# Calling with invalid datalevel should throw an error as well:
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9v2(datalevel='nonsense')
-
-#--------------------------------------------------------------------------------------------------
-@pytest.mark.skipif(not tsets.tset_available('keplerq9-linfit'), reason='TrainingSet not available')
-def test_keplerq9linfit():
-
-	for testfraction in (0, 0.2):
-		tset = tsets.keplerq9linfit(tf=testfraction)
-		print(tset)
-
-		assert tset.key == 'keplerq9-linfit'
-		assert tset.datalevel == 'corr'
-		assert tset.testfraction == testfraction
-
-	# Test-fractions which should all return in a ValueError:
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9linfit(tf=1.2)
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9linfit(tf=1.0)
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9linfit(tf=-0.2)
-
-	# KeplerQ9 does not support anything other than datalevel=corr
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9linfit(datalevel='raw')
-	with pytest.raises(ValueError):
-		tset = tsets.keplerq9linfit(datalevel='clean')
+		tset = tsetclass(tf=-0.2)
 
 	# Calling with invalid datalevel should throw an error as well:
 	with pytest.raises(ValueError):
 		tset = tsets.keplerq9linfit(datalevel='nonsense')
-
-#--------------------------------------------------------------------------------------------------
-@pytest.mark.skip()
-@pytest.mark.parametrize('datalevel', ['corr', 'raw', 'clean'])
-def test_tdasim(datalevel):
-
-	for testfraction in (0, 0.2):
-		tset = tsets.tda_simulations(datalevel=datalevel, tf=testfraction)
-		print(tset)
-
-		assert tset.key == 'tdasim'
-		assert tset.datalevel == datalevel
-		assert tset.testfraction == testfraction
-
-	# Test-fractions which should all return in a ValueError:
-	with pytest.raises(ValueError):
-		tset = tsets.tda_simulations(datalevel=datalevel, tf=1.2)
-	with pytest.raises(ValueError):
-		tset = tsets.tda_simulations(datalevel=datalevel, tf=1.0)
-	with pytest.raises(ValueError):
-		tset = tsets.tda_simulations(datalevel=datalevel, tf=-0.2)
-
-	# Calling with invalid datalevel should throw an error as well:
-	with pytest.raises(ValueError):
-		tset = tsets.tda_simulations(datalevel='nonsense')
-
-#--------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize('tsetclass', [
-	tsets.keplerq9v2,
-	tsets.keplerq9,
-	pytest.param(tsets.keplerq9linfit, marks=pytest.mark.skipif(not tsets.tset_available('keplerq9linfit'), reason='TrainingSet not available'))
-])
-def test_trainingset_labels(tsetclass):
 
 	tset = tsetclass(tf=0)
 	print(tset)
@@ -155,6 +68,84 @@ def test_trainingset_labels(tsetclass):
 	print(len(lbls), len(lbls_test))
 
 	assert len(lbls) + len(lbls_test) == tset.nobjects
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
+def test_trainingset_generate_todolist(monkeypatch, tsetkey):
+
+	# Get training set class using conv. function:
+	tsetclass = get_trainingset(tsetkey)
+
+
+	with tempfile.TemporaryDirectory(prefix='pytest-private-tsets-') as tmpdir:
+
+		tset = tsetclass()
+		input_folder = tset.input_folder
+
+		print(input_folder)
+
+		#
+		tsetdir = os.path.join(tmpdir, tsetkey)
+		os.makedirs(tsetdir)
+		for f in os.listdir(input_folder):
+			fpath = os.path.join(input_folder, f)
+			if os.path.isdir(fpath) or f == 'todo.sqlite':
+				continue
+			shutil.copy(fpath, tsetdir)
+
+
+		monkeypatch.setenv("STARCLASS_TSETS", tmpdir)
+
+		print(os.environ['STARCLASS_TSETS'])
+
+		# When we now initialize the trainingset it should run generate_todo automatically:
+		tset = tsetclass()
+
+		assert tset.input_folder == tsetdir
+		assert os.path.isfile(os.path.join(tsetdir, 'todo.sqlite'))
+
+#--------------------------------------------------------------------------------------------------
+#@pytest.mark.skipif(not trainingset_available('keplerq9'), reason='TrainingSet not available')
+def test_keplerq9():
+
+	# KeplerQ9 does not support anything other than datalevel=corr
+	with pytest.raises(ValueError):
+		tsets.keplerq9(datalevel='raw')
+	with pytest.raises(ValueError):
+		tsets.keplerq9(datalevel='clean')
+
+#--------------------------------------------------------------------------------------------------
+#@pytest.mark.skipif(not trainingset_available('keplerq9v2'), reason='TrainingSet not available')
+def test_keplerq9v2():
+
+	# KeplerQ9 does not support anything other than datalevel=corr
+	with pytest.raises(ValueError):
+		tsets.keplerq9v2(datalevel='raw')
+	with pytest.raises(ValueError):
+		tsets.keplerq9v2(datalevel='clean')
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.skipif(not trainingset_available('keplerq9-linfit'), reason='TrainingSet not available')
+def test_keplerq9linfit():
+
+	# KeplerQ9 does not support anything other than datalevel=corr
+	with pytest.raises(ValueError):
+		tsets.keplerq9linfit(datalevel='raw')
+	with pytest.raises(ValueError):
+		tsets.keplerq9linfit(datalevel='clean')
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.skip()
+@pytest.mark.parametrize('datalevel', ['corr', 'raw', 'clean'])
+def test_tdasim(datalevel):
+
+	for testfraction in (0, 0.2):
+		tset = tsets.tdasim(datalevel=datalevel, tf=testfraction)
+		print(tset)
+
+		assert tset.key == 'tdasim'
+		assert tset.datalevel == datalevel
+		assert tset.testfraction == testfraction
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

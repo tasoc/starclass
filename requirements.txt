@@ -13,3 +13,4 @@ keras == 2.3.1
 Pillow
 xgboost == 0.90
 tqdm
+pyentrp == 0.6.0

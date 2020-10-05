@@ -10,100 +10,216 @@ import numpy as np
 import sqlite3
 from contextlib import closing
 import logging
+#from bottleneck import nanmedian, nanvar
+#from lightkurve import LightCurve
 from tqdm import tqdm
-from .. import StellarClasses
+from ..StellarClasses import StellarClasses, StellarClassesLevel2
 from . import TrainingSet
+#from ..utilities import rms_timescale
 
-#----------------------------------------------------------------------------------------------
-class tda_simulations(TrainingSet):
+#--------------------------------------------------------------------------------------------------
+def _generate_todolist(self):
 
-	def __init__(self, *args, **kwargs):
+	logger = logging.getLogger(__name__)
 
-		# Key for this training-set:
-		datalevel = kwargs.get('datalevel')
-		if datalevel == 'raw':
-			self.key = 'tdasim-raw'
-			self.input_folder = self.tset_datadir('tdasim-raw', 'https://tasoc.dk/pipeline/starclass_trainingsets/tdasim-raw.zip')
-		elif datalevel == 'corr':
-			self.key = 'tdasim'
-			self.input_folder = self.tset_datadir('tdasim', 'https://tasoc.dk/pipeline/starclass_trainingsets/tdasim.zip')
-		elif datalevel == 'clean':
-			self.key = 'tdasim-clean'
-			self.input_folder = self.tset_datadir('tdasim-clean', 'https://tasoc.dk/pipeline/starclass_trainingsets/tdasim-clean.zip')
+	sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
+	with closing(sqlite3.connect(sqlite_file)) as conn:
+		conn.row_factory = sqlite3.Row
+		cursor = conn.cursor()
 
-		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=',', usecols=(0,10), encoding='utf-8')
-		self.nobjects = data.shape[0]
+		# Create the basic file structure of a TODO-list:
+		self.generate_todolist_structure(conn)
 
-		# Initialize parent
-		# NOTE: We do this after setting the input_folder, as it depends on that being set:
-		super().__init__(*args, **kwargs)
+		logger.info("Step 3: Reading file and extracting information...")
+		starlist = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),
+			delimiter=',', dtype=None, encoding='utf-8')
+		diagnostics = np.genfromtxt(os.path.join(self.input_folder, 'diagnostics.txt'),
+			delimiter=',', dtype=None, encoding='utf-8')
 
-	#----------------------------------------------------------------------------------------------
-	def generate_todolist(self):
+		pri = 0
+		for k, star in tqdm(enumerate(starlist), total=len(starlist)):
+			# Get starid:
+			starname = star[0]
+			starid = int(starname[4:])
 
-		logger = logging.getLogger(__name__)
+			# Path to lightcurve:
+			if self.key == 'tdasim-raw':
+				lightcurve = 'sysnoise/Star%d.sysnoise' % starid
+			elif self.key == 'tdasim':
+				lightcurve = 'noisy/Star%d.noisy' % starid
+			elif self.key == 'tdasim-clean':
+				lightcurve = 'clean/Star%d.clean' % starid
 
-		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
-		with closing(sqlite3.connect(sqlite_file)) as conn:
-			conn.row_factory = sqlite3.Row
-			cursor = conn.cursor()
+			# Extract the camera from the lattitude:
+			tmag = star[1]
+			#ecllat = star[4]
+			#ecllon = star[5]
 
-			# Create the basic file structure of a TODO-list:
-			self.generate_todolist_structure(conn)
+			# Load diagnostics from file, to speed up the process:
+			variance, rms_hour, ptp = diagnostics[k]
 
-			logger.info("Step 1: Reading file and extracting information...")
-			pri = 0
-			starlist = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), delimiter=',', dtype=None, encoding='utf-8')
-			#diagnostics = np.genfromtxt(os.path.join(self.input_folder, 'diagnostics.txt'), delimiter=',', dtype=None, encoding='utf-8')
-			for k, star in tqdm(enumerate(starlist), total=len(starlist)):
-				# Get starid:
-				starname = star[0]
-				starid = int(starname[4:])
+			#data = np.loadtxt(os.path.join(self.input_folder, lightcurve))
+			#sector = np.floor(data_sysnoise[:,0] / 27.4) + 1
+			#sectors = [int(s) for s in np.unique(sector)]
+			#if data[-1,0] - data[0,0] > 27.4:
+			#	raise Exception("Okay, didn't we agree that this should be only one sector?!")
 
-				# Path to lightcurve:
-				if self.datalevel == 'raw':
-					lightcurve = 'sysnoise/Star%d.sysnoise' % starid
-				elif self.datalevel == 'corr':
-					lightcurve = 'noisy/Star%d.noisy' % starid
-				elif self.datalevel == 'clean':
-					lightcurve = 'clean/Star%d.clean' % starid
+			#data[:,0] -= data[0,0]
+			#m = nanmedian(data[:,1])
+			#data[:,1] = 1e6*(data[:,1]/m - 1)
+			#data[:,2] = 1e6*data[:,2]/m
 
-				# Extract the camera from the lattitude:
-				tmag = star[1]
-				#ecllat = star[4]
-				#ecllon = star[5]
+			# Calculate diagnostics:
+			#lc = LightCurve(time=data[:,0], flux=data[:,1], flux_err=data[:,2])
+			#variance = nanvar(data[:,1], ddof=1)
+			#rms_hour = rms_timescale(lc, timescale=3600/86400)
+			#ptp = nanmedian(np.abs(np.diff(data[:,1])))
 
-				# Load diagnostics from file, to speed up the process:
-				#variance, rms_hour, ptp = diagnostics[k]
+			# Add target to TODO-list:
+			#diag.write("{variance:.16e},{rms_hour:.16e},{ptp:.16e}\n".format(
+			#	variance=variance,
+			#	rms_hour=rms_hour,
+			#	ptp=ptp
+			#))
 
-				#data = np.loadtxt(os.path.join(self.input_folder, lightcurve))
-				#sector = np.floor(data_sysnoise[:,0] / 27.4) + 1
-				#sectors = [int(s) for s in np.unique(sector)]
-				#if data[-1,0] - data[0,0] > 27.4:
-				#	raise Exception("Okay, didn't we agree that this should be only one sector?!")
+			pri += 1
+			self.generate_todolist_insert(cursor,
+				priority=pri,
+				starid=starid,
+				lightcurve=lightcurve,
+				tmag=tmag,
+				datasource='ffi',
+				variance=variance,
+				rms_hour=rms_hour,
+				ptp=ptp)
 
-				pri += 1
-				self.generate_todolist_insert(cursor,
-					priority=pri,
-					starid=starid,
-					lightcurve=lightcurve,
-					tmag=tmag)
-				#datasource='ffi',
-				#variance=variance,
-				#rms_hour=rms_hour,
-				#ptp=ptp
+		conn.commit()
+		cursor.close()
 
-			conn.commit()
-			cursor.close()
+	logger.info("%s training set successfully built.", self.key)
 
-		logger.info("DONE.")
+#--------------------------------------------------------------------------------------------------
+def _labels(self, level='L1'):
 
-	#----------------------------------------------------------------------------------------------
-	def labels(self, level='L1'):
+	logger = logging.getLogger(__name__)
 
-		logger = logging.getLogger(__name__)
+	data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),
+		dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
 
-		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
+	# Translation of Mikkel's identifiers into the broader
+	# classes we have defined in StellarClasses:
+	if level == 'L1':
+		translate = {
+			'Solar-like': StellarClasses.SOLARLIKE,
+			'Transit': StellarClasses.ECLIPSE,
+			'Eclipse': StellarClasses.ECLIPSE, # short period EBs should be CONTACT_ROT, not ECLIPSE
+			'multi': StellarClasses.ECLIPSE,
+			'MMR': StellarClasses.ECLIPSE,
+			'RR Lyrae': StellarClasses.RRLYR_CEPHEID,
+			'RRab': StellarClasses.RRLYR_CEPHEID,
+			'RRc': StellarClasses.RRLYR_CEPHEID,
+			'RRd': StellarClasses.RRLYR_CEPHEID,
+			'Cepheid': StellarClasses.RRLYR_CEPHEID,
+			'FM': StellarClasses.RRLYR_CEPHEID,
+			'1O': StellarClasses.RRLYR_CEPHEID,
+			'1O2O': StellarClasses.RRLYR_CEPHEID,
+			'FM1O': StellarClasses.RRLYR_CEPHEID,
+			'Type II': StellarClasses.RRLYR_CEPHEID,
+			'Anomaleous': StellarClasses.RRLYR_CEPHEID,
+			'SPB': StellarClasses.GDOR_SPB,
+			'dsct': StellarClasses.DSCT_BCEP,
+			'bumpy': StellarClasses.GDOR_SPB,
+			'gDor': StellarClasses.GDOR_SPB,
+			'bCep': StellarClasses.DSCT_BCEP,
+			#'roAp': StellarClasses.RAPID,
+			#'sdBV': StellarClasses.RAPID,
+			#'Flare': StellarClasses.TRANSIENT,
+			'Spots': StellarClasses.CONTACT_ROT,
+			'LPV': StellarClasses.APERIODIC,
+			'MIRA': StellarClasses.APERIODIC,
+			'SR': StellarClasses.APERIODIC,
+			'Constant': StellarClasses.CONSTANT
+		}
+	elif level == 'L2':
+		translate = {
+			'Solar-like': StellarClassesLevel2.SOLARLIKE,
+			'Transit': StellarClassesLevel2.ECLIPSE,
+			'Eclipse': StellarClassesLevel2.ECLIPSE,
+			'multi': StellarClassesLevel2.ECLIPSE,
+			'MMR': StellarClassesLevel2.ECLIPSE,
+			'RR Lyrae': StellarClassesLevel2.RRLYR,
+			'RRab': StellarClassesLevel2.RRLYR,
+			'RRc': StellarClassesLevel2.RRLYR,
+			'RRd': StellarClassesLevel2.RRLYR,
+			'Cepheid': StellarClassesLevel2.CEPHEID,
+			'FM': StellarClassesLevel2.CEPHEID,
+			'1O': StellarClassesLevel2.CEPHEID,
+			'1O2O': StellarClassesLevel2.CEPHEID,
+			'FM1O': StellarClassesLevel2.CEPHEID,
+			'Type II': StellarClassesLevel2.CEPHEID,
+			'Anomaleous': StellarClassesLevel2.CEPHEID,
+			'SPB': StellarClassesLevel2.SPB,
+			'dsct': StellarClassesLevel2.DSCT,
+			'bumpy': StellarClassesLevel2.DSCT, # This is not right - Should we make a specific class for these?
+			'gDor': StellarClassesLevel2.GDOR,
+			'bCep': StellarClassesLevel2.BCEP,
+			'roAp': StellarClassesLevel2.ROAP,
+			'sdBV': StellarClassesLevel2.SDB,
+			'Flare': StellarClassesLevel2.FLARE,
+			'Spots': StellarClassesLevel2.SPOTS,
+			'LPV': StellarClassesLevel2.LPV,
+			'MIRA': StellarClassesLevel2.LPV,
+			'SR': StellarClassesLevel2.LPV,
+			'Constant': StellarClassesLevel2.CONSTANT
+		}
+
+	# Create list of all the classes for each star:
+	lookup = []
+	for rowidx,row in enumerate(data):
+		#starid = int(row[0][4:])
+		labels = row[1].strip().split(';')
+		lbls = []
+		for lbl in labels:
+			lbl = lbl.strip()
+			if lbl == 'gDor+dSct hybrid' or lbl == 'dSct+gDor hybrid':
+				if level == 'L1':
+					lbls.append(StellarClasses.DSCT_BCEP)
+					lbls.append(StellarClasses.GDOR_SPB)
+				elif level == 'L2':
+					lbls.append(StellarClassesLevel2.DSCT)
+					lbls.append(StellarClassesLevel2.GDOR)
+			elif lbl == 'bCep+SPB hybrid':
+				if level == 'L1':
+					lbls.append(StellarClasses.DSCT_BCEP)
+					lbls.append(StellarClasses.GDOR_SPB)
+				elif level == 'L2':
+					lbls.append(StellarClassesLevel2.BCEP)
+					lbls.append(StellarClassesLevel2.SPB)
+			else:
+				c = translate.get(lbl.strip())
+				if c is None:
+					logger.error("Unknown label: %s", lbl)
+				else:
+					lbls.append(c)
+
+		if self.testfraction > 0:
+			if rowidx in self.train_idx:
+				lookup.append(tuple(set(lbls)))
+		else:
+			lookup.append(tuple(set(lbls)))
+
+	return tuple(lookup)
+
+#--------------------------------------------------------------------------------------------------
+def _labels_test(self, level='L1'):
+
+	logger = logging.getLogger(__name__)
+
+	if self.testfraction == 0:
+		return []
+	else:
+		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),
+			dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
 
 		# Translation of Mikkel's identifiers into the broader
 		# classes we have defined in StellarClasses:
@@ -130,9 +246,9 @@ class tda_simulations(TrainingSet):
 				'bumpy': StellarClasses.GDOR_SPB,
 				'gDor': StellarClasses.GDOR_SPB,
 				'bCep': StellarClasses.DSCT_BCEP,
-				'roAp': StellarClasses.RAPID,
-				'sdBV': StellarClasses.RAPID,
-				'Flare': StellarClasses.TRANSIENT,
+				#'roAp': StellarClasses.RAPID,
+				#'sdBV': StellarClasses.RAPID,
+				#'Flare': StellarClasses.TRANSIENT,
 				'Spots': StellarClasses.CONTACT_ROT,
 				'LPV': StellarClasses.APERIODIC,
 				'MIRA': StellarClasses.APERIODIC,
@@ -141,35 +257,35 @@ class tda_simulations(TrainingSet):
 			}
 		elif level == 'L2':
 			translate = {
-				'Solar-like': StellarClasses.SOLARLIKE,
-				'Transit': StellarClasses.ECLIPSE,
-				'Eclipse': StellarClasses.ECLIPSE,
-				'multi': StellarClasses.ECLIPSE,
-				'MMR': StellarClasses.ECLIPSE,
-				'RR Lyrae': StellarClasses.RRLYR,
-				'RRab': StellarClasses.RRLYR,
-				'RRc': StellarClasses.RRLYR,
-				'RRd': StellarClasses.RRLYR,
-				'Cepheid': StellarClasses.CEPHEID,
-				'FM': StellarClasses.CEPHEID,
-				'1O': StellarClasses.CEPHEID,
-				'1O2O': StellarClasses.CEPHEID,
-				'FM1O': StellarClasses.CEPHEID,
-				'Type II': StellarClasses.CEPHEID,
-				'Anomaleous': StellarClasses.CEPHEID,
-				'SPB': StellarClasses.SPB,
-				'dsct': StellarClasses.DSCT,
-				'bumpy': StellarClasses.DSCT, # This is not right - Should we make a specific class for these?
-				'gDor': StellarClasses.GDOR,
-				'bCep': StellarClasses.BCEP,
-				'roAp': StellarClasses.ROAP,
-				'sdBV': StellarClasses.SDB,
-				'Flare': StellarClasses.TRANSIENT,
-				'Spots': StellarClasses.SPOTS,
-				'LPV': StellarClasses.LPV,
-				'MIRA': StellarClasses.LPV,
-				'SR': StellarClasses.LPV,
-				'Constant': StellarClasses.CONSTANT
+				'Solar-like': StellarClassesLevel2.SOLARLIKE,
+				'Transit': StellarClassesLevel2.ECLIPSE,
+				'Eclipse': StellarClassesLevel2.ECLIPSE,
+				'multi': StellarClassesLevel2.ECLIPSE,
+				'MMR': StellarClassesLevel2.ECLIPSE,
+				'RR Lyrae': StellarClassesLevel2.RRLYR,
+				'RRab': StellarClassesLevel2.RRLYR,
+				'RRc': StellarClassesLevel2.RRLYR,
+				'RRd': StellarClassesLevel2.RRLYR,
+				'Cepheid': StellarClassesLevel2.CEPHEID,
+				'FM': StellarClassesLevel2.CEPHEID,
+				'1O': StellarClassesLevel2.CEPHEID,
+				'1O2O': StellarClassesLevel2.CEPHEID,
+				'FM1O': StellarClassesLevel2.CEPHEID,
+				'Type II': StellarClassesLevel2.CEPHEID,
+				'Anomaleous': StellarClassesLevel2.CEPHEID,
+				'SPB': StellarClassesLevel2.SPB,
+				'dsct': StellarClassesLevel2.DSCT,
+				'bumpy': StellarClassesLevel2.DSCT, # This is not right - Should we make a specific class for these?
+				'gDor': StellarClassesLevel2.GDOR,
+				'bCep': StellarClassesLevel2.BCEP,
+				'roAp': StellarClassesLevel2.ROAP,
+				'sdBV': StellarClassesLevel2.SDB,
+				'Flare': StellarClassesLevel2.FLARE,
+				'Spots': StellarClassesLevel2.SPOTS,
+				'LPV': StellarClassesLevel2.LPV,
+				'MIRA': StellarClassesLevel2.LPV,
+				'SR': StellarClassesLevel2.LPV,
+				'Constant': StellarClassesLevel2.CONSTANT
 			}
 
 		# Create list of all the classes for each star:
@@ -185,15 +301,15 @@ class tda_simulations(TrainingSet):
 						lbls.append(StellarClasses.DSCT_BCEP)
 						lbls.append(StellarClasses.GDOR_SPB)
 					elif level == 'L2':
-						lbls.append(StellarClasses.DSCT)
-						lbls.append(StellarClasses.GDOR)
+						lbls.append(StellarClassesLevel2.DSCT)
+						lbls.append(StellarClassesLevel2.GDOR)
 				elif lbl == 'bCep+SPB hybrid':
 					if level == 'L1':
 						lbls.append(StellarClasses.DSCT_BCEP)
 						lbls.append(StellarClasses.GDOR_SPB)
 					elif level == 'L2':
-						lbls.append(StellarClasses.BCEP)
-						lbls.append(StellarClasses.SPB)
+						lbls.append(StellarClassesLevel2.BCEP)
+						lbls.append(StellarClassesLevel2.SPB)
 				else:
 					c = translate.get(lbl.strip())
 					if c is None:
@@ -201,121 +317,85 @@ class tda_simulations(TrainingSet):
 					else:
 						lbls.append(c)
 
-			if self.testfraction > 0:
-				if rowidx in self.train_idx:
-					lookup.append(tuple(set(lbls)))
-			else:
+			if rowidx in self.train_idx:
 				lookup.append(tuple(set(lbls)))
 
-		return tuple(lookup)
+	return tuple(lookup)
 
-	#----------------------------------------------------------------------------------------------
-	def labels_test(self, level='L1'):
+#--------------------------------------------------------------------------------------------------
+class tdasim(TrainingSet):
 
-		logger = logging.getLogger(__name__)
+	def __init__(self, *args, **kwargs):
 
-		if self.testfraction == 0:
-			return []
-		else:
-			data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'), dtype=None, delimiter=', ', usecols=(0,10), encoding='utf-8')
+		# Key for this training-set:
+		self.key = 'tdasim'
+		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/tdasim.zip')
 
-			# Translation of Mikkel's identifiers into the broader
-			# classes we have defined in StellarClasses:
-			if level == 'L1':
-				translate = {
-					'Solar-like': StellarClasses.SOLARLIKE,
-					'Transit': StellarClasses.ECLIPSE,
-					'Eclipse': StellarClasses.ECLIPSE, # short period EBs should be CONTACT_ROT, not ECLIPSE
-					'multi': StellarClasses.ECLIPSE,
-					'MMR': StellarClasses.ECLIPSE,
-					'RR Lyrae': StellarClasses.RRLYR_CEPHEID,
-					'RRab': StellarClasses.RRLYR_CEPHEID,
-					'RRc': StellarClasses.RRLYR_CEPHEID,
-					'RRd': StellarClasses.RRLYR_CEPHEID,
-					'Cepheid': StellarClasses.RRLYR_CEPHEID,
-					'FM': StellarClasses.RRLYR_CEPHEID,
-					'1O': StellarClasses.RRLYR_CEPHEID,
-					'1O2O': StellarClasses.RRLYR_CEPHEID,
-					'FM1O': StellarClasses.RRLYR_CEPHEID,
-					'Type II': StellarClasses.RRLYR_CEPHEID,
-					'Anomaleous': StellarClasses.RRLYR_CEPHEID,
-					'SPB': StellarClasses.GDOR_SPB,
-					'dsct': StellarClasses.DSCT_BCEP,
-					'bumpy': StellarClasses.GDOR_SPB,
-					'gDor': StellarClasses.GDOR_SPB,
-					'bCep': StellarClasses.DSCT_BCEP,
-					'roAp': StellarClasses.RAPID,
-					'sdBV': StellarClasses.RAPID,
-					'Flare': StellarClasses.TRANSIENT,
-					'Spots': StellarClasses.CONTACT_ROT,
-					'LPV': StellarClasses.APERIODIC,
-					'MIRA': StellarClasses.APERIODIC,
-					'SR': StellarClasses.APERIODIC,
-					'Constant': StellarClasses.CONSTANT
-				}
-			elif level == 'L2':
-				translate = {
-					'Solar-like': StellarClasses.SOLARLIKE,
-					'Transit': StellarClasses.ECLIPSE,
-					'Eclipse': StellarClasses.ECLIPSE,
-					'multi': StellarClasses.ECLIPSE,
-					'MMR': StellarClasses.ECLIPSE,
-					'RR Lyrae': StellarClasses.RRLYR,
-					'RRab': StellarClasses.RRLYR,
-					'RRc': StellarClasses.RRLYR,
-					'RRd': StellarClasses.RRLYR,
-					'Cepheid': StellarClasses.CEPHEID,
-					'FM': StellarClasses.CEPHEID,
-					'1O': StellarClasses.CEPHEID,
-					'1O2O': StellarClasses.CEPHEID,
-					'FM1O': StellarClasses.CEPHEID,
-					'Type II': StellarClasses.CEPHEID,
-					'Anomaleous': StellarClasses.CEPHEID,
-					'SPB': StellarClasses.SPB,
-					'dsct': StellarClasses.DSCT,
-					'bumpy': StellarClasses.DSCT, # This is not right - Should we make a specific class for these?
-					'gDor': StellarClasses.GDOR,
-					'bCep': StellarClasses.BCEP,
-					'roAp': StellarClasses.ROAP,
-					'sdBV': StellarClasses.SDB,
-					'Flare': StellarClasses.TRANSIENT,
-					'Spots': StellarClasses.SPOTS,
-					'LPV': StellarClasses.LPV,
-					'MIRA': StellarClasses.LPV,
-					'SR': StellarClasses.LPV,
-					'Constant': StellarClasses.CONSTANT
-				}
+		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),
+			dtype=None, delimiter=',', usecols=(0,10), encoding='utf-8')
+		self.nobjects = data.shape[0]
 
-			# Create list of all the classes for each star:
-			lookup = []
-			for rowidx,row in enumerate(data):
-				#starid = int(row[0][4:])
-				labels = row[1].strip().split(';')
-				lbls = []
-				for lbl in labels:
-					lbl = lbl.strip()
-					if lbl == 'gDor+dSct hybrid' or lbl == 'dSct+gDor hybrid':
-						if level == 'L1':
-							lbls.append(StellarClasses.DSCT_BCEP)
-							lbls.append(StellarClasses.GDOR_SPB)
-						elif level == 'L2':
-							lbls.append(StellarClasses.DSCT)
-							lbls.append(StellarClasses.GDOR)
-					elif lbl == 'bCep+SPB hybrid':
-						if level == 'L1':
-							lbls.append(StellarClasses.DSCT_BCEP)
-							lbls.append(StellarClasses.GDOR_SPB)
-						elif level == 'L2':
-							lbls.append(StellarClasses.BCEP)
-							lbls.append(StellarClasses.SPB)
-					else:
-						c = translate.get(lbl.strip())
-						if c is None:
-							logger.error("Unknown label: %s", lbl)
-						else:
-							lbls.append(c)
+		# Initialize parent
+		# NOTE: We do this after setting the input_folder, as it depends on that being set:
+		super().__init__(*args, **kwargs)
 
-				if rowidx in self.train_idx:
-					lookup.append(tuple(set(lbls)))
+	def generate_todolist(self):
+		return _generate_todolist(self)
 
-		return tuple(lookup)
+	def labels(self, *args, **kwargs):
+		return _labels(self, *args, **kwargs)
+
+	def labels_test(self, *args, **kwargs):
+		return _labels_test(self, *args, **kwargs)
+
+#--------------------------------------------------------------------------------------------------
+class tdasim_raw(TrainingSet):
+
+	def __init__(self, *args, **kwargs):
+
+		# Key for this training-set:
+		self.key = 'tdasim-raw'
+		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/tdasim-raw.zip')
+
+		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),
+			dtype=None, delimiter=',', usecols=(0,10), encoding='utf-8')
+		self.nobjects = data.shape[0]
+
+		# Initialize parent
+		# NOTE: We do this after setting the input_folder, as it depends on that being set:
+		super().__init__(*args, **kwargs)
+
+	def generate_todolist(self):
+		return _generate_todolist(self)
+
+	def labels(self, *args, **kwargs):
+		return _labels(self, *args, **kwargs)
+
+	def labels_test(self, *args, **kwargs):
+		return _labels_test(self, *args, **kwargs)
+
+#--------------------------------------------------------------------------------------------------
+class tdasim_clean(TrainingSet):
+
+	def __init__(self, *args, **kwargs):
+
+		# Key for this training-set:
+		self.key = 'tdasim-clean'
+		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/tdasim-clean.zip')
+
+		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),
+			dtype=None, delimiter=',', usecols=(0,10), encoding='utf-8')
+		self.nobjects = data.shape[0]
+
+		# Initialize parent
+		# NOTE: We do this after setting the input_folder, as it depends on that being set:
+		super().__init__(*args, **kwargs)
+
+	def generate_todolist(self):
+		return _generate_todolist(self)
+
+	def labels(self, *args, **kwargs):
+		return _labels(self, *args, **kwargs)
+
+	def labels_test(self, *args, **kwargs):
+		return _labels_test(self, *args, **kwargs)

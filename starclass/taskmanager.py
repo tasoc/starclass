@@ -12,6 +12,7 @@ import sqlite3
 import logging
 from astropy.table import Table
 from . import STATUS, StellarClasses
+from .constants import classifier_list
 
 class TaskManager(object):
 	"""
@@ -41,7 +42,9 @@ class TaskManager(object):
 		self.readonly = readonly
 
 		# Keep a list of all the possible classifiers here:
-		self.all_classifiers = ('rfgc', 'slosh', 'xgb')
+		self.all_classifiers = list(classifier_list)
+		self.all_classifiers.remove('meta')
+		self.all_classifiers = set(self.all_classifiers)
 
 		# Setup logging:
 		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -260,7 +263,7 @@ class TaskManager(object):
 			# Make a search on all the classifiers, and record the next
 			# task for all of them:
 			all_tasks = []
-			for cl in set(self.all_classifiers).difference([classifier]):
+			for cl in self.all_classifiers.difference([classifier]):
 				task = self._query_task(classifier=cl, priority=priority)
 				if task is not None:
 					all_tasks.append(task)
@@ -269,6 +272,10 @@ class TaskManager(object):
 			if all_tasks:
 				indx = np.argmin([t['priority'] for t in all_tasks])
 				return all_tasks[indx]
+
+			# If this is reached, all classifiers are done, and we can
+			# start running the MetaClassifier:
+			task = self._query_task(classifier='meta', priority=priority)
 
 		return task
 

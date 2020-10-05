@@ -4,13 +4,17 @@
 The meta-classifier.
 
 .. codeauthor:: James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
+.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
 import logging
 import os
 import numpy as np
+import itertools
+from bottleneck import allnan, anynan
 from sklearn.ensemble import RandomForestClassifier
 from .. import BaseClassifier, utilities
+from ..constants import classifier_list
 
 #--------------------------------------------------------------------------------------------------
 class Classifier_obj(RandomForestClassifier):
@@ -35,7 +39,7 @@ class MetaClassifier(BaseClassifier):
 	.. codeauthor:: James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
 	"""
 
-	def __init__(self, clfile='meta_classifier.pickle', featdir='', *args, **kwargs):
+	def __init__(self, clfile='meta_classifier.pickle', *args, **kwargs):
 		"""
 		Initialize the classifier object.
 
@@ -46,51 +50,35 @@ class MetaClassifier(BaseClassifier):
 		# Initialize parent
 		super().__init__(*args, **kwargs)
 
-		# Start logger:
-		logger = logging.getLogger(__name__)
-
-		self.clfile = clfile
+		self.clfile = None
 		self.classifier = None
+		self.features_used = None
 
 		if clfile is not None:
 			self.clfile = os.path.join(self.data_dir, clfile)
-		else:
-			self.clfile = None
 
 		# Check if pre-trained classifier exists
 		if self.clfile is not None and os.path.exists(self.clfile):
 			# Load pre-trained classifier
 			self.load(self.clfile)
 
-		# Check for features TODO: THIS NEEDS TO BE CHANGED!
-		if featdir is not None:
-			logger.warning("This needs to be edited when we know how the features will be parsed!")
-			self.featdir = os.path.join(self.data_dir, featdir)
-			if not os.path.exists(self.featdir):
-				os.makedirs(self.featdir)
-		else:
-			logger.error("No features detected!")
-			raise ValueError("Exiting.")
-
 		# Set up classifier
 		if self.classifier is None:
 			self.classifier = Classifier_obj(random_state=self.random_state)
-
-		self.indiv_classifiers = ['rfgc', 'SLOSH', 'xgb']
 
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):
 		"""
 		Saves the classifier object with pickle.
 		"""
-		utilities.savePickle(outfile, self.classifier)
+		utilities.savePickle(outfile, [self.classifier, self.features_used])
 
 	#----------------------------------------------------------------------------------------------
 	def load(self, infile):
 		"""
 		Loads classifier object.
 		"""
-		self.classifier = utilities.loadPickle(infile)
+		self.classifier, self.features_used = utilities.loadPickle(infile)
 
 	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features):
@@ -106,21 +94,25 @@ class MetaClassifier(BaseClassifier):
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
 
-		#update to access lightcurve id parameter, if exists
-		#logger.info("Object ID: "+str(lightcurve.id))
-
 		if not self.classifier.trained:
 			logger.error('Classifier has not been trained. Exiting.')
 			raise ValueError('Classifier has not been trained. Exiting.')
 
+		# Build features array from the probabilities from the other classifiers:
+		# TODO: What about NaN values?
 		logger.debug("Importing features...")
-		featarray = np.array(features['other_classifiers']['prob']).reshape(1,-1)
+		tab = features['other_classifiers']
+		featarray = np.full(len(self.features_used), np.NaN, dtype='float32')
+		for j, (classifier, stcl) in enumerate(self.features_used):
+			indx = (tab['classifier'] == classifier) & (tab['class'] == stcl.name)
+			featarray[j] = tab[indx]['prob']
 
 		logger.debug("We are starting the magic...")
 		# Comes out with shape (1,8), but instead want shape (8,) so squeeze
 		classprobs = self.classifier.predict_proba(featarray).squeeze()
 		logger.debug("Classification complete")
 
+		# Format the output:
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):
 			key = self.StellarClasses(cla)
@@ -128,12 +120,17 @@ class MetaClassifier(BaseClassifier):
 		return result
 
 	#----------------------------------------------------------------------------------------------
-	def train(self, tset, savecl=True, recalc=False, overwrite=False):
+	def train(self, tset, savecl=True, overwrite=False):
 		"""
-		Train the classifier.
-		Assumes lightcurve time is in days
+		Train the Meta-classifier.
 
+		Parameters:
+			tset (:class:`TrainingSet`): Training set to train classifier on.
+			savecl (bool, optional): Save the classifier to file?
+			overwrite (bool, optional): Overwrite existing classifer save file.
 
+		.. codeauthor:: James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
@@ -141,18 +138,46 @@ class MetaClassifier(BaseClassifier):
 		# Check for pre-calculated features
 		fitlabels = self.parse_labels(tset.labels())
 
+		# First create list of all possible classifiers:
+		all_classifiers = list(classifier_list)
+		all_classifiers.remove('meta')
+
+		# Create list of all features:
+		features_used = list(itertools.product(all_classifiers, self.StellarClasses))
+		#features_names = ['{0:s}_{1:s}'.format(classifier, stcl.name) for classifier, stcl in features_used]
+		#logger.debug("Feature names: %s", features_names)
+
+		# Create table of features:
+		# Create as float32, since that is what RandomForestClassifier converts it to anyway.
 		logger.info("Importing features...")
-		# This bit is hardcoded! Not good for generalisability!
-		for idx, i in enumerate(tset.features()):
-			if idx == 0:
-				features = np.array(i['other_classifiers']['prob'])
-				preds = np.array(i['other_classifiers']['class'])
-			else:
-				features = np.vstack((features, np.array(i['other_classifiers']['prob'])))
-				preds = np.vstack((preds, np.array(i['other_classifiers']['class'])))
+		features = np.full((len(fitlabels), len(features_used)), np.NaN, dtype='float32')
+		for k, feat in enumerate(tset.features()):
+			tab = feat['other_classifiers']
+			for j, (classifier, stcl) in enumerate(features_used):
+				indx = (tab['classifier'] == classifier) & (tab['class'] == stcl.name)
+				features[k, j] = tab[indx]['prob']
 
-		logger.info("Features imported. Shape = %s", np.shape(features))
+		# Remove columns that are all NaN:
+		# This can be classifiers that never returns a given class or a classifier that
+		# has not been run at all.
+		keepcols = ~allnan(features, axis=1)
+		features = features[:, keepcols]
+		features_used = features_used[keepcols]
+		#features_names = features_names[keepcols]
 
+		# TODO: Should we throw an error if a classifier is not run at all?
+
+		# TODO: Remove NaNs? Or set them to -1?
+		if anynan(features):
+			raise ValueError("Features contains nans")
+
+		logger.info("Features imported. Shape = %s", features.shape)
+
+		# Save this to object, we are using it to keep track of which features were used
+		# to train the classifier:
+		self.features_used = features_used
+
+		# Run actual training:
 		self.classifier.oob_score = True
 		logger.info("Fitting model.")
 		self.classifier.fit(features, fitlabels)
@@ -160,6 +185,6 @@ class MetaClassifier(BaseClassifier):
 		self.classifier.trained = True
 
 		if savecl and self.classifier.trained and self.clfile is not None:
-			if overwrite or recalc or not os.path.exists(self.clfile):
+			if overwrite or not os.path.exists(self.clfile):
 				logger.info("Saving pickled classifier instance to '%s'", self.clfile)
 				self.save(self.clfile)

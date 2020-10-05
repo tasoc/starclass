@@ -74,7 +74,8 @@ class BaseClassifier(object):
 		"""
 
 		# Check the input:
-		assert level in ('L1', 'L2'), "Invalid level"
+		if level not in ('L1', 'L2'):
+			raise ValueError("Invalid level")
 
 		# Start logger:
 		logger = logging.getLogger(__name__)
@@ -102,6 +103,7 @@ class BaseClassifier(object):
 			'RFGCClassifier': 'rfgc',
 			'SLOSHClassifier': 'slosh',
 			'XGBClassifier': 'xgb',
+			'SortingHatClassifier': 'sortinghat',
 			'MetaClassifier': 'meta'
 		}[self.__class__.__name__]
 
@@ -111,6 +113,10 @@ class BaseClassifier(object):
 			'L1': StellarClasses,
 			'L2': StellarClassesLevel2
 		}[level]
+
+		# Just for catching all those places random numbers are used without explicitly requesting
+		# a random_state:
+		np.random.seed(self._random_seed)
 
 	#----------------------------------------------------------------------------------------------
 	def __enter__(self):
@@ -406,7 +412,18 @@ class BaseClassifier(object):
 		features['powerspectrum'] = psd
 
 		# Extract primary frequencies from lightcurve and add to features:
-		features.update(freqextr(lightcurve))
+		features['frequencies'] = freqextr(lc, n_peaks=6, n_harmonics=0, initps=psd)
+
+		# Add these for backward compatibility:
+		for row in features['frequencies']:
+			if row['harmonic'] == 0:
+				key = '{0:d}'.format(row['num'])
+			else:
+				key = '{0:d}_harmonic{1:d}'.format(row['num'], row['harmonic'])
+
+			features['freq' + key] = row['frequency']
+			features['amp' + key] = row['amplitude']
+			features['phase' + key] = row['phase']
 
 		# Calculate FliPer features:
 		features.update(FliPer(psd))

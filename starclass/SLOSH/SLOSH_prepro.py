@@ -39,11 +39,11 @@ class npy_generator(tf.keras.utils.Sequence):
 
 		for dirpath, dirnames, filenames in os.walk(root):
 			for file in filenames:
-				if file.endswith(extension) & dirpath[-1].isdigit(): # I infer the class label '0' or '1' according to subfolder names
+				if file.endswith(extension) and dirpath[-1].isdigit(): # I infer the class label '0' or '1' according to subfolder names
 					self.filenames.append(os.path.join(dirpath, file))
 					self.subfolder_labels.append(int(dirpath[-1]))
 		# Get labels from filenames
-		labels = np.array([i.split('/')[-2] for i in self.filenames])
+		labels = np.array([i.split(os.path.sep)[-2] for i in self.filenames])
 		if len(indices) == 0: # otherwise pass a list of training/validation indices
 			self.indexes = np.arange(len(self.filenames))
 		else:
@@ -244,14 +244,12 @@ def generate_train_images(freq, power, star_id, output_path, label):
 	:return: None
 	'''
 
+	image = generate_single_image(freq, power)
 	if label is None:
-		image = generate_single_image(freq, power)
-		np.savez_compressed(file=output_path + '/%s' % star_id, im=image)
+		np.savez_compressed(file=os.path.join(output_path, str(star_id)), im=image)
 	else:
-		image = generate_single_image(freq, power)
-		if not os.path.exists(output_path + '/' + str(label) + '/'):
-			os.mkdir(output_path + '/' + str(label) + '/')
-		np.savez_compressed(file=output_path + '/%s/%s' % (label, star_id), im=image)
+		os.makedirs(os.path.join(output_path, str(label)), exist_ok=True)
+		np.savez_compressed(file=os.path.join(output_path, str(label), str(star_id)), im=image)
 
 #--------------------------------------------------------------------------------------------------
 def default_classifier_model():

@@ -9,9 +9,9 @@ Utilities for SLOSH (2D deep learning methods).
 import os
 import numpy as np
 import tensorflow
-from tf.keras.layers import Dropout, MaxPool2D, Flatten, Conv2D, LeakyReLU, Dense
-from tf.keras.regularizers import l2
-from tf.keras.optimizers import Adam
+from tensorflow.keras.layers import Dropout, MaxPool2D, Flatten, Conv2D, LeakyReLU, Dense
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras.optimizers import Adam
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
 from sklearn.model_selection import train_test_split

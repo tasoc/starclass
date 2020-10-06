@@ -23,7 +23,8 @@ class npy_generator(tensorflow.keras.utils.Sequence):
 	Generator that loads numpy arrays from a folder for training a deep learning model. This version has been tailored
 	for a classifier, with #the training labels taken from the subfolder. Indices of training/validation can be passed
 	to indicate which files to partition for each set.
-	Written by  Marc Hon (mtyh555@uowmail.edu.au)
+
+	.. codeauthor:: Marc Hon <mtyh555@uowmail.edu.au>
 	"""
 	def __init__(self, root, batch_size, dim, extension='.npz', shuffle=True, indices=[],
 			subset=None, random_seed=42):
@@ -137,17 +138,28 @@ def squeeze(arr, minval, maxval, axis=0):
 	return squeezed
 
 #--------------------------------------------------------------------------------------------------
-def ps_to_array(freq, power, nbins=128, supersample=1,
-				minfreq=3., maxfreq=283., minpow=3., maxpow=3e7):
+def ps_to_array(freq, power, nbins=128, supersample=1, minfreq=3., maxfreq=283.,
+	minpow=3., maxpow=3e7):
 	"""
-	Produce 2D array representation of power spectrum that is similar to Marc Hon's 2D images
-	Written by Keaton Bell (bell@mps.mpg.de)
-	This should be faster and more precise than writing plots to images
-	Returns nbin x nbins image-like representation of the data
-	freq and power are from power spectrum
-	min/max freqs/powers define the array edges in same units as input spectrum
-	if supersample == 1, result is strictly black and white (1s and 0s)
-	if supersample > 1, returns grayscale image represented spectrum "image" density
+	Produce 2D array representation of power spectrum that is similar to Marc Hon's 2D images.
+	This should be faster and more precise than writing plots to images.
+
+	Parameters:
+		freq (ndarray): Frequencies from power spectrum.
+		power (ndarray): Power from from power spectrum.
+		nbins (int, optional): Dimensions of output image.
+		supersample (float, optional): If ``supersample = 1``, result is strictly black and white
+			(1s and 0s). If ``supersample > 1``, returns grayscale image represented spectrum
+			"image" density.
+		minfreq (float, optional): Minimum of frequency axis on image in same units as ``freq``.
+		maxfreq (float, optional): Maximum of frequency axis on image in same units as ``freq``.
+		minpow (float, optional): Minimum of power axis on image in same units as ``power``.
+		maxpow (float, optional): Maximum of power axis on image in same units as ``power``.
+
+	Returns:
+		ndarray: Returns ``nbin`` x ``nbins`` image-like representation of the data.
+
+	.. codeauthor:: Keaton Bell <bell@mps.mpg.de>
 	"""
 	# 04/01/2020 jsk389 - added edit to scale power by subtracting mean and dividing by
 	# standard deviation
@@ -323,4 +335,4 @@ def weighted_mean_squared_error(y_true, y_pred):
 	:param y_pred: Model predicted value
 	:return: Weighted MSE loss
 	'''
-	return tf.reduce_mean((tf.square(y_pred - y_true))*tf.square(y_true-64), axis=-1)
+	return tensorflow.reduce_mean((tensorflow.square(y_pred - y_true))*tensorflow.square(y_true-64), axis=-1)

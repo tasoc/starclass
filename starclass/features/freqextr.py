@@ -227,7 +227,7 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 			deviation[i,0] = (alpha[i,0]**2 + beta[i,0]**2) / (atemp**2 + btemp**2)
 
 		# Stops if there are to many consecutive failed peaks
-		if conseclim is not None:
+		if devlim is not None and conseclim is not None:
 			# Stop numpy from warning us that deviation contains NaN
 			with np.errstate(invalid='ignore'):
 				deviation_large = (deviation > 1/devlim) | (deviation < devlim)
@@ -326,8 +326,8 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 				logger.debug("Optimizing %d peaks", len(order))
 
 				for j in order:
-					if np.isfinite(alpha[j]) and deviation[j] < 1/devlim and deviation[j] > devlim:
-						#add the oscillation:
+					if np.isfinite(alpha[j]): # and deviation[j] < 1/devlim and deviation[j] > devlim:
+						# Add the oscillation:
 						lightcurve += model(lightcurve.time, alpha[j], beta[j], nu[j])
 						ps = powerspectrum(lightcurve)
 

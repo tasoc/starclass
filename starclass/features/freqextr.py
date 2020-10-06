@@ -29,9 +29,12 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 	r"""
 	Extract frequencies from timeseries.
 
+	The program will perform iterative sine-wave fitting (CLEAN or pre-whitening) using
+	a sum of harmonic functions of the following form:
+
 	.. math::
-		\sum_{i=1}^{N_\mathrm{peaks}} A_i \sin(2\pi\nu_i j t + \delta_i)
-		= \sum_{i=1}^{N_\mathrm{peaks}} \alpha_i\sin(2\pi\nu_i j t) + \beta_i\cos(2\pi\nu_i j t) \, ,
+		\sum_{i=1}^{N_\mathrm{peaks}} A_i \sin(2\pi\nu_i t + \delta_i)
+		= \sum_{i=1}^{N_\mathrm{peaks}} \alpha_i\sin(2\pi\nu_i t) + \beta_i\cos(2\pi\nu_i t) \, ,
 
 	where :math:`\nu_i`, :math:`A_i` and :math:`\delta_i` denoted the frequency, amplitude
 	and phase of the oscillation.
@@ -39,6 +42,11 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 	If ``n_harmonic`` is greater than zero, the routine will additionally for each extracted peak
 	extract peaks at the given number of harmonics for each peak. Default is to :math:`2\nu_i`,
 	:math:`3\nu_i` etc., but this can be controlled by the ``harmonics_list`` input.
+
+	At each iteration, an optimization loop is entered which will go back and re-optimize the
+	previously found peaks in an attempt at minimizing influences between close frequencies.
+	The details of this optimization can be controlled by the parameters ``Noptimize`` and
+	``optim_max_diff``.
 
 	Parameters:
 		lightcurve (:class:`lightkurve.LightCurve`): Lightcurve to extract frequencies for.

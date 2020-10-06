@@ -170,24 +170,21 @@ class XGBClassifier(BaseClassifier):
 		#			if not os.path.exists(self.features_file) or overwrite:
 		#				logger.info('Saving extracted features to feets_features.txt')
 		#				feature_results.to_csv(self.features_file, index=False)
-		try:
-			logger.info('Training ...')
-			#logger.info('SHAPES ', str(np.shape(featarray)))
-			#logger.info('SHAPES ', str(np.shape(fit_labels)))
-			self.classifier.fit(featarray, fit_labels)
-			if feat_import:
-				importances = self.classifier.feature_importances_.astype(float)
-				feature_importances = zip(list(featarray), importances)
-				with open(os.path.join(self.data_dir, 'xgbClassifier_feat_import.json'), 'w') as outfile:
-					json.dump(list(feature_importances), outfile)
 
-			self.trained = True
-		except:
-			logger.exception('Training error ...')
+		logger.info('Training ...')
+		#logger.info('SHAPES ', str(np.shape(featarray)))
+		#logger.info('SHAPES ', str(np.shape(fit_labels)))
+		self.classifier.fit(featarray, fit_labels)
+		if feat_import:
+			importances = self.classifier.feature_importances_.astype(float)
+			feature_importances = zip(list(featarray), importances)
+			with open(os.path.join(self.data_dir, 'xgbClassifier_feat_import.json'), 'w') as outfile:
+				json.dump(list(feature_importances), outfile)
 
-		if savecl and self.trained:
-			if self.classifier_file is not None:
-				if not os.path.exists(self.classifier_file) or overwrite:
-					logger.info('Saving pickled xgb classifier to %s', self.classifier_file)
-					self.save(self.classifier_file)
-					#self.save_model(self.classifier_file)
+		self.trained = True
+
+		if savecl and self.classifier_file is not None:
+			if not os.path.exists(self.classifier_file) or overwrite:
+				logger.info('Saving pickled xgb classifier to %s', self.classifier_file)
+				self.save(self.classifier_file)
+				#self.save_model(self.classifier_file)

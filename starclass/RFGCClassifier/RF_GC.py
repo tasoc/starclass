@@ -202,22 +202,18 @@ class RFGCClassifier(BaseClassifier):
 			featarray = fc.featcalc(tset.features(), self.classifier.som, savefeat=self.featdir, recalc=recalc)
 		logger.info('Features calculated/loaded.')
 
-		try:
-			self.classifier.oob_score = True
-			self.classifier.fit(featarray, fitlabels)
-			logger.info('Trained. OOB Score = %f', self.classifier.oob_score_)
-			#logger.info([estimator.tree_.max_depth for estimator in self.classifier.estimators_])
-			self.classifier.oob_score = False
-			self.classifier.trained = True
-		except:
-			logger.exception('Training Error') # add more details...
+		self.classifier.oob_score = True
+		self.classifier.fit(featarray, fitlabels)
+		logger.info('Trained. OOB Score = %f', self.classifier.oob_score_)
+		#logger.info([estimator.tree_.max_depth for estimator in self.classifier.estimators_])
+		self.classifier.oob_score = False
+		self.classifier.trained = True
 
-		if savecl and self.classifier.trained:
-			if self.clfile is not None:
-				if not os.path.exists(self.clfile) or overwrite or recalc:
-					logger.info("Saving pickled classifier instance to '%s'", self.clfile)
-					logger.info("Saving SOM to '%s'", self.somfile)
-					self.save(self.clfile, self.somfile)
+		if savecl and self.clfile is not None:
+			if not os.path.exists(self.clfile) or overwrite or recalc:
+				logger.info("Saving pickled classifier instance to '%s'", self.clfile)
+				logger.info("Saving SOM to '%s'", self.somfile)
+				self.save(self.clfile, self.somfile)
 
 	#----------------------------------------------------------------------------------------------
 	def loadsom(self, somfile, dimx=1, dimy=400, cardinality=64):

@@ -310,6 +310,7 @@ class BaseClassifier(object):
 					time=data[:,0],
 					flux=data[:,1],
 					flux_err=data[:,2],
+					flux_unit=cds.ppm,
 					quality=quality,
 					time_format='jd',
 					time_scale='tdb',

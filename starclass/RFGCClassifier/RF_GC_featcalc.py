@@ -7,6 +7,7 @@ Utilities for the RF-GC classifier (general random forest).
 """
 
 import numpy as np
+import astropy.units as u
 import os
 import logging
 from tqdm import tqdm
@@ -62,22 +63,12 @@ def prepLCs(lc, linflatten=False):
 	Optionally removes linear trend.
 	Assumes LCs come in in normalised ppm with median zero.
 	"""
-	nancut = (lc.flux == 0) | np.isnan(lc.flux)
-
-	#norm = np.median(lc.flux[~nancut])
-	#lc.flux /= norm
-	#lc.flux_err /= norm
-
-	lc.time = lc.time[~nancut]
-	lc.flux = lc.flux[~nancut]
-	lc.flux_err = lc.flux_err[~nancut]
-
-	lc.flux *= 1e-6
-	lc.flux_err *= 1e-6
-	lc.flux += 1
+	lc = lc.remove_nans()
+	lc = lc*1e-6 + 1
+	lc.flux_unit = u.dimensionless_unscaled
 
 	if linflatten:
-		lc.flux = lc.flux - np.polyval(np.polyfit(lc.time, lc.flux, 1), lc.time) + 1
+		lc = lc - np.polyval(np.polyfit(lc.time, lc.flux, 1), lc.time) + 1
 
 	return lc
 

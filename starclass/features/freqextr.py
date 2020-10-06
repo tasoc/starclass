@@ -99,6 +99,9 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 	if initps is not None and not isinstance(initps, powerspectrum):
 		raise ValueError("Initial powerspectrum is invalid")
 
+	if Noptimize is None:
+		Noptimize = 0
+
 	# If no list of harmonics is given, do the simple one:
 	if harmonics_list is None:
 		harmonics_list = np.arange(2, n_harmonics+2)
@@ -182,7 +185,10 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 
 		# Finds the frequency of the largest peak:
 		pmax_index = np.argmax(power / mean_noise)
-		nu[i,0] = ps.optimize_peak(frequency[pmax_index])
+		fsearch = frequency[pmax_index]
+		if pmax_index > 0 and pmax_index < len(power)-1:
+			fsearch = [frequency[pmax_index-1], fsearch, frequency[pmax_index+1]]
+		nu[i,0] = ps.optimize_peak(fsearch)
 		alpha[i,0], beta[i,0] = ps.alpha_beta(nu[i,0])
 		logger.debug('Fundamental frequency: %f', nu[i,0])
 

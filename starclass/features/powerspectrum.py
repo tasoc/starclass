@@ -227,7 +227,7 @@ class powerspectrum(object):
 		#res = minimize(func, fmax, bounds=((freq_low, freq_high),), method='TNC')
 		#return res.x[0]
 
-		res = minimize_scalar(func, bracket=[freq_low, fmax, freq_high], bounds=(freq_low, freq_high), method='bounded', options={'xatol': 1e-6})
+		res = minimize_scalar(func, bracket=[freq_low, fmax, freq_high], bounds=(freq_low, freq_high), method='bounded', options={'xatol': 1e-5})
 		#print(res)
 
 		#x = np.linspace(freq_low-10*self.df*1e6, freq_high+10*self.df*1e6, 200)

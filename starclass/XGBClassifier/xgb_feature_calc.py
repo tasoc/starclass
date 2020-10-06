@@ -19,7 +19,7 @@ def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
 	if not isinstance(features, types.GeneratorType):
 		features = [features]
 
-	for idx, obj in enumerate(features):
+	for obj in features:
 
 		precalc = False
 		if savefeat is not None:
@@ -30,7 +30,8 @@ def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
 				featout = featout.append(objfeatures)
 
 		if not precalc:
-			lc = lc_norm(obj['lightcurve'], linflatten)
+			# TODO: Why is it needed to re-normalize the lightcurve here?
+			lc = RF_GC_featcalc.prepLCs(obj['lightcurve'], linflatten)
 
 			features_dict = {}
 			features_dict['skewness'] = ss.skew(lc.flux) # Skewness
@@ -55,10 +56,10 @@ def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
 			features_dict['Freq_phasediff_31'] = pd31
 
 			# phase-fold lightcurve on dominant period
-			folded_lc = phase_fold_lc(lc, periods[0])
+			folded_lc = lc.fold(period=periods[0])
 
 			# Compute phi_rcs and rcs features
-			features_dict['Rcs'] = Rcs(lc.flux)
+			features_dict['Rcs'] = Rcs(lc)
 			features_dict['psi_Rcs'] = Rcs(folded_lc)
 
 			objfeatures = pd.DataFrame(features_dict, index=[0])
@@ -72,24 +73,7 @@ def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
 		#featout = np.vstack((featout, objfeatures.values))
 	return featout
 
-
-def lc_norm(lc, linflatten=False):
-	"""
-	Preprocess light curves using sigma clipping and normalise them with the median
-	This is is done under the assumption that missing (nan) have been removed
-	"""
-	lc = lc.remove_nans()
-	lc = lc[lc.flux != 0]
-	lc.flux = lc.flux*1e-6 + 1
-	lc.flux_err = lc.flux_err * 1e-6
-
-	if linflatten:
-		#lc_f[:,1] = lc_f[:,1] - np.polyval(np.polyfit(lc_f[:,0],lc_f[:,1],1),lc_f[:,0]) + 1
-		lc.flux = lc.flux - np.polyval(np.polyfit(lc.time, lc.flux, 1), lc.time) + 1
-
-	return lc
-
-
+#--------------------------------------------------------------------------------------------------
 def calculate_eta(lc):
 	"""
 	Calculate Eta feature.
@@ -112,37 +96,25 @@ def calculate_eta(lc):
 
 	return eta
 
-
-def Rcs(flux):
+#--------------------------------------------------------------------------------------------------
+def Rcs(lc):
 	"""
 	Range of cumulative sum.
 
 	Parameters:
-		flux (array): Array to calculate Rcs for.
+		lc (:class:`lightkurve.LightCurve`): Lightcurve to calculate Rcs for.
 
 	Returns:
 		float: Range of cumulative sum.
 	"""
-	sigma = np.std(flux)
-	N = len(flux)
-	m = np.mean(flux)
-	s = np.cumsum(flux - m) * 1.0 / (N * sigma)
+	sigma = np.std(lc.flux)
+	N = len(lc)
+	m = np.mean(lc.flux)
+	s = np.cumsum(lc.flux - m) / (N * sigma)
 	R = np.max(s) - np.min(s)
 	return R
 
-
-def phase_fold_lc(lc, per):
-	"""
-	Uses functions from RF_GC_featcalc to compute phase folded light curve
-	"""
-	# Compute additional features
-	time, flux = lc.time.copy(), lc.flux.copy()
-
-	EBper = RF_GC_featcalc.EBperiod(time, flux, per)
-	phase = RF_GC_featcalc.phasefold(time, EBper)
-	return flux[np.argsort(phase)]
-
-
+#--------------------------------------------------------------------------------------------------
 def checkfrequencies(featdictrow, nfreqs, providednfreqs, forbiddenfreqs, time):
 	"""
 	Cuts frequency data down to desired number of frequencies, and removes harmonics
@@ -184,7 +156,7 @@ def checkfrequencies(featdictrow, nfreqs, providednfreqs, forbiddenfreqs, time):
 			freqs.append(np.max(time)-np.min(time))
 	return np.array(freqs), np.array(usedfreqs)
 
-
+#--------------------------------------------------------------------------------------------------
 def freq_ampratios(featdictrow, usedfreqs):
 	"""
 	Amplitude ratios of frequencies
@@ -209,7 +181,7 @@ def freq_ampratios(featdictrow, usedfreqs):
 		amp31 = 0
 	return amp21,amp31
 
-
+#--------------------------------------------------------------------------------------------------
 def freq_phasediffs(featdictrow, usedfreqs):
 	"""
 	Phase differences of frequencies

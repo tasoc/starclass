@@ -145,6 +145,7 @@ class TrainingSet(object):
 		tqdm_settings = {
 			'unit': 'B',
 			'unit_scale': True,
+			'unit_divisor': 1024,
 			'disable': not logger.isEnabledFor(logging.INFO)
 		}
 
@@ -158,9 +159,11 @@ class TrainingSet(object):
 				res.raise_for_status()
 				total_size = int(res.headers.get('content-length', 0))
 				block_size = 1024
-				with open(zip_tmp, 'wb') as fid:
-					for data in tqdm(res.iter_content(block_size), total=np.ceil(total_size/block_size), **tqdm_settings):
-						fid.write(data)
+				with tqdm(total=total_size, **tqdm_settings) as pbar:
+					with open(zip_tmp, 'wb') as fid:
+						for data in res.iter_content(block_size):
+							datasize = fid.write(data)
+							pbar.update(datasize)
 
 				# Extract ZIP file:
 				logger.info("Step 2: Unpacking %s training set...", self.key)

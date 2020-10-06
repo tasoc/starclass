@@ -76,15 +76,14 @@ def test_trainingset_generate_todolist(monkeypatch, tsetkey):
 	# Get training set class using conv. function:
 	tsetclass = get_trainingset(tsetkey)
 
-
 	with tempfile.TemporaryDirectory(prefix='pytest-private-tsets-') as tmpdir:
 
 		tset = tsetclass()
 		input_folder = tset.input_folder
-
 		print(input_folder)
 
-		#
+		# Create a copy of the root fies of the trainings set (ignore that actual data)
+		# in the temp. directory:
 		tsetdir = os.path.join(tmpdir, tsetkey)
 		os.makedirs(tsetdir)
 		for f in os.listdir(input_folder):
@@ -93,9 +92,8 @@ def test_trainingset_generate_todolist(monkeypatch, tsetkey):
 				continue
 			shutil.copy(fpath, tsetdir)
 
-
+		# Change the environment variable to the temp. dir:
 		monkeypatch.setenv("STARCLASS_TSETS", tmpdir)
-
 		print(os.environ['STARCLASS_TSETS'])
 
 		# When we now initialize the trainingset it should run generate_todo automatically:
@@ -103,6 +101,26 @@ def test_trainingset_generate_todolist(monkeypatch, tsetkey):
 
 		assert tset.input_folder == tsetdir
 		assert os.path.isfile(os.path.join(tsetdir, 'todo.sqlite'))
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
+def test_trainingset_folds(tsetkey):
+
+	# Get training set class using conv. function:
+	tsetclass = get_trainingset(tsetkey)
+	tset = tsetclass()
+
+	for k, fold in enumerate(tset.folds(n_splits=5, tf=0.2)):
+		assert isinstance(fold, tsetclass)
+		assert fold.crossval_folds == 5
+		assert fold.fold == k + 1
+		assert fold.testfraction == 0.2
+		assert len(fold.train_idx) > 0
+		assert len(fold.test_idx) > 0
+		assert len(fold.train_idx) > len(fold.test_idx)
+		assert len(fold.train_idx) < len(tset.train_idx)
+
+	assert k == 4, "Not the correct number of folds"
 
 #--------------------------------------------------------------------------------------------------
 #@pytest.mark.skipif(not trainingset_available('keplerq9'), reason='TrainingSet not available')

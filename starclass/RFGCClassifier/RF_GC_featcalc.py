@@ -37,11 +37,12 @@ def featcalc(features, som,
 		if not precalc:
 			objfeatures = np.zeros(nfrequencies+16)
 			lc = prepLCs(obj['lightcurve'],linflatten)
-			periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs,
-				forbiddenfreqs, lc.time)
+			#periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs,
+				#forbiddenfreqs, lc.time)
+			periods, n_usedfreqs = get_periods(obj, nfrequencies, lc.time)
 			objfeatures[:nfrequencies] = periods
-			objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj,usedfreqs)
-			objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj,usedfreqs)
+			objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj,n_usedfreqs)
+			objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj,n_usedfreqs)
 			EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)
 			objfeatures[0] = EBper # overwrites top period
 			objfeatures[nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, cardinality)
@@ -192,7 +193,9 @@ def SOM_alldataprep(features, outfile=None, cardinality=64):
 		lc = obj['lightcurve']
 		lc = prepLCs(lc, linflatten=True)
 
-		freq = obj['freq1']
+		#freq = obj['freq1']
+		tab = obj['frequencies']
+		freq = tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['frequency']
 		#if np.isfinite(freq):
 
 		time, flux = lc.time.copy(), lc.flux.copy()
@@ -420,8 +423,23 @@ def SOMloc(som, time, flux, per, cardinality):
 	return map, range
 
 #--------------------------------------------------------------------------------------------------
+def get_periods(featdict, nfreqs, time):
+	"""
+		Cuts frequency data down to desired number of frequencies and transforms them (in umHz) into periods.
+	"""
+	tab = featdict['frequencies']
+	periods = tab[tab['harmonic'] == 0][:nfreqs]['frequency']
+	periods = periods.to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d, equivalencies=[(u.cycle/u.d, u.d, lambda x: x**-1)]).value
+	is_nan = np.isnan(periods)
+	periods[np.where(is_nan)] = np.max(time)-np.min(time)
+	n_usedfreqs = nfreqs - np.sum(is_nan)
+
+	return periods, n_usedfreqs
+
+#--------------------------------------------------------------------------------------------------
 def checkfrequencies(featdictrow, nfreqs, providednfreqs, forbiddenfreqs, time):
 	"""
+	DEPRECATED - remember to check wether we need forbiddenfreqs in freqextr in the future.
 	Cuts frequency data down to desired number of frequencies, and removes harmonics
 	of forbidden frequencies
 
@@ -434,11 +452,13 @@ def checkfrequencies(featdictrow, nfreqs, providednfreqs, forbiddenfreqs, time):
 	freqs: ndarray [self.nfreqs]
 		array of frequencies
 	"""
+	freq_table = featdictrow['frequencies']
 	freqs = []
 	usedfreqs = []
 	j = 0
 	while len(freqs) < nfreqs:
-		freqdict = featdictrow['freq' + str(j+1)]
+		#freqdict = freq_table.loc[j+1][0]['frequency']
+		freqdict = freq_table[(freq_table['num'] == j+1) & (freq_table['harmonic'] == 0)]['frequency']
 		if np.isfinite(freqdict):
 			freq = 1./(freqdict*1e-6)/86400. # convert to days
 
@@ -478,12 +498,15 @@ def freq_ampratios(featdictrow, usedfreqs):
 		ratio of 2nd to 1st and 3rd to 1st frequency amplitudes
 
 	"""
-	if len(usedfreqs) >= 2:
-		amp21 = featdictrow['amp'+str(usedfreqs[1]+1)]/featdictrow['amp'+str(usedfreqs[0]+1)]
+	tab=featdictrow['frequencies']
+	if usedfreqs >= 2:
+		#amp21 = featdictrow['amp'+str(usedfreqs[1]+1)]/featdictrow['amp'+str(usedfreqs[0]+1)]
+		amp21 = tab[(tab['num'] == 2) & (tab['harmonic']== 0)]['amplitude'] / tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['amplitude']
 	else:
 		amp21 = 0
-	if len(usedfreqs) >= 3:
-		amp31 = featdictrow['amp'+str(usedfreqs[2]+1)]/featdictrow['amp'+str(usedfreqs[0]+1)]
+	if usedfreqs >= 3:
+		#amp31 = featdictrow['amp'+str(usedfreqs[2]+1)]/featdictrow['amp'+str(usedfreqs[0]+1)]
+		amp31 = tab[(tab['num'] == 3) & (tab['harmonic']== 0)]['amplitude'] / tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['amplitude']
 	else:
 		amp31 = 0
 	return amp21,amp31
@@ -502,12 +525,15 @@ def freq_phasediffs(featdictrow, usedfreqs):
 		phase difference of 2nd to 1st and 3rd to 1st frequencies
 
 	"""
-	if len(usedfreqs) >= 2:
-		phi21 = featdictrow['phase'+str(usedfreqs[1]+1)] - 2*featdictrow['phase'+str(usedfreqs[0]+1)]
+	tab=featdictrow['frequencies']
+	if usedfreqs >= 2:
+		#phi21 = featdictrow['phase'+str(usedfreqs[1]+1)] - 2*featdictrow['phase'+str(usedfreqs[0]+1)]
+		phi21 = tab[(tab['num'] == 2) & (tab['harmonic']== 0)]['phase'] - 2*tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['phase']
 	else:
 		phi21 = 0
-	if len(usedfreqs) >= 3:
-		phi31 = featdictrow['phase'+str(usedfreqs[2]+1)] - 3*featdictrow['phase'+str(usedfreqs[0]+1)]
+	if usedfreqs >= 3:
+		#phi31 = featdictrow['phase'+str(usedfreqs[2]+1)] - 3*featdictrow['phase'+str(usedfreqs[0]+1)]
+		phi31 = tab[(tab['num'] == 3) & (tab['harmonic']== 0)]['phase'] - 2*tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['phase']
 	else:
 		phi31 = 0
 	return phi21,phi31

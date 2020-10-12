@@ -7,6 +7,7 @@
 
 import pandas as pd
 import numpy as np
+import astropy.units as u
 import scipy.stats as ss
 import os.path
 import types
@@ -39,14 +40,14 @@ def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
 			features_dict['shapiro_wilk'] = ss.shapiro(lc.flux)[0] # Shapiro-Wilk test statistic for normality
 			features_dict['eta'] = calculate_eta(lc)
 
-			forbiddenfreqs = [13.49/4.]
-			periods, usedfreqs = checkfrequencies(obj, 6, 6, forbiddenfreqs, lc.time)
-			amp21, amp31 = freq_ampratios(obj,usedfreqs)
-			pd21, pd31 = freq_phasediffs(obj,usedfreqs)
+			periods, n_usedfreqs = get_periods(obj, 6, lc.time)
+			amp21, amp31 = freq_ampratios(obj,n_usedfreqs)
+			pd21, pd31 = freq_phasediffs(obj,n_usedfreqs)
 
 			features_dict['PeriodLS'] = periods[0]
-			if len(usedfreqs) > 0:
-				features_dict['Freq_amp_0'] = obj['amp' + str(usedfreqs[0]+1)]
+			
+			if n_usedfreqs > 0:
+				features_dict['Freq_amp_0'] = obj['frequencies'][(obj['frequencies']['num'] == 1) & (obj['frequencies']['harmonic']== 0)]['amplitude']
 			else:
 				features_dict['Freq_amp_0'] = 0.
 
@@ -115,46 +116,18 @@ def Rcs(lc):
 	return R
 
 #--------------------------------------------------------------------------------------------------
-def checkfrequencies(featdictrow, nfreqs, providednfreqs, forbiddenfreqs, time):
+def get_periods(featdict, nfreqs, time):
 	"""
-	Cuts frequency data down to desired number of frequencies, and removes harmonics
-	of forbidden frequencies
-
-	Parameters:
-		featdictrow (dict):
-		nfreqs (integer):
-
-	Returns:
-		ndarray[nfreqs]: Array of frequencies.
+		Cuts frequency data down to desired number of frequencies and transforms them (in umHz) into periods.
 	"""
-	freqs = []
-	usedfreqs = []
-	j = 0
-	while len(freqs) < nfreqs:
-		freqdict = featdictrow['freq' + str(j+1)]
-		if np.isfinite(freqdict):
-			freq = 1./(freqdict*1e-6)/86400. # convert to days
+	tab = featdict['frequencies']
+	periods = tab[tab['harmonic'] == 0][:nfreqs]['frequency']
+	periods = periods.to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d, equivalencies=[(u.cycle/u.d, u.d, lambda x: x**-1)]).value
+	is_nan = np.isnan(periods)
+	periods[np.where(is_nan)] = np.max(time)-np.min(time)
+	n_usedfreqs = nfreqs - np.sum(is_nan)
 
-			#check to cut bad frequencies
-			cut = False
-			if (freq < 0) or (freq > np.max(time)-np.min(time)):
-				cut = True
-			for freqtocut in forbiddenfreqs:
-				for k in range(4): # cuts 4 harmonics of frequency, within +-3% of given frequency
-					if (1./freq > (1./((k+1)*freqtocut))*(1-0.01)) & (1./freq < (1./((k+1)*freqtocut))*(1+0.01)):
-						cut = True
-			if not cut:
-				freqs.append(freq)
-				usedfreqs.append(j)
-		j += 1
-		if j >= providednfreqs:
-			break
-	#fill in any unfilled frequencies with negative numbers
-	gap = nfreqs - len(freqs)
-	if gap > 0:
-		for k in range(gap):
-			freqs.append(np.max(time)-np.min(time))
-	return np.array(freqs), np.array(usedfreqs)
+	return periods, n_usedfreqs
 
 #--------------------------------------------------------------------------------------------------
 def freq_ampratios(featdictrow, usedfreqs):
@@ -171,15 +144,17 @@ def freq_ampratios(featdictrow, usedfreqs):
 		ratio of 2nd to 1st and 3rd to 1st frequency amplitudes
 
 	"""
-	if len(usedfreqs) >= 2:
-		amp21 = featdictrow['amp'+str(usedfreqs[1]+1)]/featdictrow['amp'+str(usedfreqs[0]+1)]
+	tab=featdictrow['frequencies']
+	if usedfreqs >= 2:
+		amp21 = tab[(tab['num'] == 2) & (tab['harmonic']== 0)]['amplitude'] / tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['amplitude']
 	else:
 		amp21 = 0
-	if len(usedfreqs) >= 3:
-		amp31 = featdictrow['amp'+str(usedfreqs[2]+1)]/featdictrow['amp'+str(usedfreqs[0]+1)]
+	if usedfreqs >= 3:
+		amp31 = tab[(tab['num'] == 3) & (tab['harmonic']== 0)]['amplitude'] / tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['amplitude']
 	else:
 		amp31 = 0
 	return amp21,amp31
+
 
 #--------------------------------------------------------------------------------------------------
 def freq_phasediffs(featdictrow, usedfreqs):
@@ -195,12 +170,13 @@ def freq_phasediffs(featdictrow, usedfreqs):
 		phase difference of 2nd to 1st and 3rd to 1st frequencies
 
 	"""
-	if len(usedfreqs) >= 2:
-		phi21 = featdictrow['phase'+str(usedfreqs[1]+1)] - 2*featdictrow['phase'+str(usedfreqs[0]+1)]
+	tab=featdictrow['frequencies']
+	if usedfreqs >= 2:
+		phi21 = tab[(tab['num'] == 2) & (tab['harmonic']== 0)]['phase'] - 2*tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['phase']
 	else:
 		phi21 = 0
-	if len(usedfreqs) >= 3:
-		phi31 = featdictrow['phase'+str(usedfreqs[2]+1)] - 3*featdictrow['phase'+str(usedfreqs[0]+1)]
+	if usedfreqs >= 3:
+		phi31 = tab[(tab['num'] == 3) & (tab['harmonic']== 0)]['phase'] - 2*tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['phase']
 	else:
 		phi31 = 0
 	return phi21,phi31

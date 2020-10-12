@@ -15,7 +15,7 @@ import pyentrp.entropy as ent
 from . import npeet_entropy_estimators as npeet
 
 #--------------------------------------------------------------------------------------------------
-def featcalc(features, providednfreqs=6, nfrequencies=3, forbiddenfreqs=[13.49/4.],
+def featcalc(features, providednfreqs=6, nfrequencies=3,
 	linflatten=False, savefeat=None, recalc=False):
 	"""
 	Calculates features for set of lightcurves
@@ -37,8 +37,8 @@ def featcalc(features, providednfreqs=6, nfrequencies=3, forbiddenfreqs=[13.49/4
 		if not precalc:
 			objfeatures = np.zeros(nfrequencies+10)
 			lc = prepLCs(obj['lightcurve'],linflatten)
-			periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs,
-				forbiddenfreqs, lc.time)
+
+			periods = get_periods(obj, nfrequencies, lc.time)
 			objfeatures[:nfrequencies] = periods
 
 			#EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)
@@ -216,50 +216,24 @@ def prepFilePhasefold(time, flux, period, cardinality):
 	return binnedlc[:,1],maxflux-minflux
 
 #--------------------------------------------------------------------------------------------------
-def checkfrequencies(featdictrow, nfreqs, providednfreqs, forbiddenfreqs, time):
+def get_periods(featdict, nfreqs, time, in_days=False):
 	"""
-	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
-
-	Cuts frequency data down to desired number of frequencies, and removes harmonics
-	of forbidden frequencies
-
-	Inputs
-	-----------------
-
-
-	Returns
-	-----------------
-	freqs: ndarray [self.nfreqs]
-		array of frequencies
+		Cuts frequency data down to desired number of frequencies and optionally transforms them (in umHz) into periods in days.
 	"""
-	freqs = []
-	usedfreqs = []
-	j = 0
-	while len(freqs) < nfreqs:
-		freqdict = featdictrow['freq' + str(j+1)]
-		if np.isfinite(freqdict):
-			freq = 1./(freqdict*1e-6)/86400. # convert to days
+	# convert to c/d (1*u.uHz).to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d))
+	# covert to days (1*u.uHz).to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d, equivalencies=[(u.cycle/u.d, u.d, lambda x: x**-1)])
+	
+	#periods = featdict['frequencies'].loc['harmonic',0].loc['num',:nfreqs]['frequency']
+	tab = featdict['frequencies']
+	periods = tab[tab['harmonic'] == 0][:nfreqs]['frequency']
+	if in_days:
+		periods = periods.to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d, equivalencies=[(u.cycle/u.d, u.d, lambda x: x**-1)]).value
+	
+	is_nan = np.isnan(periods)
+	periods[np.where(is_nan)] = np.max(time)-np.min(time)
+	n_usedfreqs = nfreqs - np.sum(is_nan)
 
-			#check to cut bad frequencies
-			cut = False
-			if (freq < 0) or (freq > np.max(time)-np.min(time)):
-				cut = True
-			for freqtocut in forbiddenfreqs:
-				for k in range(4): # cuts 4 harmonics of frequency, within +-3% of given frequency
-					if (1./freq > (1./((k+1)*freqtocut))*(1-0.01)) & (1./freq < (1./((k+1)*freqtocut))*(1+0.01)):
-						cut = True
-			if not cut:
-				freqs.append(freq)
-				usedfreqs.append(j)
-		j += 1
-		if j >= providednfreqs:
-			break
-	# Fill in any unfilled frequencies with negative numbers
-	gap = nfreqs - len(freqs)
-	if gap > 0:
-		for k in range(gap):
-			freqs.append(np.max(time)-np.min(time))
-	return np.array(freqs), np.array(usedfreqs)
+	return periods, n_usedfreqs
 
 #--------------------------------------------------------------------------------------------------
 def compute_lpf1pa11(featdictrow):
@@ -277,7 +251,7 @@ def compute_lpf1pa11(featdictrow):
 
 	"""
 	tab = featdictrow['frequencies']
-	peak1 = tab.loc[1]
+	peak1 = tab[tab['num'] == 1]
 	amp11 = peak1['amplitude'][peak1['harmonic'] == 1]
 	amps = peak1['amplitude'][peak1['harmonic'] > 0]
 	return np.log10(nansum(amps**2)/amp11 - 1)
@@ -300,7 +274,7 @@ def compute_varrat(featdictrow):
 		number of harmonics of f1 that is not nan
 	"""
 	tab = featdictrow['frequencies']
-	peak1 = tab.loc[1]
+	peak1 = tab[tab['num'] == 1]
 
 	amps = np.array(peak1['amplitude'])
 	significant_harmonics = int(np.sum((peak1['harmonic'] > 0) & ~np.isnan(peak1['amplitude'])))

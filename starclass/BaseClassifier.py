@@ -413,7 +413,7 @@ class BaseClassifier(object):
 		features['powerspectrum'] = psd
 
 		# Extract primary frequencies from lightcurve and add to features:
-		features['frequencies'] = freqextr(lc, n_peaks=6, n_harmonics=0, initps=psd)
+		features['frequencies'] = freqextr(lc, n_peaks=6, n_harmonics=5, initps=psd)
 
 		# Add these for backward compatibility:
 		for row in features['frequencies']:

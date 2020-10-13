@@ -222,13 +222,13 @@ def get_periods(featdict, nfreqs, time, in_days=False):
 	"""
 	# convert to c/d (1*u.uHz).to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d))
 	# covert to days (1*u.uHz).to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d, equivalencies=[(u.cycle/u.d, u.d, lambda x: x**-1)])
-	
 	#periods = featdict['frequencies'].loc['harmonic',0].loc['num',:nfreqs]['frequency']
+
 	tab = featdict['frequencies']
 	periods = tab[tab['harmonic'] == 0][:nfreqs]['frequency'].quantity
 	if in_days:
-		periods =(1./(periods)).to(u.day)
-	
+		periods = (1./(periods)).to(u.day)
+
 	is_nan = np.isnan(periods)
 	periods[np.where(is_nan)] = np.max(time)-np.min(time)
 	n_usedfreqs = nfreqs - np.sum(is_nan)

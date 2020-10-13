@@ -45,9 +45,9 @@ def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
 			pd21, pd31 = freq_phasediffs(obj,n_usedfreqs)
 
 			features_dict['PeriodLS'] = periods[0]
-			
+
 			if n_usedfreqs > 0:
-				features_dict['Freq_amp_0'] = obj['frequencies'][(obj['frequencies']['num'] == 1) & (obj['frequencies']['harmonic']== 0)]['amplitude']
+				features_dict['Freq_amp_0'] = obj['frequencies'][(obj['frequencies']['num'] == 1) & (obj['frequencies']['harmonic'] == 0)]['amplitude']
 			else:
 				features_dict['Freq_amp_0'] = 0.
 
@@ -144,14 +144,14 @@ def freq_ampratios(featdictrow, usedfreqs):
 		ratio of 2nd to 1st and 3rd to 1st frequency amplitudes
 
 	"""
-	tab=featdictrow['frequencies']
-	peak1 = tab[(tab['num'] == 1) & (tab['harmonic']== 0)]
+	tab = featdictrow['frequencies']
+	peak1 = tab[(tab['num'] == 1) & (tab['harmonic'] == 0)]
 	if usedfreqs >= 2:
-		amp21 = tab[(tab['num'] == 2) & (tab['harmonic']== 0)]['amplitude'] / peak1['amplitude']
+		amp21 = tab[(tab['num'] == 2) & (tab['harmonic'] == 0)]['amplitude'] / peak1['amplitude']
 	else:
 		amp21 = 0
 	if usedfreqs >= 3:
-		amp31 = tab[(tab['num'] == 3) & (tab['harmonic']== 0)]['amplitude'] / peak1['amplitude']
+		amp31 = tab[(tab['num'] == 3) & (tab['harmonic'] == 0)]['amplitude'] / peak1['amplitude']
 	else:
 		amp31 = 0
 	return amp21,amp31
@@ -171,14 +171,14 @@ def freq_phasediffs(featdictrow, usedfreqs):
 		phase difference of 2nd to 1st and 3rd to 1st frequencies
 
 	"""
-	tab=featdictrow['frequencies']
-	peak1 = tab[(tab['num'] == 1) & (tab['harmonic']== 0)]
+	tab = featdictrow['frequencies']
+	peak1 = tab[(tab['num'] == 1) & (tab['harmonic'] == 0)]
 	if usedfreqs >= 2:
-		phi21 = tab[(tab['num'] == 2) & (tab['harmonic']== 0)]['phase'] - 2*peak1['phase']
+		phi21 = tab[(tab['num'] == 2) & (tab['harmonic'] == 0)]['phase'] - 2*peak1['phase']
 	else:
 		phi21 = 0
 	if usedfreqs >= 3:
-		phi31 = tab[(tab['num'] == 3) & (tab['harmonic']== 0)]['phase'] - 3*peak1['phase']
+		phi31 = tab[(tab['num'] == 3) & (tab['harmonic'] == 0)]['phase'] - 3*peak1['phase']
 	else:
 		phi31 = 0
 	return phi21,phi31

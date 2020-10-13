@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Tests of Frequency extraction.
@@ -111,7 +111,7 @@ def test_freqextr_onlynoise():
 	assert tab.meta['n_peaks'] == 5
 	assert tab.meta['n_harmonics'] == 2
 
-	print(tab.loc[1])
+	#print(tab.loc[1])
 
 	assert allnan(tab['frequency'])
 	assert allnan(tab['amplitude'])

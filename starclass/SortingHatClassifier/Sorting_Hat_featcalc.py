@@ -225,9 +225,9 @@ def get_periods(featdict, nfreqs, time, in_days=False):
 	
 	#periods = featdict['frequencies'].loc['harmonic',0].loc['num',:nfreqs]['frequency']
 	tab = featdict['frequencies']
-	periods = tab[tab['harmonic'] == 0][:nfreqs]['frequency']
+	periods = tab[tab['harmonic'] == 0][:nfreqs]['frequency'].quantity
 	if in_days:
-		periods = periods.to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d, equivalencies=[(u.cycle/u.d, u.d, lambda x: x**-1)]).value
+		periods =(1./(periods)).to(u.day)
 	
 	is_nan = np.isnan(periods)
 	periods[np.where(is_nan)] = np.max(time)-np.min(time)

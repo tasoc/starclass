@@ -428,8 +428,8 @@ def get_periods(featdict, nfreqs, time):
 		Cuts frequency data down to desired number of frequencies and transforms them (in umHz) into periods.
 	"""
 	tab = featdict['frequencies']
-	periods = tab[tab['harmonic'] == 0][:nfreqs]['frequency']
-	periods = periods.to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d, equivalencies=[(u.cycle/u.d, u.d, lambda x: x**-1)]).value
+	periods = tab[tab['harmonic'] == 0][:nfreqs]['frequency'].quantity
+	periods = (1./(periods)).to(u.day)
 	is_nan = np.isnan(periods)
 	periods[np.where(is_nan)] = np.max(time)-np.min(time)
 	n_usedfreqs = nfreqs - np.sum(is_nan)
@@ -499,14 +499,15 @@ def freq_ampratios(featdictrow, usedfreqs):
 
 	"""
 	tab=featdictrow['frequencies']
+	peak1 = tab[(tab['num'] == 1) & (tab['harmonic']== 0)]
 	if usedfreqs >= 2:
 		#amp21 = featdictrow['amp'+str(usedfreqs[1]+1)]/featdictrow['amp'+str(usedfreqs[0]+1)]
-		amp21 = tab[(tab['num'] == 2) & (tab['harmonic']== 0)]['amplitude'] / tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['amplitude']
+		amp21 = tab[(tab['num'] == 2) & (tab['harmonic']== 0)]['amplitude'] / peak1['amplitude']
 	else:
 		amp21 = 0
 	if usedfreqs >= 3:
 		#amp31 = featdictrow['amp'+str(usedfreqs[2]+1)]/featdictrow['amp'+str(usedfreqs[0]+1)]
-		amp31 = tab[(tab['num'] == 3) & (tab['harmonic']== 0)]['amplitude'] / tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['amplitude']
+		amp31 = tab[(tab['num'] == 3) & (tab['harmonic']== 0)]['amplitude'] / peak1['amplitude']
 	else:
 		amp31 = 0
 	return amp21,amp31
@@ -526,14 +527,15 @@ def freq_phasediffs(featdictrow, usedfreqs):
 
 	"""
 	tab=featdictrow['frequencies']
+	peak1 = tab[(tab['num'] == 1) & (tab['harmonic']== 0)]
 	if usedfreqs >= 2:
 		#phi21 = featdictrow['phase'+str(usedfreqs[1]+1)] - 2*featdictrow['phase'+str(usedfreqs[0]+1)]
-		phi21 = tab[(tab['num'] == 2) & (tab['harmonic']== 0)]['phase'] - 2*tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['phase']
+		phi21 = tab[(tab['num'] == 2) & (tab['harmonic']== 0)]['phase'] - 2*peak1['phase']
 	else:
 		phi21 = 0
 	if usedfreqs >= 3:
 		#phi31 = featdictrow['phase'+str(usedfreqs[2]+1)] - 3*featdictrow['phase'+str(usedfreqs[0]+1)]
-		phi31 = tab[(tab['num'] == 3) & (tab['harmonic']== 0)]['phase'] - 2*tab[(tab['num'] == 1) & (tab['harmonic']== 0)]['phase']
+		phi31 = tab[(tab['num'] == 3) & (tab['harmonic']== 0)]['phase'] - 3*peak1['phase']
 	else:
 		phi31 = 0
 	return phi21,phi31

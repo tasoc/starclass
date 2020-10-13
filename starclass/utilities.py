@@ -97,7 +97,6 @@ def rms_timescale(lc, timescale=3600/86400):
 	# Compute robust RMS value (MAD scaled to RMS)
 	return mad_to_sigma * nanmedian(np.abs(flux_bin - nanmedian(flux_bin)))
 
-
 #--------------------------------------------------------------------------------------------------
 def get_periods(featdict, nfreqs, time, in_days=True):
 	"""

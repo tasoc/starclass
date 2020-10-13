@@ -11,6 +11,7 @@ import pickle
 import gzip
 from bottleneck import nanmedian, nanmean, allnan
 from scipy.stats import binned_statistic
+import astropy.units as u
 
 # Constants:
 mad_to_sigma = 1.482602218505602 #: Conversion constant from MAD to Sigma. Constant is 1/norm.ppf(3/4)
@@ -95,3 +96,23 @@ def rms_timescale(lc, timescale=3600/86400):
 
 	# Compute robust RMS value (MAD scaled to RMS)
 	return mad_to_sigma * nanmedian(np.abs(flux_bin - nanmedian(flux_bin)))
+
+
+#--------------------------------------------------------------------------------------------------
+def get_periods(featdict, nfreqs, time, in_days=True):
+	"""
+		Cuts frequency data down to desired number of frequencies (in umHz) and optionally transforms them into periods in days.
+	"""
+	# convert to c/d (1*u.uHz).to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d))
+	#periods = featdict['frequencies'].loc['harmonic',0].loc['num',:nfreqs]['frequency']
+
+	tab = featdict['frequencies']
+	periods = tab[tab['harmonic'] == 0][:nfreqs]['frequency'].quantity
+	if in_days:
+		periods = (1./(periods)).to(u.day)
+
+	is_nan = np.isnan(periods)
+	periods[np.where(is_nan)] = np.max(time)-np.min(time)
+	n_usedfreqs = nfreqs - np.sum(is_nan)
+
+	return periods, n_usedfreqs

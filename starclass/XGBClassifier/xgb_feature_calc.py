@@ -7,12 +7,12 @@
 
 import pandas as pd
 import numpy as np
-import astropy.units as u
 import scipy.stats as ss
 import os.path
 import types
 #from tqdm import tqdm
 from ..RFGCClassifier import RF_GC_featcalc
+from ..utilities import get_periods
 
 #--------------------------------------------------------------------------------------------------
 def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
@@ -114,20 +114,6 @@ def Rcs(lc):
 	s = np.cumsum(lc.flux - m) / (N * sigma)
 	R = np.max(s) - np.min(s)
 	return R
-
-#--------------------------------------------------------------------------------------------------
-def get_periods(featdict, nfreqs, time):
-	"""
-		Cuts frequency data down to desired number of frequencies and transforms them (in umHz) into periods.
-	"""
-	tab = featdict['frequencies']
-	periods = tab[tab['harmonic'] == 0][:nfreqs]['frequency'].quantity
-	periods = (1./(periods)).to(u.day)
-	is_nan = np.isnan(periods)
-	periods[np.where(is_nan)] = np.max(time)-np.min(time)
-	n_usedfreqs = nfreqs - np.sum(is_nan)
-
-	return periods, n_usedfreqs
 
 #--------------------------------------------------------------------------------------------------
 def freq_ampratios(featdictrow, usedfreqs):

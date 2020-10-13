@@ -13,6 +13,7 @@ import scipy.stats as stat
 import astropy.units as u
 import pyentrp.entropy as ent
 from . import npeet_entropy_estimators as npeet
+from ..utilities import get_periods
 
 #--------------------------------------------------------------------------------------------------
 def featcalc(features, providednfreqs=6, nfrequencies=3,
@@ -38,7 +39,7 @@ def featcalc(features, providednfreqs=6, nfrequencies=3,
 			objfeatures = np.zeros(nfrequencies+10)
 			lc = prepLCs(obj['lightcurve'],linflatten)
 
-			periods = get_periods(obj, nfrequencies, lc.time)
+			periods = get_periods(obj, nfrequencies, lc.time, False)
 			objfeatures[:nfrequencies] = periods
 
 			#EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)
@@ -214,26 +215,6 @@ def prepFilePhasefold(time, flux, period, cardinality):
 	binnedlc[:,0] = np.mod(binnedlc[:,0]-binnedlc[np.argmin(binnedlc[:,1]),0],1)
 	binnedlc = binnedlc[np.argsort(binnedlc[:,0]),:]
 	return binnedlc[:,1],maxflux-minflux
-
-#--------------------------------------------------------------------------------------------------
-def get_periods(featdict, nfreqs, time, in_days=False):
-	"""
-		Cuts frequency data down to desired number of frequencies and optionally transforms them (in umHz) into periods in days.
-	"""
-	# convert to c/d (1*u.uHz).to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d))
-	# covert to days (1*u.uHz).to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d, equivalencies=[(u.cycle/u.d, u.d, lambda x: x**-1)])
-	#periods = featdict['frequencies'].loc['harmonic',0].loc['num',:nfreqs]['frequency']
-
-	tab = featdict['frequencies']
-	periods = tab[tab['harmonic'] == 0][:nfreqs]['frequency'].quantity
-	if in_days:
-		periods = (1./(periods)).to(u.day)
-
-	is_nan = np.isnan(periods)
-	periods[np.where(is_nan)] = np.max(time)-np.min(time)
-	n_usedfreqs = nfreqs - np.sum(is_nan)
-
-	return periods, n_usedfreqs
 
 #--------------------------------------------------------------------------------------------------
 def compute_lpf1pa11(featdictrow):

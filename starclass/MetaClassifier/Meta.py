@@ -36,7 +36,13 @@ class MetaClassifier(BaseClassifier):
 	"""
 	The meta-classifier.
 
+	Attributes:
+		clfile (str): Path to the file where the classifier is saved.
+		classifier (:class:`Classifier_obj`): Actual classifier object.
+		features_used (list): List of features used for training.
+
 	.. codeauthor:: James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
 	def __init__(self, clfile='meta_classifier.pickle', *args, **kwargs):
@@ -45,7 +51,6 @@ class MetaClassifier(BaseClassifier):
 
 		Parameters:
 			clfile (str): Filepath to previously pickled Classifier_obj
-			featfile (str):	Filepath to pre-calculated features, if available.
 		"""
 		# Initialize parent
 		super().__init__(*args, **kwargs)
@@ -81,6 +86,33 @@ class MetaClassifier(BaseClassifier):
 		self.classifier, self.features_used = utilities.loadPickle(infile)
 
 	#----------------------------------------------------------------------------------------------
+	def build_features_table(self, features, total=None):
+		"""
+		Build table of features.
+
+		Parameters:
+			features (iterable): Features to build table from.
+			total (int, optional): Number of features in ``features``. If not provided,
+				the length of ``features`` is found using :func:`len`.
+
+		Returns:
+			ndarray: Two dimensional float32 ndarray with probabilities from all classifiers.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		if total is None:
+			total = len(features)
+
+		featarray = np.full((total, len(self.features_used)), np.NaN, dtype='float32')
+		for k, feat in enumerate(features):
+			tab = feat['other_classifiers']
+			for j, (classifier, stcl) in enumerate(self.features_used):
+				indx = (tab['classifier'] == classifier) & (tab['class'] == stcl.name)
+				featarray[k, j] = tab[indx]['prob']
+
+		return featarray
+
+	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features):
 		"""
 		Classify a single lightcurve.
@@ -101,11 +133,7 @@ class MetaClassifier(BaseClassifier):
 		# Build features array from the probabilities from the other classifiers:
 		# TODO: What about NaN values?
 		logger.debug("Importing features...")
-		tab = features['other_classifiers']
-		featarray = np.full(len(self.features_used), np.NaN, dtype='float32')
-		for j, (classifier, stcl) in enumerate(self.features_used):
-			indx = (tab['classifier'] == classifier) & (tab['class'] == stcl.name)
-			featarray[j] = tab[indx]['prob']
+		featarray = self.build_features_table([features], total=1)
 
 		logger.debug("We are starting the magic...")
 		# Comes out with shape (1,8), but instead want shape (8,) so squeeze
@@ -143,39 +171,34 @@ class MetaClassifier(BaseClassifier):
 		all_classifiers.remove('meta')
 
 		# Create list of all features:
-		features_used = list(itertools.product(all_classifiers, self.StellarClasses))
-		#features_names = ['{0:s}_{1:s}'.format(classifier, stcl.name) for classifier, stcl in features_used]
+		# Save this to object, we are using it to keep track of which features were used
+		# to train the classifier:
+		self.features_used = list(itertools.product(all_classifiers, self.StellarClasses))
+		#features_names = ['{0:s}_{1:s}'.format(classifier, stcl.name) for classifier, stcl in self.features_used]
 		#logger.debug("Feature names: %s", features_names)
 
 		# Create table of features:
 		# Create as float32, since that is what RandomForestClassifier converts it to anyway.
 		logger.info("Importing features...")
-		features = np.full((len(fitlabels), len(features_used)), np.NaN, dtype='float32')
-		for k, feat in enumerate(tset.features()):
-			tab = feat['other_classifiers']
-			for j, (classifier, stcl) in enumerate(features_used):
-				indx = (tab['classifier'] == classifier) & (tab['class'] == stcl.name)
-				features[k, j] = tab[indx]['prob']
+		features = self.build_features_table(tset.features(), total=len(tset))
 
 		# Remove columns that are all NaN:
 		# This can be classifiers that never returns a given class or a classifier that
 		# has not been run at all.
 		keepcols = ~allnan(features, axis=1)
 		features = features[:, keepcols]
-		features_used = features_used[keepcols]
-		#features_names = features_names[keepcols]
+		self.features_used = self.features_used[keepcols]
 
-		# TODO: Should we throw an error if a classifier is not run at all?
+		# Throw an error if a classifier is not run at all:
+		run_classifiers = set([fu[0] for fu in self.features_used])
+		if run_classifiers != set(all_classifiers):
+			raise Exception("Classifier did not contribute at all: %s" % set(all_classifiers).difference(run_classifiers))
 
-		# TODO: Remove NaNs? Or set them to -1?
+		# Raise an exception if there are NaNs left in the features:
 		if anynan(features):
-			raise ValueError("Features contains nans")
+			raise ValueError("Features contains NaNs")
 
 		logger.info("Features imported. Shape = %s", features.shape)
-
-		# Save this to object, we are using it to keep track of which features were used
-		# to train the classifier:
-		self.features_used = features_used
 
 		# Run actual training:
 		self.classifier.oob_score = True

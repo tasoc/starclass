@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 .. codeauthor:: Kristine Kousholt Mikkelsen <201505068@post.au.dk>

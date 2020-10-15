@@ -76,6 +76,10 @@ class TrainingSet(object):
 		)
 
 	#----------------------------------------------------------------------------------------------
+	def __len__(self):
+		return self.nobjects
+
+	#----------------------------------------------------------------------------------------------
 	def folds(self, n_splits=5, tf=0.2):
 		"""
 		Split training set object into stratified folds.

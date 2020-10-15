@@ -10,14 +10,14 @@ import argparse
 import logging
 import starclass
 
-#----------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 def main():
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Utility function for training stellar classifiers.')
 	parser.add_argument('-c', '--classifier', help='Classifier to train.', default='rfgc', choices=starclass.classifier_list)
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
-	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9', choices=starclass.trainingset_list)
+	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9v2', choices=starclass.trainingset_list)
 	parser.add_argument('-tf', '--testfraction', help='Test-set fraction', type=float, default=0.0)
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
@@ -90,6 +90,6 @@ def main():
 			logger.info("Classifying test-set using %s...", current_classifier)
 			stcl.test(tset, save=True, save_func=tm.save_results)
 
-#----------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	main()

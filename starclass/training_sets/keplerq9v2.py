@@ -39,6 +39,12 @@ class keplerq9v2(TrainingSet):
 			delimiter=',',
 			comments='#',
 			encoding='utf-8')
+
+		# Remove the instrumental class from this trainingset:
+		indx = [star[1] != 'INSTRUMENT' for star in self.starlist]
+		self.starlist = self.starlist[indx]
+
+		# Count the number of objects in trainingset:
 		self.nobjects = self.starlist.shape[0]
 
 		# Initialize parent
@@ -66,6 +72,8 @@ class keplerq9v2(TrainingSet):
 				# Get starid:
 				starname = star[0]
 				starclass = star[1]
+				if starclass == 'INSTRUMENT':
+					continue
 				if starname.startswith('constant_'):
 					starid = -10000 - int(starname[9:])
 				elif starname.startswith('fakerrlyr_'):
@@ -79,10 +87,6 @@ class keplerq9v2(TrainingSet):
 
 				# Load diagnostics from file, to speed up the process:
 				variance, rms_hour, ptp = diagnostics[k]
-
-				#data = np.loadtxt(os.path.join(self.input_folder, lightcurve))
-				#if data[-1,0] - data[0,0] > 27.4:
-				#	raise Exception("Okay, didn't we agree that this should be only one sector?!")
 
 				pri += 1
 				self.generate_todolist_insert(cursor,

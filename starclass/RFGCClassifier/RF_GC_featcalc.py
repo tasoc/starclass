@@ -39,10 +39,10 @@ def featcalc(features, som,
 			objfeatures = np.zeros(nfrequencies+16)
 			lc = prepLCs(obj['lightcurve'],linflatten)
 			#periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs, forbiddenfreqs, lc.time)
-			periods, n_usedfreqs = get_periods(obj, nfrequencies, lc.time)
+			periods, n_usedfreqs, usedfreqs = get_periods(obj, nfrequencies, lc.time, sorted=True)
 			objfeatures[:nfrequencies] = periods
-			objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj,n_usedfreqs)
-			objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj,n_usedfreqs)
+			objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj,n_usedfreqs, usedfreqs)
+			objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj,n_usedfreqs, usedfreqs)
 			EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)
 			objfeatures[0] = EBper # overwrites top period
 			objfeatures[nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, cardinality)
@@ -470,7 +470,7 @@ def checkfrequencies(featdictrow, nfreqs, providednfreqs, forbiddenfreqs, time):
 	return np.array(freqs), np.array(usedfreqs)
 
 #--------------------------------------------------------------------------------------------------
-def freq_ampratios(featdictrow, usedfreqs):
+def freq_ampratios(featdictrow, n_usedfreqs, usedfreqs):
 	"""
 	Amplitude ratios of frequencies
 
@@ -486,20 +486,20 @@ def freq_ampratios(featdictrow, usedfreqs):
 	"""
 	tab = featdictrow['frequencies']
 	peak1 = tab[(tab['num'] == 1) & (tab['harmonic'] == 0)]
-	if usedfreqs >= 2:
+	if n_usedfreqs >= 2:
 		#amp21 = featdictrow['amp'+str(usedfreqs[1]+1)]/featdictrow['amp'+str(usedfreqs[0]+1)]
-		amp21 = tab[(tab['num'] == 2) & (tab['harmonic'] == 0)]['amplitude'] / peak1['amplitude']
+		amp21 = tab[(tab['num'] == usedfreqs[1]['num']) & (tab['harmonic'] == usedfreqs[1]['harmonic'])]['amplitude'] / peak1['amplitude']
 	else:
 		amp21 = 0
-	if usedfreqs >= 3:
+	if n_usedfreqs >= 3:
 		#amp31 = featdictrow['amp'+str(usedfreqs[2]+1)]/featdictrow['amp'+str(usedfreqs[0]+1)]
-		amp31 = tab[(tab['num'] == 3) & (tab['harmonic'] == 0)]['amplitude'] / peak1['amplitude']
+		amp31 = tab[(tab['num'] == usedfreqs[2]['num']) & (tab['harmonic'] == usedfreqs[2]['harmonic'])]['amplitude'] / peak1['amplitude']
 	else:
 		amp31 = 0
 	return amp21,amp31
 
 #--------------------------------------------------------------------------------------------------
-def freq_phasediffs(featdictrow, usedfreqs):
+def freq_phasediffs(featdictrow, n_usedfreqs, usedfreqs):
 	"""
 	Phase differences of frequencies
 
@@ -514,14 +514,14 @@ def freq_phasediffs(featdictrow, usedfreqs):
 	"""
 	tab = featdictrow['frequencies']
 	peak1 = tab[(tab['num'] == 1) & (tab['harmonic'] == 0)]
-	if usedfreqs >= 2:
+	if n_usedfreqs >= 2:
 		#phi21 = featdictrow['phase'+str(usedfreqs[1]+1)] - 2*featdictrow['phase'+str(usedfreqs[0]+1)]
-		phi21 = tab[(tab['num'] == 2) & (tab['harmonic'] == 0)]['phase'] - 2*peak1['phase']
+		phi21 = tab[(tab['num'] == usedfreqs[1]['num']) & (tab['harmonic'] == usedfreqs[1]['harmonic'])]['phase'] - 2*peak1['phase']
 	else:
 		phi21 = 0
-	if usedfreqs >= 3:
+	if n_usedfreqs >= 3:
 		#phi31 = featdictrow['phase'+str(usedfreqs[2]+1)] - 3*featdictrow['phase'+str(usedfreqs[0]+1)]
-		phi31 = tab[(tab['num'] == 3) & (tab['harmonic'] == 0)]['phase'] - 3*peak1['phase']
+		phi31 = tab[(tab['num'] == usedfreqs[2]['num']) & (tab['harmonic'] == usedfreqs[2]['harmonic'])]['phase'] - 3*peak1['phase']
 	else:
 		phi31 = 0
 	return phi21,phi31

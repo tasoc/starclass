@@ -98,20 +98,57 @@ def rms_timescale(lc, timescale=3600/86400):
 	return mad_to_sigma * nanmedian(np.abs(flux_bin - nanmedian(flux_bin)))
 
 #--------------------------------------------------------------------------------------------------
-def get_periods(featdict, nfreqs, time, in_days=True):
+def get_periods(featdict, nfreqs, time, sorted=False, in_days=True):
 	"""
-		Cuts frequency data down to desired number of frequencies (in umHz) and optionally transforms them into periods in days.
+	Cuts frequency data down to desired number of frequencies (in umHz) and optionally transforms them into periods in days.
+
+	Inputs
+	-----------------
+	featdict
+	nfreq:	int
+			number of frequencies/periods to extract
+	time
+	sorted: bool
+			sort frequency table by amplitude (i.e. to take into account harmonic structure)
+
+	Returns
+	-----------------
+	periods:
+
+	n_usedfreqs
+		number of true periods/frequencies that are used
+	usedfreqs:
+		indices of the used periods/frequencies in the astropy table
+
 	"""
 	# convert to c/d (1*u.uHz).to(u.cycle/u.d, equivalencies=[(u.cycle/u.s, u.Hz)]).to(u.d))
 	#periods = featdict['frequencies'].loc['harmonic',0].loc['num',:nfreqs]['frequency']
 
 	tab = featdict['frequencies']
-	periods = tab[tab['harmonic'] == 0][:nfreqs]['frequency'].quantity
+	tab = tab[~np.isnan(tab['amplitude'])]
+	if sorted:
+		tab.sort('amplitude', reverse=True)
+		selection = tab[:min(len(tab),nfreqs)]
+		periods = selection['frequency'].quantity
+	else:
+		selection = tab[tab['harmonic'] == 0][:nfreqs]
+		periods = selection['frequency'].quantity
+
+	usedfreqs = selection[['num', 'harmonic']]
+
 	if in_days:
 		periods = (1./(periods)).to(u.day)
 
-	is_nan = np.isnan(periods)
-	periods[np.where(is_nan)] = np.max(time)-np.min(time)
-	n_usedfreqs = nfreqs - np.sum(is_nan)
+	per = (np.max(time) - np.min(time)) * u.d
+	gap = nfreqs - len(periods)
+	if gap > 0:
+		if in_days:
+			for i in range(gap):
+				periods = periods.insert(len(periods), per)
+		else:
+			for i in range(gap):
+				periods = periods.insert(len(periods), (1/per).to(u.uHz))
 
-	return periods, n_usedfreqs
+	n_usedfreqs = len(usedfreqs)
+
+	return periods.value, n_usedfreqs, usedfreqs

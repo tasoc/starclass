@@ -40,9 +40,9 @@ def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
 			features_dict['shapiro_wilk'] = ss.shapiro(lc.flux)[0] # Shapiro-Wilk test statistic for normality
 			features_dict['eta'] = calculate_eta(lc)
 
-			periods, n_usedfreqs = get_periods(obj, 6, lc.time)
-			amp21, amp31 = freq_ampratios(obj,n_usedfreqs)
-			pd21, pd31 = freq_phasediffs(obj,n_usedfreqs)
+			periods, n_usedfreqs, usedfreqs = get_periods(obj, 6, lc.time, sorted=False)
+			amp21, amp31 = RF_GC_featcalc.freq_ampratios(obj,n_usedfreqs, usedfreqs)
+			pd21, pd31 = RF_GC_featcalc.freq_phasediffs(obj,n_usedfreqs, usedfreqs)
 
 			features_dict['PeriodLS'] = periods[0]
 
@@ -114,57 +114,3 @@ def Rcs(lc):
 	s = np.cumsum(lc.flux - m) / (N * sigma)
 	R = np.max(s) - np.min(s)
 	return R
-
-#--------------------------------------------------------------------------------------------------
-def freq_ampratios(featdictrow, usedfreqs):
-	"""
-	Amplitude ratios of frequencies
-
-	Inputs
-	-----------------
-
-
-	Returns
-	-----------------
-	amp21, amp31: float, float
-		ratio of 2nd to 1st and 3rd to 1st frequency amplitudes
-
-	"""
-	tab = featdictrow['frequencies']
-	peak1 = tab[(tab['num'] == 1) & (tab['harmonic'] == 0)]
-	if usedfreqs >= 2:
-		amp21 = tab[(tab['num'] == 2) & (tab['harmonic'] == 0)]['amplitude'] / peak1['amplitude']
-	else:
-		amp21 = 0
-	if usedfreqs >= 3:
-		amp31 = tab[(tab['num'] == 3) & (tab['harmonic'] == 0)]['amplitude'] / peak1['amplitude']
-	else:
-		amp31 = 0
-	return amp21,amp31
-
-
-#--------------------------------------------------------------------------------------------------
-def freq_phasediffs(featdictrow, usedfreqs):
-	"""
-	Phase differences of frequencies
-
-	Inputs
-	-----------------
-
-	Returns
-	-----------------
-	phi21, phi31: float, float
-		phase difference of 2nd to 1st and 3rd to 1st frequencies
-
-	"""
-	tab = featdictrow['frequencies']
-	peak1 = tab[(tab['num'] == 1) & (tab['harmonic'] == 0)]
-	if usedfreqs >= 2:
-		phi21 = tab[(tab['num'] == 2) & (tab['harmonic'] == 0)]['phase'] - 2*peak1['phase']
-	else:
-		phi21 = 0
-	if usedfreqs >= 3:
-		phi31 = tab[(tab['num'] == 3) & (tab['harmonic'] == 0)]['phase'] - 3*peak1['phase']
-	else:
-		phi31 = 0
-	return phi21,phi31

@@ -39,7 +39,7 @@ def featcalc(features, providednfreqs=6, nfrequencies=3,
 			objfeatures = np.zeros(nfrequencies+10)
 			lc = prepLCs(obj['lightcurve'],linflatten)
 
-			periods = get_periods(obj, nfrequencies, lc.time, False)
+			periods, _, _ = get_periods(obj, nfrequencies, lc.time, in_days=False)
 			objfeatures[:nfrequencies] = periods
 
 			#EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)

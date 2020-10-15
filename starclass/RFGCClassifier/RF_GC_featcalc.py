@@ -485,9 +485,9 @@ def freq_ampratios(featdictrow, n_usedfreqs, usedfreqs):
 
 	"""
 	tab = featdictrow['frequencies']
-	peak1 = tab[(tab['num'] == 1) & (tab['harmonic'] == 0)]
 	if n_usedfreqs >= 2:
 		#amp21 = featdictrow['amp'+str(usedfreqs[1]+1)]/featdictrow['amp'+str(usedfreqs[0]+1)]
+		peak1 = tab[(tab['num'] == usedfreqs[0]['num']) & (tab['harmonic'] == usedfreqs[0]['harmonic'])]
 		amp21 = tab[(tab['num'] == usedfreqs[1]['num']) & (tab['harmonic'] == usedfreqs[1]['harmonic'])]['amplitude'] / peak1['amplitude']
 	else:
 		amp21 = 0
@@ -513,9 +513,9 @@ def freq_phasediffs(featdictrow, n_usedfreqs, usedfreqs):
 
 	"""
 	tab = featdictrow['frequencies']
-	peak1 = tab[(tab['num'] == 1) & (tab['harmonic'] == 0)]
 	if n_usedfreqs >= 2:
 		#phi21 = featdictrow['phase'+str(usedfreqs[1]+1)] - 2*featdictrow['phase'+str(usedfreqs[0]+1)]
+		peak1 = tab[(tab['num'] == usedfreqs[0]['num']) & (tab['harmonic'] == usedfreqs[0]['harmonic'])]
 		phi21 = tab[(tab['num'] == usedfreqs[1]['num']) & (tab['harmonic'] == usedfreqs[1]['harmonic'])]['phase'] - 2*peak1['phase']
 	else:
 		phi21 = 0

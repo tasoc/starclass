@@ -56,21 +56,6 @@ if __name__ == '__main__':
 	# Where output will be saved:
 	output_dir = r'G:\keplerq9\keplerq9v3'
 
-	# If it doesn't exist in subdir (to not have too many files in one directory)
-	# check of it is in the root dir instead:
-	"""
-	regex = re.compile(r'^kplr(\d+)-2011177032512_llc\.fits$')
-	for fname in tqdm(glob.iglob(os.path.join(thisdir, '*.fits'))):
-		bname = os.path.basename(fname)
-		m = regex.match(bname)
-		starid = int(m.group(1))
-		subdir = os.path.join(thisdir, '{0:09d}'.format(starid)[:5])
-		os.makedirs(subdir, exist_ok=True)
-		shutil.move(fname, subdir)
-
-	sys.exit()
-	"""
-
 	# Make sure directories exists:
 	os.makedirs(output_dir, exist_ok=True)
 	shutil.copy('keplerq9v2_targets.txt', os.path.join(output_dir, 'targets.txt'))
@@ -145,18 +130,6 @@ if __name__ == '__main__':
 						fname=fname)
 					os.makedirs(subdir, exist_ok=True)
 					download_file(url, fpath)
-
-					"""
-					# Check if the target was actually observed in Q9:
-					r = requests.get('https://kasoc.phys.au.dk/catalog/sectors.php',
-						params={'starid': starid})
-					r.raise_for_status()
-					if 'Q9' not in r.json():
-						tqdm.write("Not observed in Q9: %d,%s" % (starid, sclass))
-					else:
-						tqdm.write("Data file does not exist: %d,%s" % (starid, sclass))
-					continue
-					"""
 
 				# Load Kepler Q9 FITS file (PDC corrected):
 				with fits.open(fpath, mode='readonly', memmap=True) as hdu:

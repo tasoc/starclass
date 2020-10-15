@@ -40,7 +40,7 @@ def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
 			features_dict['shapiro_wilk'] = ss.shapiro(lc.flux)[0] # Shapiro-Wilk test statistic for normality
 			features_dict['eta'] = calculate_eta(lc)
 
-			periods, n_usedfreqs, usedfreqs = get_periods(obj, 6, lc.time, sorted=False)
+			periods, n_usedfreqs, usedfreqs = get_periods(obj, 6, lc.time, ignore_harmonics=False)
 			amp21, amp31 = RF_GC_featcalc.freq_ampratios(obj,n_usedfreqs, usedfreqs)
 			pd21, pd31 = RF_GC_featcalc.freq_phasediffs(obj,n_usedfreqs, usedfreqs)
 

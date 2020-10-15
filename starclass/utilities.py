@@ -98,7 +98,7 @@ def rms_timescale(lc, timescale=3600/86400):
 	return mad_to_sigma * nanmedian(np.abs(flux_bin - nanmedian(flux_bin)))
 
 #--------------------------------------------------------------------------------------------------
-def get_periods(featdict, nfreqs, time, sorted=False, in_days=True):
+def get_periods(featdict, nfreqs, time, in_days=True, ignore_harmonics=False):
 	"""
 	Cuts frequency data down to desired number of frequencies (in umHz) and optionally transforms them into periods in days.
 
@@ -126,7 +126,7 @@ def get_periods(featdict, nfreqs, time, sorted=False, in_days=True):
 
 	tab = featdict['frequencies']
 	tab = tab[~np.isnan(tab['amplitude'])]
-	if sorted:
+	if ignore_harmonics:
 		tab.sort('amplitude', reverse=True)
 		selection = tab[:min(len(tab),nfreqs)]
 		periods = selection['frequency'].quantity

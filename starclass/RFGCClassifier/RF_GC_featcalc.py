@@ -39,7 +39,7 @@ def featcalc(features, som,
 			objfeatures = np.zeros(nfrequencies+16)
 			lc = prepLCs(obj['lightcurve'],linflatten)
 			#periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs, forbiddenfreqs, lc.time)
-			periods, n_usedfreqs, usedfreqs = get_periods(obj, nfrequencies, lc.time, sorted=True)
+			periods, n_usedfreqs, usedfreqs = get_periods(obj, nfrequencies, lc.time, ignore_harmonics=True)
 			objfeatures[:nfrequencies] = periods
 			objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj,n_usedfreqs, usedfreqs)
 			objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj,n_usedfreqs, usedfreqs)

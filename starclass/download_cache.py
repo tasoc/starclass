@@ -35,7 +35,7 @@ def download_cache(all_trainingsets=False):
 	IERS_Auto().open()
 
 	# Download trainingsets:
-	download_tsets = trainingset_list if all_trainingsets else ['keplerq9v2']
+	download_tsets = trainingset_list if all_trainingsets else ['keplerq9v3']
 	for tskey in download_tsets:
 		logger.info("Downloading %s training set...", tskey)
 		tset = get_trainingset(tskey)

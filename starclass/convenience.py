@@ -51,6 +51,7 @@ def get_trainingset(tset_key):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 	TsetClass = {
+		'keplerq9v3': tsets.keplerq9v3,
 		'keplerq9v2': tsets.keplerq9v2,
 		'keplerq9': tsets.keplerq9,
 		'keplerq9-linfit': tsets.keplerq9linfit,

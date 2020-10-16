@@ -15,8 +15,9 @@ import starclass.training_sets as tsets
 from starclass import trainingset_available, get_trainingset
 
 AVAILABLE_TSETS = [
-	'keplerq9v2',
-	'keplerq9',
+	'keplerq9v3',
+	pytest.param('keplerq9v2', marks=pytest.mark.skipif(not trainingset_available('keplerq9v2'), reason='TrainingSet not available')),
+	pytest.param('keplerq9', marks=pytest.mark.skipif(not trainingset_available('keplerq9'), reason='TrainingSet not available')),
 	pytest.param('keplerq9-linfit', marks=pytest.mark.skipif(not trainingset_available('keplerq9-linfit'), reason='TrainingSet not available')),
 	pytest.param('tdasim', marks=pytest.mark.skip),
 	pytest.param('tdasim-raw', marks=pytest.mark.skip),

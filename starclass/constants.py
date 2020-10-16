@@ -16,4 +16,4 @@ classifier_list = ('rfgc', 'slosh', 'xgb', 'sortinghat', 'meta')
 """
 List of available training sets.
 """
-trainingset_list = ('keplerq9v2', 'keplerq9', 'keplerq9-linfit', 'tdasim', 'tdasim-raw', 'tdasim-clean')
+trainingset_list = ('keplerq9v3', 'keplerq9v2', 'keplerq9', 'keplerq9-linfit', 'tdasim', 'tdasim-raw', 'tdasim-clean')

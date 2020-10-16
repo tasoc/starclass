@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Kepler Q9 Training Set (version 2).
+Kepler Q9 Training Set (version 3).
 
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
@@ -15,9 +15,9 @@ from tqdm import tqdm
 from . import TrainingSet
 
 #--------------------------------------------------------------------------------------------------
-class keplerq9v2(TrainingSet):
+class keplerq9v3(TrainingSet):
 	"""
-	Kepler Q9 Training Set (version 2).
+	Kepler Q9 Training Set (version 3).
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
@@ -25,13 +25,13 @@ class keplerq9v2(TrainingSet):
 	def __init__(self, *args, datalevel='corr', **kwargs):
 
 		if datalevel != 'corr':
-			raise ValueError("The KeplerQ9v2 training set only as corrected data. Please specify datalevel='corr'.")
+			raise ValueError("The KeplerQ9v3 training set only as corrected data. Please specify datalevel='corr'.")
 
 		# Key for this training-set:
-		self.key = 'keplerq9v2'
+		self.key = 'keplerq9v3'
 
 		# Point this to the directory where the TDA simulations are stored
-		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/keplerq9v2.zip')
+		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/keplerq9v3.zip')
 
 		# Find the number of training sets:
 		self.starlist = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
@@ -39,6 +39,10 @@ class keplerq9v2(TrainingSet):
 			delimiter=',',
 			comments='#',
 			encoding='utf-8')
+
+		# Remove the instrumental class from this trainingset:
+		indx = [star[1] != 'INSTRUMENT' for star in self.starlist]
+		self.starlist = self.starlist[indx]
 
 		# Count the number of objects in trainingset:
 		self.nobjects = self.starlist.shape[0]
@@ -68,6 +72,8 @@ class keplerq9v2(TrainingSet):
 				# Get starid:
 				starname = star[0]
 				starclass = star[1]
+				if starclass == 'INSTRUMENT':
+					continue
 				if starname.startswith('constant_'):
 					starid = -10000 - int(starname[9:])
 				elif starname.startswith('fakerrlyr_'):

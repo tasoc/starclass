@@ -122,12 +122,18 @@ class TaskManager(object):
 	#----------------------------------------------------------------------------------------------
 	def close(self):
 		"""Close TaskManager and all associated objects."""
-		if hasattr(self, 'cursor'):
+		if hasattr(self, 'cursor') and hasattr(self, 'conn') and self.conn:
 			try:
+				self.conn.rollback()
+				self.cursor.execute("PRAGMA journal_mode=DELETE;")
+				self.conn.commit()
 				self.cursor.close()
-			except sqlite3.ProgrammingError:
+			except sqlite3.ProgrammingError: # pragma: no cover
 				pass
-		if hasattr(self, 'conn') and self.conn: self.conn.close()
+
+		if hasattr(self, 'conn') and self.conn:
+			self.conn.close()
+			self.conn = None
 
 	#----------------------------------------------------------------------------------------------
 	def __del__(self):

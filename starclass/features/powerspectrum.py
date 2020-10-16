@@ -25,7 +25,7 @@ class powerspectrum(object):
 		df (float): Fundamental frequency spacing in Hz.
 		standard (tuple): Frequency in microHz and power density spectrum sampled
 			from 0 to ``nyquist`` with a spacing of ``df``.
-		ls (``astropy.stats.LombScargle`` object):
+		ls (:class:`astropy.timeseries.LombScargle`):
 
 	.. codeauthor:: Kristine Kousholt Mikkelsen <201505068@post.au.dk>
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
@@ -35,7 +35,7 @@ class powerspectrum(object):
 	def __init__(self, lightcurve, fit_mean=False):
 		"""
 		Parameters:
-			lightcurve (``lightkurve.LightCurve`` object): Lightcurve to estimate power spectrum for.
+			lightcurve (:class:`lightkurve.LightCurve`): Lightcurve to estimate power spectrum for.
 			fit_mean (boolean, optional):
 		"""
 
@@ -49,7 +49,8 @@ class powerspectrum(object):
 		self.standard = None
 
 		# Create LombScargle object of timeseries, where time is in seconds:
-		self.ls = LombScargle(lightcurve.time[indx]*86400, lightcurve.flux[indx], center_data=True, fit_mean=self.fit_mean) # , normalization='psd'
+		self.ls = LombScargle(lightcurve.time[indx]*86400, lightcurve.flux[indx], center_data=True,
+			fit_mean=self.fit_mean)
 
 		# Calculate a better estimate of the fundamental frequency spacing:
 		self.df = self.fundamental_spacing_integral()
@@ -72,6 +73,7 @@ class powerspectrum(object):
 
 	#----------------------------------------------------------------------------------------------
 	def copy(self):
+		"""Create copy of power spectrum."""
 		return deepcopy(self)
 
 	#----------------------------------------------------------------------------------------------
@@ -107,10 +109,11 @@ class powerspectrum(object):
 
 		Parameters:
 			freq (ndarray, optional): Frequencies to calculate power spectrum for. If set
-				to None, the full frequency range from 0 to ``nyquist``*``nyquist_factor`` is calculated.
+				to None, the full frequency range from 0 to ``nyquist``*``nyquist_factor``
+				is calculated.
 			oversampling (float, optional): Oversampling factor. Default=1.
 			nyquist_factor (float, optional): Nyquist factor. Default=1.
-			scale (string, optional): 'power', 'powerdensity' and 'amplitude'. Default='power'.
+			scale (str, optional): 'power', 'powerdensity' and 'amplitude'. Default='power'.
 
 		Returns:
 			tuple: Tuple of two ndarray with frequencies in microHz and corresponding

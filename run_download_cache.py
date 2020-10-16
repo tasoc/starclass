@@ -1,10 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import argparse
 import logging
 import starclass
 
+#--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 
 	# Parse command line arguments:

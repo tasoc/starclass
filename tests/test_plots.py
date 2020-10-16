@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Tests of plotting utilities for stellar classification.
@@ -9,8 +9,9 @@ Tests of plotting utilities for stellar classification.
 import pytest
 import numpy as np
 import conftest # noqa: F401
-from starclass.plots import plt, plotConfMatrix
+from starclass.plots import plt, plotConfMatrix, plots_interactive
 
+#--------------------------------------------------------------------------------------------------
 def test_plots_confmatrix():
 
 	mat = np.identity(7)
@@ -22,7 +23,8 @@ def test_plots_confmatrix():
 	plt.figure()
 	plotConfMatrix(mat, labels)
 
+#--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
-	plt.switch_backend('Qt5Agg')
+	plots_interactive()
 	pytest.main([__file__])
 	plt.show()

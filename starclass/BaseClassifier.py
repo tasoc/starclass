@@ -231,7 +231,7 @@ class BaseClassifier(object):
 
 		# Classify test set (has to be one by one unless we change classifiers)
 		y_pred = []
-		for features, labels in tqdm(zip(tset.features_test(), tset.labels_test(level=self.level)), total=len(tset.test_idx)):
+		for features in tqdm(tset.features_test(), total=len(tset.test_idx)):
 			# Create result-dict that is understood by the TaskManager:
 			res = {
 				'priority': features['priority'],
@@ -273,7 +273,7 @@ class BaseClassifier(object):
 	#----------------------------------------------------------------------------------------------
 	def load_star(self, task, fname):
 		"""
-		Recieve a task from the TaskManager, loads the lightcurve and returns derived features.
+		Receive a task from the TaskManager, loads the lightcurve and returns derived features.
 
 		Parameters:
 			task (dict): Task dictionary as returned by :func:`TaskManager.get_task`.
@@ -315,11 +315,6 @@ class BaseClassifier(object):
 					time_format='jd',
 					time_scale='tdb',
 					targetid=task['starid'],
-					camera=1,
-					ccd=1,
-					sector=2,
-					#ra=0,
-					#dec=0,
 					quality_bitmask=2+8+256, # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK,
 					meta={}
 				)
@@ -344,7 +339,7 @@ class BaseClassifier(object):
 						sector=hdu[0].header.get('SECTOR'),
 						ra=hdu[0].header.get('RA_OBJ'),
 						dec=hdu[0].header.get('DEC_OBJ'),
-						quality_bitmask=2+8+256, # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK
+						quality_bitmask=1+2+256, # CorrectorQualityFlags.DEFAULT_BITMASK
 						meta={}
 					)
 
@@ -413,7 +408,8 @@ class BaseClassifier(object):
 		features['powerspectrum'] = psd
 
 		# Extract primary frequencies from lightcurve and add to features:
-		features['frequencies'] = freqextr(lc, n_peaks=6, n_harmonics=0, initps=psd)
+		features['frequencies'] = freqextr(lc, n_peaks=6, n_harmonics=5,
+			Noptimize=5, devlim=None, initps=psd)
 
 		# Add these for backward compatibility:
 		for row in features['frequencies']:

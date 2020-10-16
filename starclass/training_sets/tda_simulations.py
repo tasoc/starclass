@@ -324,11 +324,11 @@ def _labels_test(self, level='L1'):
 
 #--------------------------------------------------------------------------------------------------
 class tdasim(TrainingSet):
+	# Class constants:
+	key = 'tdasim'
 
 	def __init__(self, *args, **kwargs):
 
-		# Key for this training-set:
-		self.key = 'tdasim'
 		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/tdasim.zip')
 
 		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),
@@ -350,11 +350,11 @@ class tdasim(TrainingSet):
 
 #--------------------------------------------------------------------------------------------------
 class tdasim_raw(TrainingSet):
+	# Class constants:
+	key = 'tdasim-raw'
 
 	def __init__(self, *args, **kwargs):
 
-		# Key for this training-set:
-		self.key = 'tdasim-raw'
 		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/tdasim-raw.zip')
 
 		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),
@@ -376,11 +376,12 @@ class tdasim_raw(TrainingSet):
 
 #--------------------------------------------------------------------------------------------------
 class tdasim_clean(TrainingSet):
+	# Class constants:
+	key = 'tdasim-clean'
 
 	def __init__(self, *args, **kwargs):
 
 		# Key for this training-set:
-		self.key = 'tdasim-clean'
 		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/tdasim-clean.zip')
 
 		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),

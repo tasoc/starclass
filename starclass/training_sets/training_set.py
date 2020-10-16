@@ -29,6 +29,9 @@ class TrainingSet(object):
 			random_seed (optional): Random seed. Default=42.
 		"""
 
+		if not hasattr(self, 'key'):
+			raise Exception("Training set class does not have 'key' definied.")
+
 		# Basic checks of input:
 		if tf < 0 or tf >= 1:
 			raise ValueError("Invalid TESTFRACTION provided.")
@@ -89,7 +92,8 @@ class TrainingSet(object):
 			tf (real, optional): Test-fraction, between 0 and 1, to split from each fold.
 
 		Returns:
-			Iterator of ``TrainingSet`` objects: Iterator of folds, which are also ``TrainingSet`` objects.
+			Iterator of :class:`TrainingSet` objects: Iterator of folds, which are also
+				:class:`TrainingSet` objects.
 		"""
 
 		logger = logging.getLogger(__name__)
@@ -120,6 +124,27 @@ class TrainingSet(object):
 			yield newtset
 
 	#----------------------------------------------------------------------------------------------
+	@classmethod
+	def find_input_folder(cls):
+		"""
+
+		This is a class method, so it can be called without having to initialize the training set.
+
+		"""
+		if not hasattr(cls, 'key'):
+			raise Exception("Training set class does not have 'key' definied.")
+
+		# Point this to the directory where the training set data are stored
+		INPUT_DIR = os.environ.get('STARCLASS_TSETS')
+		if INPUT_DIR is None:
+			INPUT_DIR = os.path.join(os.path.dirname(__file__), 'data')
+		elif not os.path.exists(INPUT_DIR) or not os.path.isdir(INPUT_DIR):
+			raise IOError("The environment variable STARCLASS_TSETS is set, but points to a non-existent directory.")
+
+		datadir = cls.key if not hasattr(cls, 'datadir') else cls.datadir
+		return os.path.join(INPUT_DIR, datadir)
+
+	#----------------------------------------------------------------------------------------------
 	def tset_datadir(self, url):
 		"""
 		Setup TrainingSet data directory. If the directory doesn't already exist,
@@ -133,25 +158,19 @@ class TrainingSet(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
 		if not hasattr(self, 'key'):
-			raise ValueError("Trainingset does not have a defined key")
+			raise Exception("Training set class does not have 'key' definied.")
 
-		# Point this to the directory where the TDA simulations are stored
-		INPUT_DIR = os.environ.get('STARCLASS_TSETS')
-		if INPUT_DIR is None:
-			INPUT_DIR = os.path.join(os.path.dirname(__file__), 'data')
-		elif not os.path.exists(INPUT_DIR) or not os.path.isdir(INPUT_DIR):
-			raise IOError("The environment variable STARCLASS_TSETS is set, but points to a non-existent directory.")
-
-		input_folder = os.path.join(INPUT_DIR, self.key)
-
+		logger = logging.getLogger(__name__)
 		tqdm_settings = {
 			'unit': 'B',
 			'unit_scale': True,
 			'unit_divisor': 1024,
 			'disable': not logger.isEnabledFor(logging.INFO)
 		}
+
+		# Find folder where training set is stored:
+		input_folder = self.find_input_folder()
 
 		if not os.path.exists(input_folder):
 			logger.info("Step 1: Downloading %s training set...", self.key)

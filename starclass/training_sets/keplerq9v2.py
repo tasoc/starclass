@@ -21,14 +21,13 @@ class keplerq9v2(TrainingSet):
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
+	# Class constants:
+	key = 'keplerq9v2'
 
 	def __init__(self, *args, datalevel='corr', **kwargs):
 
 		if datalevel != 'corr':
 			raise ValueError("The KeplerQ9v2 training set only as corrected data. Please specify datalevel='corr'.")
-
-		# Key for this training-set:
-		self.key = 'keplerq9v2'
 
 		# Point this to the directory where the TDA simulations are stored
 		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/keplerq9v2.zip')

@@ -15,14 +15,13 @@ from . import TrainingSet
 
 #--------------------------------------------------------------------------------------------------
 class keplerq9linfit(TrainingSet):
+	# Class constants:
+	key = 'keplerq9-linfit'
 
 	def __init__(self, *args, datalevel='corr', **kwargs):
 
 		if datalevel != 'corr':
 			raise ValueError("The KeplerQ9 training set only as corrected data. Please specify datalevel='corr'.")
-
-		# Key for this training-set:
-		self.key = 'keplerq9-linfit'
 
 		# Point this to the directory where the TDA simulations are stored
 		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/keplerq9-linfit.zip')

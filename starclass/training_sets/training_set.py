@@ -20,6 +20,18 @@ from .. import BaseClassifier, TaskManager, utilities, StellarClasses
 
 #--------------------------------------------------------------------------------------------------
 class TrainingSet(object):
+	"""
+	Generic Training Set.
+
+	Attributes:
+		testfraction (float):
+		random_seed (int):
+		features_cache (str):
+		train_idx (ndarray):
+		test_idx (ndarray):
+		crossval_folds (int):
+		fold (int):
+	"""
 
 	def __init__(self, datalevel='corr', tf=0.0, random_seed=42):
 		"""
@@ -50,22 +62,21 @@ class TrainingSet(object):
 
 		# Generate TODO file if it is needed:
 		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
-		if not os.path.exists(sqlite_file):
+		if not os.path.isfile(sqlite_file):
 			self.generate_todolist()
 
 		# Generate training/test indices
-		self.train_idx = np.arange(self.nobjects, dtype=int) # Define here because it is needed by self.labels() used below
+		# Define here because it is needed by self.labels() used below
+		self.train_idx = np.arange(self.nobjects, dtype=int)
 		self.test_idx = np.array([], dtype=int)
 		if self.testfraction > 0:
 			self.train_idx, self.test_idx = train_test_split(
-				np.arange(self.nobjects),
+				np.arange(self.nobjects, dtype=int),
 				test_size=self.testfraction,
 				random_state=self.random_seed,
 				stratify=self.labels()
 			)
-			# Have to sort as train_test_split shuffles and we don't want that
-			self.train_idx = np.sort(self.train_idx)
-			self.test_idx = np.sort(self.test_idx)
+
 		# Cross Validation
 		self.fold = 0
 		self.crossval_folds = 0
@@ -88,8 +99,8 @@ class TrainingSet(object):
 		Split training set object into stratified folds.
 
 		Parameters:
-			n_splits (integer, optional): Number of folds to split training set into. Default=5.
-			tf (real, optional): Test-fraction, between 0 and 1, to split from each fold.
+			n_splits (int, optional): Number of folds to split training set into. Default=5.
+			tf (float, optional): Test-fraction, between 0 and 1, to split from each fold.
 
 		Returns:
 			Iterator of :class:`TrainingSet` objects: Iterator of folds, which are also
@@ -398,33 +409,42 @@ class TrainingSet(object):
 
 	#----------------------------------------------------------------------------------------------
 	def labels(self, level='L1'):
+		"""
+		Labels of training-set.
 
+		Returns:
+			tuple: Tuple of labels associated with features in :meth:`features`.
+				Each element is itself a tuple of enums of :class:`StellarClasses`.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 		# Create list of all the classes for each star:
 		lookup = []
-		for rowidx, row in enumerate(self.starlist):
+		for rowidx in self.train_idx:
+			row = self.starlist[rowidx, :]
 			labels = row[1].strip().split(';')
 			lbls = [StellarClasses[lbl.strip()] for lbl in labels]
-
-			if self.testfraction > 0:
-				if rowidx in self.train_idx:
-					lookup.append(tuple(set(lbls)))
-			else:
-				lookup.append(tuple(set(lbls)))
+			lookup.append(tuple(set(lbls)))
 
 		return tuple(lookup)
 
 	#----------------------------------------------------------------------------------------------
 	def labels_test(self, level='L1'):
+		"""
+		Labels of test-set.
 
-		if self.testfraction <= 0:
-			return []
+		Returns:
+			tuple: Tuple of labels associated with features in :meth:`features_test`.
+				Each element is itself a tuple of enums of :class:`StellarClasses`.
 
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 		# Create list of all the classes for each star:
 		lookup = []
-		for rowidx, row in enumerate(self.starlist):
-			if rowidx in self.test_idx:
-				labels = row[1].strip().split(';')
-				lbls = [StellarClasses[lbl.strip()] for lbl in labels]
-				lookup.append(tuple(set(lbls)))
+		for rowidx in self.test_idx:
+			row = self.starlist[rowidx, :]
+			labels = row[1].strip().split(';')
+			lbls = [StellarClasses[lbl.strip()] for lbl in labels]
+			lookup.append(tuple(set(lbls)))
 
 		return tuple(lookup)

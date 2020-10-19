@@ -175,7 +175,8 @@ def _labels(self, level='L1'):
 
 	# Create list of all the classes for each star:
 	lookup = []
-	for rowidx,row in enumerate(data):
+	for rowidx in self.train_idx:
+		row = data[rowidx, :]
 		#starid = int(row[0][4:])
 		labels = row[1].strip().split(';')
 		lbls = []
@@ -202,11 +203,7 @@ def _labels(self, level='L1'):
 				else:
 					lbls.append(c)
 
-		if self.testfraction > 0:
-			if rowidx in self.train_idx:
-				lookup.append(tuple(set(lbls)))
-		else:
-			lookup.append(tuple(set(lbls)))
+		lookup.append(tuple(set(lbls)))
 
 	return tuple(lookup)
 
@@ -290,7 +287,8 @@ def _labels_test(self, level='L1'):
 
 		# Create list of all the classes for each star:
 		lookup = []
-		for rowidx,row in enumerate(data):
+		for rowidx in self.test_idx:
+			row = data[rowidx, :]
 			#starid = int(row[0][4:])
 			labels = row[1].strip().split(';')
 			lbls = []
@@ -317,8 +315,7 @@ def _labels_test(self, level='L1'):
 					else:
 						lbls.append(c)
 
-			if rowidx in self.train_idx:
-				lookup.append(tuple(set(lbls)))
+			lookup.append(tuple(set(lbls)))
 
 	return tuple(lookup)
 

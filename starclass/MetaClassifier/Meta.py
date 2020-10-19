@@ -186,7 +186,7 @@ class MetaClassifier(BaseClassifier):
 		# Remove columns that are all NaN:
 		# This can be classifiers that never returns a given class or a classifier that
 		# has not been run at all.
-		keepcols = ~allnan(features, axis=1)
+		keepcols = ~allnan(features, axis=0)
 		features = features[:, keepcols]
 		self.features_used = self.features_used[keepcols]
 

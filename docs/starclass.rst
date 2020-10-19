@@ -26,6 +26,7 @@ Individual classifiers
 	starclass.RFGCClassifier
 	starclass.SLOSHClassifier
 	starclass.XGBClassifier
+	starclass.SortingHatClassifier
 
 Meta Classifier
 ---------------

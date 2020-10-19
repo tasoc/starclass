@@ -108,7 +108,8 @@ class MetaClassifier(BaseClassifier):
 			tab = feat['other_classifiers']
 			for j, (classifier, stcl) in enumerate(self.features_used):
 				indx = (tab['classifier'] == classifier) & (tab['class'] == stcl.name)
-				featarray[k, j] = tab[indx]['prob']
+				if any(indx):
+					featarray[k, j] = tab['prob'][indx]
 
 		return featarray
 

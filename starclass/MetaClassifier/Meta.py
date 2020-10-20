@@ -181,7 +181,7 @@ class MetaClassifier(BaseClassifier):
 		# Create table of features:
 		# Create as float32, since that is what RandomForestClassifier converts it to anyway.
 		logger.info("Importing features...")
-		features = self.build_features_table(tset.features(), total=len(tset))
+		features = self.build_features_table(tset.features(), total=len(tset.train_idx))
 
 		# Remove columns that are all NaN:
 		# This can be classifiers that never returns a given class or a classifier that

@@ -192,7 +192,6 @@ class RFGCClassifier(BaseClassifier):
 		# Check for pre-calculated som
 		if self.classifier.som is None:
 			logger.info("No SOM loaded. Creating new SOM, saving to '%s'.", self.somfile)
-			#make copy of features iterator
 			self.classifier.som = fc.makeSOM(tset.features(), outfile=self.somfile, overwrite=overwrite)
 			logger.info('SOM created and saved.')
 			logger.info('Calculating/Loading Features.')

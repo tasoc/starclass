@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Utilities for the RF-GC classifier (general random forest).
@@ -15,9 +15,8 @@ from . import selfsom
 from ..utilities import get_periods
 
 #--------------------------------------------------------------------------------------------------
-def featcalc(features, som,
-	providednfreqs=6, nfrequencies=6, forbiddenfreqs=[13.49/4.],
-	cardinality=64, linflatten=False, savefeat=None, recalc=False):
+def featcalc(features, som, providednfreqs=6, nfrequencies=6, cardinality=64,
+	linflatten=False, savefeat=None, recalc=False):
 	"""
 	Calculates features for set of lightcurves
 	"""
@@ -38,22 +37,26 @@ def featcalc(features, som,
 		if not precalc:
 			objfeatures = np.zeros(nfrequencies+16, dtype='float32')
 			lc = prepLCs(obj['lightcurve'], linflatten=linflatten)
-			#periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs, forbiddenfreqs, lc.time)
+
 			periods, n_usedfreqs, usedfreqs = get_periods(obj, nfrequencies, lc.time, ignore_harmonics=True)
+
 			objfeatures[:nfrequencies] = periods
-			objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj,n_usedfreqs, usedfreqs)
-			objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj,n_usedfreqs, usedfreqs)
+			objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj, n_usedfreqs, usedfreqs)
+			objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj, n_usedfreqs, usedfreqs)
+
 			EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=True)
 			objfeatures[0] = EBper # overwrites top period
+
 			objfeatures[nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, cardinality)
-			objfeatures[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux,EBper)
+			objfeatures[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux, EBper)
 			objfeatures[nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
+
 			psi, zc = compute_hocs(lc.time, lc.flux, 5)
 			objfeatures[nfrequencies+10] = psi
 			objfeatures[nfrequencies+11] = zc[0]
 			objfeatures[nfrequencies+12:] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
 			if savefeat is not None:
-				np.savetxt(featfile,objfeatures, delimiter=',')
+				np.savetxt(featfile, objfeatures, delimiter=',')
 		featout = np.vstack((featout, objfeatures))
 	return featout[1:,:]
 
@@ -146,7 +149,7 @@ def kohonenLoad(infile):
 	return out
 
 #--------------------------------------------------------------------------------------------------
-def kohonenSave(layer,outfile): # basically a 3d >> 2d saver
+def kohonenSave(layer, outfile): # basically a 3d >> 2d saver
 	"""
 	Takes a 3d array and saves it to txt file in a recoverable way.
 
@@ -170,7 +173,8 @@ def kohonenSave(layer,outfile): # basically a 3d >> 2d saver
 
 #--------------------------------------------------------------------------------------------------
 def SOM_alldataprep(features, outfile=None, cardinality=64):
-	''' Function to create an array of normalised lightcurves to train a SOM
+	"""
+	Function to create an array of normalised lightcurves to train a SOM.
 
 	Parameters
 	----------------
@@ -184,45 +188,42 @@ def SOM_alldataprep(features, outfile=None, cardinality=64):
 	-----------------
 	SOMarray:		np array, [n_lightcurves, cardinality]
 		Array of phase-folded, binned lightcurves
-	'''
+	"""
 	logger = logging.getLogger(__name__)
 	SOMarray = np.ones(cardinality)
-	i = 0
-	total = 0
 	for obj in tqdm(features, disable=not logger.isEnabledFor(logging.INFO)):
 		lc = obj['lightcurve']
 		lc = prepLCs(lc, linflatten=True)
 
-		#freq = obj['freq1']
+		# Main frequency found in light curve:
 		tab = obj['frequencies']
-		freq = tab[(tab['num'] == 1) & (tab['harmonic'] == 0)]['frequency']
-		#if np.isfinite(freq):
+		freq = tab[(tab['num'] == 1) & (tab['harmonic'] == 0)]['frequency'].quantity
 
 		time, flux = lc.time.copy(), lc.flux.copy()
 
-		#check double period
+		# check double period
 		if np.isfinite(freq):
+			# convert to days
+			per = (1/freq).to(u.day).value
+		else:
 			# Put in random longer period than timeseries if no dominant frequency is found
 			# Set to length of timeseries
-			per = (time.max() - time.min())
-		else:
-			per = 1./(freq*1e-6)/86400. # convert to days
+			per = time.max() - time.min()
+
 		EBper = EBperiod(time, flux, per)
 		if EBper > 0: # ignores others
-			binlc,range = prepFilePhasefold(time, flux, EBper, cardinality)
-			SOMarray = np.vstack((SOMarray,binlc))
-		i += 1
-		total += 1
-	print("Size of features: ", i)
-	print("Total features: ", total)
+			binlc, range = prepFilePhasefold(time, flux, EBper, cardinality)
+			SOMarray = np.vstack((SOMarray, binlc))
+
+	logger.info("Total features: %d", SOMarray.shape[0]-1)
 
 	if outfile is not None:
-		np.savetxt(outfile,SOMarray[1:,:])
+		np.savetxt(outfile, SOMarray[1:,:])
 	return SOMarray[1:,:] # drop first line as this is just ones
 
 #--------------------------------------------------------------------------------------------------
 def SOM_train(SOMarray, outfile=None, overwrite=False, cardinality=64, dimx=1, dimy=400,
-				nsteps=300, learningrate=0.1):
+	nsteps=300, learningrate=0.1):
 	''' Function to train a SOM
 
 	Parameters
@@ -421,53 +422,6 @@ def SOMloc(som, time, flux, per, cardinality):
 	map = som(SOMarray)
 	map = map[0,1]
 	return map, range
-
-#--------------------------------------------------------------------------------------------------
-def checkfrequencies(featdictrow, nfreqs, providednfreqs, forbiddenfreqs, time):
-	"""
-	DEPRECATED - remember to check wether we need forbiddenfreqs in freqextr in the future.
-	Cuts frequency data down to desired number of frequencies, and removes harmonics
-	of forbidden frequencies
-
-	Inputs
-	-----------------
-
-
-	Returns
-	-----------------
-	freqs: ndarray [self.nfreqs]
-		array of frequencies
-	"""
-	freq_table = featdictrow['frequencies']
-	freqs = []
-	usedfreqs = []
-	j = 0
-	while len(freqs) < nfreqs:
-		#freqdict = freq_table.loc[j+1][0]['frequency']
-		freqdict = freq_table[(freq_table['num'] == j+1) & (freq_table['harmonic'] == 0)]['frequency']
-		if np.isfinite(freqdict):
-			freq = 1./(freqdict*1e-6)/86400. # convert to days
-
-			#check to cut bad frequencies
-			cut = False
-			if (freq < 0) or (freq > np.max(time)-np.min(time)):
-				cut = True
-			for freqtocut in forbiddenfreqs:
-				for k in range(4): # cuts 4 harmonics of frequency, within +-3% of given frequency
-					if (1./freq > (1./((k+1)*freqtocut))*(1-0.01)) & (1./freq < (1./((k+1)*freqtocut))*(1+0.01)):
-						cut = True
-			if not cut:
-				freqs.append(freq)
-				usedfreqs.append(j)
-		j += 1
-		if j >= providednfreqs:
-			break
-	# Fill in any unfilled frequencies with negative numbers
-	gap = nfreqs - len(freqs)
-	if gap > 0:
-		for k in range(gap):
-			freqs.append(np.max(time)-np.min(time))
-	return np.array(freqs), np.array(usedfreqs)
 
 #--------------------------------------------------------------------------------------------------
 def freq_ampratios(featdictrow, n_usedfreqs, usedfreqs):

@@ -22,7 +22,7 @@ def featcalc(features, som,
 	Calculates features for set of lightcurves
 	"""
 
-	featout = np.zeros([1,nfrequencies+16])
+	featout = np.zeros([1,nfrequencies+16], dtype='float32')
 	if isinstance(features, dict): # trick for single features
 		features = [features]
 
@@ -36,14 +36,14 @@ def featcalc(features, som,
 				precalc = True
 
 		if not precalc:
-			objfeatures = np.zeros(nfrequencies+16)
-			lc = prepLCs(obj['lightcurve'],linflatten)
+			objfeatures = np.zeros(nfrequencies+16, dtype='float32')
+			lc = prepLCs(obj['lightcurve'], linflatten=linflatten)
 			#periods, usedfreqs = checkfrequencies(obj, nfrequencies, providednfreqs, forbiddenfreqs, lc.time)
 			periods, n_usedfreqs, usedfreqs = get_periods(obj, nfrequencies, lc.time, ignore_harmonics=True)
 			objfeatures[:nfrequencies] = periods
 			objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj,n_usedfreqs, usedfreqs)
 			objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj,n_usedfreqs, usedfreqs)
-			EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)
+			EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=True)
 			objfeatures[0] = EBper # overwrites top period
 			objfeatures[nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, cardinality)
 			objfeatures[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux,EBper)
@@ -54,7 +54,7 @@ def featcalc(features, som,
 			objfeatures[nfrequencies+12:] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
 			if savefeat is not None:
 				np.savetxt(featfile,objfeatures, delimiter=',')
-		featout = np.vstack((featout,objfeatures))
+		featout = np.vstack((featout, objfeatures))
 	return featout[1:,:]
 
 #--------------------------------------------------------------------------------------------------

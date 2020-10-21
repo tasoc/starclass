@@ -107,7 +107,7 @@ class MetaClassifier(BaseClassifier):
 		for k, feat in enumerate(features):
 			tab = feat['other_classifiers']
 			for j, (classifier, stcl) in enumerate(self.features_used):
-				indx = (tab['classifier'] == classifier) & (tab['class'] == stcl.name)
+				indx = (tab['classifier'] == classifier) & (tab['class'] == stcl)
 				if any(indx):
 					featarray[k, j] = tab['prob'][indx]
 
@@ -188,7 +188,7 @@ class MetaClassifier(BaseClassifier):
 		# has not been run at all.
 		keepcols = ~allnan(features, axis=0)
 		features = features[:, keepcols]
-		self.features_used = self.features_used[keepcols]
+		self.features_used = [x for i, x in enumerate(self.features_used) if keepcols[i]]
 
 		# Throw an error if a classifier is not run at all:
 		run_classifiers = set([fu[0] for fu in self.features_used])

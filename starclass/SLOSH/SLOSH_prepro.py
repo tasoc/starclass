@@ -43,6 +43,7 @@ class npy_generator(tensorflow.keras.utils.Sequence):
 				if file.endswith(extension) and dirpath[-1].isdigit(): # I infer the class label '0' or '1' according to subfolder names
 					self.filenames.append(os.path.join(dirpath, file))
 					self.subfolder_labels.append(int(dirpath[-1]))
+
 		# Get labels from filenames
 		labels = np.array([i.split(os.path.sep)[-2] for i in self.filenames])
 		if len(indices) == 0: # otherwise pass a list of training/validation indices

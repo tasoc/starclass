@@ -11,9 +11,11 @@ import os
 import sqlite3
 import logging
 from astropy.table import Table
-from . import STATUS, StellarClasses
+from . import STATUS
 from .constants import classifier_list
+from .StellarClasses import StellarClassesLevel1
 
+#--------------------------------------------------------------------------------------------------
 class TaskManager(object):
 	"""
 	A TaskManager which keeps track of which targets to process.
@@ -228,9 +230,10 @@ class TaskManager(object):
 				self.cursor.execute("SELECT starclass_results.classifier,class,prob FROM starclass_results INNER JOIN starclass_diagnostics ON starclass_results.priority=starclass_diagnostics.priority AND starclass_results.classifier=starclass_diagnostics.classifier WHERE starclass_results.priority=? AND status=? AND starclass_results.classifier != 'meta' ORDER BY starclass_results.classifier, class;", (task['priority'], STATUS.OK.value))
 
 				# Add as a Table to the task list:
+				# TODO: Level 1 classes hardcoded!
 				rows = []
 				for r in self.cursor.fetchall():
-					rows.append([r['classifier'], StellarClasses[r['class']], r['prob']])
+					rows.append([r['classifier'], StellarClassesLevel1[r['class']], r['prob']])
 				if not rows: rows = None
 				task['other_classifiers'] = Table(
 					rows=rows,

@@ -13,7 +13,7 @@ import logging
 #from bottleneck import nanmedian, nanvar
 #from lightkurve import LightCurve
 from tqdm import tqdm
-from ..StellarClasses import StellarClasses, StellarClassesLevel2
+from ..StellarClasses import StellarClassesLevel1, StellarClassesLevel2
 from . import TrainingSet
 #from ..utilities import rms_timescale
 
@@ -99,7 +99,7 @@ def _generate_todolist(self):
 	logger.info("%s training set successfully built.", self.key)
 
 #--------------------------------------------------------------------------------------------------
-def _labels(self, level='L1'):
+def _labels(self):
 
 	logger = logging.getLogger(__name__)
 
@@ -108,39 +108,39 @@ def _labels(self, level='L1'):
 
 	# Translation of Mikkel's identifiers into the broader
 	# classes we have defined in StellarClasses:
-	if level == 'L1':
+	if self.level == 'L1':
 		translate = {
-			'Solar-like': StellarClasses.SOLARLIKE,
-			'Transit': StellarClasses.ECLIPSE,
-			'Eclipse': StellarClasses.ECLIPSE, # short period EBs should be CONTACT_ROT, not ECLIPSE
-			'multi': StellarClasses.ECLIPSE,
-			'MMR': StellarClasses.ECLIPSE,
-			'RR Lyrae': StellarClasses.RRLYR_CEPHEID,
-			'RRab': StellarClasses.RRLYR_CEPHEID,
-			'RRc': StellarClasses.RRLYR_CEPHEID,
-			'RRd': StellarClasses.RRLYR_CEPHEID,
-			'Cepheid': StellarClasses.RRLYR_CEPHEID,
-			'FM': StellarClasses.RRLYR_CEPHEID,
-			'1O': StellarClasses.RRLYR_CEPHEID,
-			'1O2O': StellarClasses.RRLYR_CEPHEID,
-			'FM1O': StellarClasses.RRLYR_CEPHEID,
-			'Type II': StellarClasses.RRLYR_CEPHEID,
-			'Anomaleous': StellarClasses.RRLYR_CEPHEID,
-			'SPB': StellarClasses.GDOR_SPB,
-			'dsct': StellarClasses.DSCT_BCEP,
-			'bumpy': StellarClasses.GDOR_SPB,
-			'gDor': StellarClasses.GDOR_SPB,
-			'bCep': StellarClasses.DSCT_BCEP,
-			#'roAp': StellarClasses.RAPID,
-			#'sdBV': StellarClasses.RAPID,
-			#'Flare': StellarClasses.TRANSIENT,
-			'Spots': StellarClasses.CONTACT_ROT,
-			'LPV': StellarClasses.APERIODIC,
-			'MIRA': StellarClasses.APERIODIC,
-			'SR': StellarClasses.APERIODIC,
-			'Constant': StellarClasses.CONSTANT
+			'Solar-like': StellarClassesLevel1.SOLARLIKE,
+			'Transit': StellarClassesLevel1.ECLIPSE,
+			'Eclipse': StellarClassesLevel1.ECLIPSE, # short period EBs should be CONTACT_ROT, not ECLIPSE
+			'multi': StellarClassesLevel1.ECLIPSE,
+			'MMR': StellarClassesLevel1.ECLIPSE,
+			'RR Lyrae': StellarClassesLevel1.RRLYR_CEPHEID,
+			'RRab': StellarClassesLevel1.RRLYR_CEPHEID,
+			'RRc': StellarClassesLevel1.RRLYR_CEPHEID,
+			'RRd': StellarClassesLevel1.RRLYR_CEPHEID,
+			'Cepheid': StellarClassesLevel1.RRLYR_CEPHEID,
+			'FM': StellarClassesLevel1.RRLYR_CEPHEID,
+			'1O': StellarClassesLevel1.RRLYR_CEPHEID,
+			'1O2O': StellarClassesLevel1.RRLYR_CEPHEID,
+			'FM1O': StellarClassesLevel1.RRLYR_CEPHEID,
+			'Type II': StellarClassesLevel1.RRLYR_CEPHEID,
+			'Anomaleous': StellarClassesLevel1.RRLYR_CEPHEID,
+			'SPB': StellarClassesLevel1.GDOR_SPB,
+			'dsct': StellarClassesLevel1.DSCT_BCEP,
+			'bumpy': StellarClassesLevel1.GDOR_SPB,
+			'gDor': StellarClassesLevel1.GDOR_SPB,
+			'bCep': StellarClassesLevel1.DSCT_BCEP,
+			#'roAp': StellarClassesLevel1.RAPID,
+			#'sdBV': StellarClassesLevel1.RAPID,
+			#'Flare': StellarClassesLevel1.TRANSIENT,
+			'Spots': StellarClassesLevel1.CONTACT_ROT,
+			'LPV': StellarClassesLevel1.APERIODIC,
+			'MIRA': StellarClassesLevel1.APERIODIC,
+			'SR': StellarClassesLevel1.APERIODIC,
+			'Constant': StellarClassesLevel1.CONSTANT
 		}
-	elif level == 'L2':
+	elif self.level == 'L2':
 		translate = {
 			'Solar-like': StellarClassesLevel2.SOLARLIKE,
 			'Transit': StellarClassesLevel2.ECLIPSE,
@@ -183,17 +183,17 @@ def _labels(self, level='L1'):
 		for lbl in labels:
 			lbl = lbl.strip()
 			if lbl == 'gDor+dSct hybrid' or lbl == 'dSct+gDor hybrid':
-				if level == 'L1':
-					lbls.append(StellarClasses.DSCT_BCEP)
-					lbls.append(StellarClasses.GDOR_SPB)
-				elif level == 'L2':
+				if self.level == 'L1':
+					lbls.append(StellarClassesLevel1.DSCT_BCEP)
+					lbls.append(StellarClassesLevel1.GDOR_SPB)
+				elif self.level == 'L2':
 					lbls.append(StellarClassesLevel2.DSCT)
 					lbls.append(StellarClassesLevel2.GDOR)
 			elif lbl == 'bCep+SPB hybrid':
-				if level == 'L1':
-					lbls.append(StellarClasses.DSCT_BCEP)
-					lbls.append(StellarClasses.GDOR_SPB)
-				elif level == 'L2':
+				if self.level == 'L1':
+					lbls.append(StellarClassesLevel1.DSCT_BCEP)
+					lbls.append(StellarClassesLevel1.GDOR_SPB)
+				elif self.level == 'L2':
 					lbls.append(StellarClassesLevel2.BCEP)
 					lbls.append(StellarClassesLevel2.SPB)
 			else:
@@ -208,7 +208,7 @@ def _labels(self, level='L1'):
 	return tuple(lookup)
 
 #--------------------------------------------------------------------------------------------------
-def _labels_test(self, level='L1'):
+def _labels_test(self):
 
 	logger = logging.getLogger(__name__)
 
@@ -220,39 +220,39 @@ def _labels_test(self, level='L1'):
 
 		# Translation of Mikkel's identifiers into the broader
 		# classes we have defined in StellarClasses:
-		if level == 'L1':
+		if self.level == 'L1':
 			translate = {
-				'Solar-like': StellarClasses.SOLARLIKE,
-				'Transit': StellarClasses.ECLIPSE,
-				'Eclipse': StellarClasses.ECLIPSE, # short period EBs should be CONTACT_ROT, not ECLIPSE
-				'multi': StellarClasses.ECLIPSE,
-				'MMR': StellarClasses.ECLIPSE,
-				'RR Lyrae': StellarClasses.RRLYR_CEPHEID,
-				'RRab': StellarClasses.RRLYR_CEPHEID,
-				'RRc': StellarClasses.RRLYR_CEPHEID,
-				'RRd': StellarClasses.RRLYR_CEPHEID,
-				'Cepheid': StellarClasses.RRLYR_CEPHEID,
-				'FM': StellarClasses.RRLYR_CEPHEID,
-				'1O': StellarClasses.RRLYR_CEPHEID,
-				'1O2O': StellarClasses.RRLYR_CEPHEID,
-				'FM1O': StellarClasses.RRLYR_CEPHEID,
-				'Type II': StellarClasses.RRLYR_CEPHEID,
-				'Anomaleous': StellarClasses.RRLYR_CEPHEID,
-				'SPB': StellarClasses.GDOR_SPB,
-				'dsct': StellarClasses.DSCT_BCEP,
-				'bumpy': StellarClasses.GDOR_SPB,
-				'gDor': StellarClasses.GDOR_SPB,
-				'bCep': StellarClasses.DSCT_BCEP,
-				#'roAp': StellarClasses.RAPID,
-				#'sdBV': StellarClasses.RAPID,
-				#'Flare': StellarClasses.TRANSIENT,
-				'Spots': StellarClasses.CONTACT_ROT,
-				'LPV': StellarClasses.APERIODIC,
-				'MIRA': StellarClasses.APERIODIC,
-				'SR': StellarClasses.APERIODIC,
-				'Constant': StellarClasses.CONSTANT
+				'Solar-like': StellarClassesLevel1.SOLARLIKE,
+				'Transit': StellarClassesLevel1.ECLIPSE,
+				'Eclipse': StellarClassesLevel1.ECLIPSE, # short period EBs should be CONTACT_ROT, not ECLIPSE
+				'multi': StellarClassesLevel1.ECLIPSE,
+				'MMR': StellarClassesLevel1.ECLIPSE,
+				'RR Lyrae': StellarClassesLevel1.RRLYR_CEPHEID,
+				'RRab': StellarClassesLevel1.RRLYR_CEPHEID,
+				'RRc': StellarClassesLevel1.RRLYR_CEPHEID,
+				'RRd': StellarClassesLevel1.RRLYR_CEPHEID,
+				'Cepheid': StellarClassesLevel1.RRLYR_CEPHEID,
+				'FM': StellarClassesLevel1.RRLYR_CEPHEID,
+				'1O': StellarClassesLevel1.RRLYR_CEPHEID,
+				'1O2O': StellarClassesLevel1.RRLYR_CEPHEID,
+				'FM1O': StellarClassesLevel1.RRLYR_CEPHEID,
+				'Type II': StellarClassesLevel1.RRLYR_CEPHEID,
+				'Anomaleous': StellarClassesLevel1.RRLYR_CEPHEID,
+				'SPB': StellarClassesLevel1.GDOR_SPB,
+				'dsct': StellarClassesLevel1.DSCT_BCEP,
+				'bumpy': StellarClassesLevel1.GDOR_SPB,
+				'gDor': StellarClassesLevel1.GDOR_SPB,
+				'bCep': StellarClassesLevel1.DSCT_BCEP,
+				#'roAp': StellarClassesLevel1.RAPID,
+				#'sdBV': StellarClassesLevel1.RAPID,
+				#'Flare': StellarClassesLevel1.TRANSIENT,
+				'Spots': StellarClassesLevel1.CONTACT_ROT,
+				'LPV': StellarClassesLevel1.APERIODIC,
+				'MIRA': StellarClassesLevel1.APERIODIC,
+				'SR': StellarClassesLevel1.APERIODIC,
+				'Constant': StellarClassesLevel1.CONSTANT
 			}
-		elif level == 'L2':
+		elif self.level == 'L2':
 			translate = {
 				'Solar-like': StellarClassesLevel2.SOLARLIKE,
 				'Transit': StellarClassesLevel2.ECLIPSE,
@@ -295,17 +295,17 @@ def _labels_test(self, level='L1'):
 			for lbl in labels:
 				lbl = lbl.strip()
 				if lbl == 'gDor+dSct hybrid' or lbl == 'dSct+gDor hybrid':
-					if level == 'L1':
-						lbls.append(StellarClasses.DSCT_BCEP)
-						lbls.append(StellarClasses.GDOR_SPB)
-					elif level == 'L2':
+					if self.level == 'L1':
+						lbls.append(StellarClassesLevel1.DSCT_BCEP)
+						lbls.append(StellarClassesLevel1.GDOR_SPB)
+					elif self.level == 'L2':
 						lbls.append(StellarClassesLevel2.DSCT)
 						lbls.append(StellarClassesLevel2.GDOR)
 				elif lbl == 'bCep+SPB hybrid':
-					if level == 'L1':
-						lbls.append(StellarClasses.DSCT_BCEP)
-						lbls.append(StellarClasses.GDOR_SPB)
-					elif level == 'L2':
+					if self.level == 'L1':
+						lbls.append(StellarClassesLevel1.DSCT_BCEP)
+						lbls.append(StellarClassesLevel1.GDOR_SPB)
+					elif self.level == 'L2':
 						lbls.append(StellarClassesLevel2.BCEP)
 						lbls.append(StellarClassesLevel2.SPB)
 				else:

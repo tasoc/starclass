@@ -53,11 +53,6 @@ def main():
 	if not input_folder:
 		parser.error("Please specify an INPUT_FOLDER.")
 
-	# Setup the location of the features cache:
-	#features_cache = os.path.join(input_folder, 'features_cache_%s' % args.datalevel)
-	#if not os.path.exists(features_cache):
-	#	os.makedirs(features_cache)
-
 	# Define MPI message tags
 	tags = enum.IntEnum('tags', ('READY', 'DONE', 'EXIT', 'START'))
 
@@ -143,6 +138,10 @@ def main():
 		current_classifier = None
 		stcl = None
 
+		# Initialize the training set:
+		tsetclass = starclass.get_trainingset(args.trainingset)
+		tset = tsetclass(level=args.level)
+
 		try:
 			# Send signal that we are ready for task:
 			comm.send(None, dest=0, tag=tags.READY)
@@ -163,7 +162,7 @@ def main():
 							current_classifier = task['classifier']
 							if stcl: stcl.close()
 							stcl = starclass.get_classifier(current_classifier)
-							stcl = stcl(level=args.level, features_cache=None, tset_key=args.trainingset)
+							stcl = stcl(tset=tset, features_cache=None)
 
 						fname = os.path.join(input_folder, task['lightcurve'])
 						features = stcl.load_star(task, fname)

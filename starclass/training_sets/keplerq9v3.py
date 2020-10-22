@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Kepler Q9 Training Set (version 3).
@@ -13,6 +13,7 @@ import sqlite3
 import logging
 from tqdm import tqdm
 from . import TrainingSet
+from ..StellarClasses import StellarClassesLevel1Instr
 
 #--------------------------------------------------------------------------------------------------
 class keplerq9v3(TrainingSet):
@@ -105,13 +106,12 @@ class keplerq9v3(TrainingSet):
 #--------------------------------------------------------------------------------------------------
 class keplerq9v3_instr(TrainingSet):
 	"""
-	Kepler Q9 Training Set (version 3).
+	Kepler Q9 Training Set (version 3) including instrumental class.
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 	# Class constants:
 	key = 'keplerq9v3-instr'
-	datadir = 'keplerq9v3'
 
 	def __init__(self, *args, datalevel='corr', **kwargs):
 
@@ -130,6 +130,9 @@ class keplerq9v3_instr(TrainingSet):
 
 		# Count the number of objects in trainingset:
 		self.nobjects = self.starlist.shape[0]
+
+		# Pin the StellarClasses Enum to special values for this training set:
+		self.StellarClasses = StellarClassesLevel1Instr
 
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:

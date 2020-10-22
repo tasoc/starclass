@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Training Sets.
@@ -16,7 +16,8 @@ import logging
 import tempfile
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
-from .. import BaseClassifier, TaskManager, utilities, StellarClasses
+from .. import BaseClassifier, TaskManager, utilities
+from ..StellarClasses import StellarClassesLevel1, StellarClassesLevel2
 
 #--------------------------------------------------------------------------------------------------
 class TrainingSet(object):
@@ -33,7 +34,7 @@ class TrainingSet(object):
 		fold (int):
 	"""
 
-	def __init__(self, datalevel='corr', tf=0.0, random_seed=42):
+	def __init__(self, level='L1', datalevel='corr', tf=0.0, random_seed=42):
 		"""
 		Parameters:
 			datalevel (string, optional):
@@ -45,6 +46,9 @@ class TrainingSet(object):
 			raise Exception("Training set class does not have 'key' definied.")
 
 		# Basic checks of input:
+		if level not in ('L1', 'L2'):
+			raise ValueError("Invalid LEVEL")
+
 		if tf < 0 or tf >= 1:
 			raise ValueError("Invalid TESTFRACTION provided.")
 
@@ -52,9 +56,18 @@ class TrainingSet(object):
 			raise ValueError("Invalid DATALEVEL provided.")
 
 		# Store input:
+		self.level = level
 		self.datalevel = datalevel
 		self.testfraction = tf
 		self.random_seed = random_seed
+
+		# Assign StellarClasses Enum depending on
+		# the classification level we are running:
+		if not hasattr(self, 'StellarClasses'):
+			self.StellarClasses = {
+				'L1': StellarClassesLevel1,
+				'L2': StellarClassesLevel2
+			}[self.level]
 
 		# Define cache location where we will save common features:
 		self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)
@@ -83,10 +96,12 @@ class TrainingSet(object):
 
 	#----------------------------------------------------------------------------------------------
 	def __str__(self):
-		return "<TrainingSet({key:s}, {datalevel:s}, tf={tf:.2f})>".format(
+		str_fold = '' if self.fold == 0 else ', fold={0:d}/{1:d}'.format(self.fold, self.crossval_folds)
+		return "<TrainingSet({key:s}, {datalevel:s}, tf={tf:.2f}{fold:s})>".format(
 			key=self.key,
 			datalevel=self.datalevel,
-			tf=self.testfraction
+			tf=self.testfraction,
+			fold=str_fold
 		)
 
 	#----------------------------------------------------------------------------------------------
@@ -124,7 +139,7 @@ class TrainingSet(object):
 
 			# Set tf to be zero here so the training set isn't further split
 			# as want to run all the data through CV
-			newtset = self.__class__(datalevel=self.datalevel, tf=0.0)
+			newtset = self.__class__(level=self.level, datalevel=self.datalevel, tf=0.0)
 
 			# Set testfraction to value from CV i.e. 1/n_splits
 			newtset.testfraction = tf
@@ -138,9 +153,9 @@ class TrainingSet(object):
 	@classmethod
 	def find_input_folder(cls):
 		"""
+		Find the folder containing the data for the training set.
 
 		This is a class method, so it can be called without having to initialize the training set.
-
 		"""
 		if not hasattr(cls, 'key'):
 			raise Exception("Training set class does not have 'key' definied.")
@@ -347,11 +362,13 @@ class TrainingSet(object):
 					shutil.copyfileobj(fid, tmpdir)
 				tmpdir.flush()
 
-				with TaskManager(tmpdir.name, readonly=True, overwrite=False, cleanup=False) as tm:
-					with BaseClassifier(tset_key=self.key, features_cache=self.features_cache) as stcl:
+				with TaskManager(tmpdir.name, overwrite=True, cleanup=False) as tm:
+					# NOTE: This does not propergate the 'data_dir' keyword to the BaseClassifier,
+					#       But since we are not doing anything other than loading data,
+					#       this should not cause any problems.
+					with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
 						for rowidx in self.train_idx:
 							task = tm.get_task(priority=rowidx+1, change_classifier=False)
-							if task is None: break
 
 							# Lightcurve file to load:
 							# We do not use the one from the database because in the simulations the
@@ -389,11 +406,13 @@ class TrainingSet(object):
 					shutil.copyfileobj(fid, tmpdir)
 				tmpdir.flush()
 
-				with TaskManager(tmpdir.name, readonly=True, overwrite=False, cleanup=False) as tm:
-					with BaseClassifier(tset_key=self.key, features_cache=self.features_cache) as stcl:
+				with TaskManager(tmpdir.name, overwrite=True, cleanup=False) as tm:
+					# NOTE: This does not propergate the 'data_dir' keyword to the BaseClassifier,
+					#       But since we are not doing anything other than loading data,
+					#       this should not cause any problems.
+					with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
 						for rowidx in self.test_idx:
 							task = tm.get_task(priority=rowidx+1, change_classifier=False)
-							if task is None: break
 
 							# Lightcurve file to load:
 							# We do not use the one from the database because in the simulations the
@@ -408,7 +427,7 @@ class TrainingSet(object):
 				os.remove(tmpdir.name + '-journal')
 
 	#----------------------------------------------------------------------------------------------
-	def labels(self, level='L1'):
+	def labels(self):
 		"""
 		Labels of training-set.
 
@@ -423,13 +442,13 @@ class TrainingSet(object):
 		for rowidx in self.train_idx:
 			row = self.starlist[rowidx, :]
 			labels = row[1].strip().split(';')
-			lbls = [StellarClasses[lbl.strip()] for lbl in labels]
+			lbls = [self.StellarClasses[lbl.strip()] for lbl in labels]
 			lookup.append(tuple(set(lbls)))
 
 		return tuple(lookup)
 
 	#----------------------------------------------------------------------------------------------
-	def labels_test(self, level='L1'):
+	def labels_test(self):
 		"""
 		Labels of test-set.
 
@@ -444,7 +463,7 @@ class TrainingSet(object):
 		for rowidx in self.test_idx:
 			row = self.starlist[rowidx, :]
 			labels = row[1].strip().split(';')
-			lbls = [StellarClasses[lbl.strip()] for lbl in labels]
+			lbls = [self.StellarClasses[lbl.strip()] for lbl in labels]
 			lookup.append(tuple(set(lbls)))
 
 		return tuple(lookup)

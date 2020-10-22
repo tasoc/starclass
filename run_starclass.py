@@ -58,10 +58,9 @@ def main():
 	# For now, there is only one...
 	current_classifier = args.classifier
 
-	# Path to TODO file and feature cache:
-	features_cache = os.path.join(input_folder, 'features_cache_%s' % args.datalevel)
-	if not os.path.exists(features_cache):
-		os.makedirs(features_cache)
+	# Initialize training set:
+	tsetclass = starclass.get_trainingset(args.trainingset)
+	tset = tsetclass(level=args.level)
 
 	# Running:
 	# When simply running the classifier on new stars:
@@ -69,18 +68,20 @@ def main():
 	with starclass.TaskManager(input_folder, overwrite=args.overwrite) as tm:
 		while True:
 			task = tm.get_task(classifier=current_classifier)
-			if task is None: break
+			if task is None:
+				break
 			tm.start_task(task)
 
 			if task['classifier'] != current_classifier or stcl is None:
 				current_classifier = task['classifier']
-				if stcl: stcl.close()
+				if stcl:
+					stcl.close()
 				stcl = starclass.get_classifier(current_classifier)
-				stcl = stcl(level=args.level, features_cache=features_cache, tset_key=args.trainingset)
+				stcl = stcl(tset=tset, features_cache=None)
 
 			# ----------------- This code would run on each worker ------------------------
 
-			fname = os.path.join(input_folder, task['lightcurve']) # These are the lightcurves INCLUDING SYSTEMATIC NOISE
+			fname = os.path.join(input_folder, task['lightcurve'])
 			features = stcl.load_star(task, fname)
 
 			print(features)

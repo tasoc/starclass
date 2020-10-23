@@ -10,7 +10,8 @@ import pytest
 import os.path
 from astropy.table import Table
 import conftest # noqa: F401
-from starclass import TaskManager, STATUS, StellarClasses
+from starclass import TaskManager, STATUS
+from starclass.StellarClasses import StellarClassesLevel1
 
 #--------------------------------------------------------------------------------------------------
 def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
@@ -116,9 +117,9 @@ def test_taskmanager_meta_classifier(PRIVATE_TODO_FILE):
 
 		# Create fake results from SLOSH:
 		tm.save_results({'priority': 17, 'classifier': 'slosh', 'status': STATUS.OK, 'starclass_results': {
-			StellarClasses.SOLARLIKE: 0.2,
-			StellarClasses.DSCT_BCEP: 0.1,
-			StellarClasses.ECLIPSE: 0.7
+			StellarClassesLevel1.SOLARLIKE: 0.2,
+			StellarClassesLevel1.DSCT_BCEP: 0.1,
+			StellarClassesLevel1.ECLIPSE: 0.7
 		}})
 
 		# Get the first task in the TODO file for the MetaClassifier:
@@ -133,9 +134,9 @@ def test_taskmanager_meta_classifier(PRIVATE_TODO_FILE):
 		tab = task1['other_classifiers']
 		print(tab)
 
-		assert tab[tab['class'] == StellarClasses.SOLARLIKE]['prob'] == 0.2
-		assert tab[tab['class'] == StellarClasses.DSCT_BCEP]['prob'] == 0.1
-		assert tab[tab['class'] == StellarClasses.ECLIPSE]['prob'] == 0.7
+		assert tab[tab['class'] == StellarClassesLevel1.SOLARLIKE]['prob'] == 0.2
+		assert tab[tab['class'] == StellarClassesLevel1.DSCT_BCEP]['prob'] == 0.1
+		assert tab[tab['class'] == StellarClassesLevel1.ECLIPSE]['prob'] == 0.7
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

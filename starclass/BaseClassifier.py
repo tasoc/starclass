@@ -6,8 +6,7 @@ All other specific stellar classification algorithms will inherit from BaseClass
 
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
-#import warnings
-#warnings.filterwarnings('ignore', category=DeprecationWarning, message='Using or importing the ABCs from \'collections\' instead of from \'collections.abc\' is deprecated')
+
 import numpy as np
 import os.path
 import logging
@@ -22,6 +21,7 @@ from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import savePickle, loadPickle
 from .plots import plotConfMatrix, plt
+from .StellarClasses import StellarClassesLevel1
 
 __docformat__ = 'restructuredtext'
 
@@ -105,7 +105,11 @@ class BaseClassifier(object):
 		}[self.__class__.__name__]
 
 		# Create a shortcut to to possible stellar classes:
-		self.StellarClasses = tset.StellarClasses
+		if tset is None:
+			logger.warning("BaseClassifier initialized without TrainingSet")
+			self.StellarClasses = StellarClassesLevel1
+		else:
+			self.StellarClasses = tset.StellarClasses
 
 		# Just for catching all those places random numbers are used without explicitly requesting
 		# a random_state:

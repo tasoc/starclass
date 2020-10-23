@@ -14,6 +14,8 @@ import zipfile
 import shutil
 import logging
 import tempfile
+import sqlite3
+from contextlib import closing
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from .. import BaseClassifier, TaskManager, utilities
@@ -80,11 +82,14 @@ class TrainingSet(object):
 
 		# Generate training/test indices
 		# Define here because it is needed by self.labels() used below
-		self.train_idx = np.arange(self.nobjects, dtype=int)
+		if hasattr(self, '_valid_indicies'):
+			self.train_idx = self._valid_indicies
+		else:
+			self.train_idx = np.arange(self.nobjects, dtype=int)
 		self.test_idx = np.array([], dtype=int)
 		if self.testfraction > 0:
 			self.train_idx, self.test_idx = train_test_split(
-				np.arange(self.nobjects, dtype=int),
+				self.train_idx,
 				test_size=self.testfraction,
 				random_state=self.random_seed,
 				stratify=self.labels()
@@ -233,10 +238,70 @@ class TrainingSet(object):
 
 	#----------------------------------------------------------------------------------------------
 	def generate_todolist(self):
-		raise NotImplementedError()
+		"""
+		Generate todo.sqlite file in training set directory.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		logger = logging.getLogger(__name__)
+
+		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
+		with closing(sqlite3.connect(sqlite_file)) as conn:
+			conn.row_factory = sqlite3.Row
+			cursor = conn.cursor()
+
+			# Create the basic file structure of a TODO-list:
+			self.generate_todolist_structure(conn)
+
+			logger.info("Step 3: Reading file and extracting information...")
+			pri = 0
+
+			diagnostics = np.genfromtxt(os.path.join(self.input_folder, 'diagnostics.txt'),
+				delimiter=',', comments='#', dtype=None, encoding='utf-8')
+
+			for k, star in tqdm(enumerate(self.starlist), total=len(self.starlist)):
+				# Get starid:
+				starname = star[0]
+				starclass = star[1]
+				if starname.startswith('constant_'):
+					starid = -10000 - int(starname[9:])
+				elif starname.startswith('fakerrlyr_'):
+					starid = -20000 - int(starname[10:])
+				else:
+					starid = int(starname)
+					starname = '{0:09d}'.format(starid)
+
+				# Path to lightcurve:
+				lightcurve = starclass + '/' + starname + '.txt'
+
+				# Load diagnostics from file, to speed up the process:
+				variance, rms_hour, ptp = diagnostics[k]
+
+				pri += 1
+				self.generate_todolist_insert(cursor,
+					priority=pri,
+					starid=starid,
+					lightcurve=lightcurve,
+					datasource='ffi',
+					variance=variance,
+					rms_hour=rms_hour,
+					ptp=ptp)
+
+			conn.commit()
+			cursor.close()
+
+		logger.info("%s training set successfully built.", self.key)
 
 	#----------------------------------------------------------------------------------------------
 	def generate_todolist_structure(self, conn):
+		"""
+		Generate overall database structure for todo.sqlite.
+
+		Parameters:
+			conn (sqlite3.connection): Connection to SQLite file.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 
 		cursor = conn.cursor()
 		cursor.execute("PRAGMA foreign_keys=ON;")
@@ -280,18 +345,36 @@ class TrainingSet(object):
 		conn.commit()
 
 	#----------------------------------------------------------------------------------------------
-	def generate_todolist_insert(self, cursor, priority=None, starid=None, tmag=None,
-		lightcurve=None, datasource=None, variance=None, rms_hour=None, ptp=None):
+	def generate_todolist_insert(self, cursor, priority=None, lightcurve=None, starid=None,
+		tmag=None, datasource=None, variance=None, rms_hour=None, ptp=None):
+		"""
+		Insert an entry in the todo.sqlite file.
+
+		Parameters:
+			cursor (sqlite3.Cursor): Cursor in SQLite file.
+			priority (int):
+			lightcurve (str):
+			starid (int, optional):
+			tmag (float, optional): TESS Magnitude.
+			datasource (str, optional): 
+			variance (float, optional):
+			rms_hour (float, optional):
+			ptp (float, optional):
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 
 		if priority is None:
-			raise ValueError("priority is required")
+			raise ValueError("PRIORITY is required.")
+		if lightcurve is None:
+			raise ValueError("LIGHTCURVE is required.")
 		if starid is None:
 			starid = priority
 
 		# Try to load the lightcurve using the BaseClassifier method.
 		# This will ensure that the lightcurve can actually be read by the system.
 		if not all([datasource, variance, rms_hour, ptp]):
-			with BaseClassifier(tset_key=self.key, features_cache=None) as bc:
+			with BaseClassifier(tset=self, features_cache=None) as bc:
 				fake_task = {
 					'priority': priority,
 					'starid': starid

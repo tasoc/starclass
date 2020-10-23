@@ -10,12 +10,9 @@ import numpy as np
 import sqlite3
 from contextlib import closing
 import logging
-#from bottleneck import nanmedian, nanvar
-#from lightkurve import LightCurve
 from tqdm import tqdm
 from ..StellarClasses import StellarClassesLevel1, StellarClassesLevel2
 from . import TrainingSet
-#from ..utilities import rms_timescale
 
 #--------------------------------------------------------------------------------------------------
 def _generate_todolist(self):
@@ -57,30 +54,6 @@ def _generate_todolist(self):
 
 			# Load diagnostics from file, to speed up the process:
 			variance, rms_hour, ptp = diagnostics[k]
-
-			#data = np.loadtxt(os.path.join(self.input_folder, lightcurve))
-			#sector = np.floor(data_sysnoise[:,0] / 27.4) + 1
-			#sectors = [int(s) for s in np.unique(sector)]
-			#if data[-1,0] - data[0,0] > 27.4:
-			#	raise Exception("Okay, didn't we agree that this should be only one sector?!")
-
-			#data[:,0] -= data[0,0]
-			#m = nanmedian(data[:,1])
-			#data[:,1] = 1e6*(data[:,1]/m - 1)
-			#data[:,2] = 1e6*data[:,2]/m
-
-			# Calculate diagnostics:
-			#lc = LightCurve(time=data[:,0], flux=data[:,1], flux_err=data[:,2])
-			#variance = nanvar(data[:,1], ddof=1)
-			#rms_hour = rms_timescale(lc, timescale=3600/86400)
-			#ptp = nanmedian(np.abs(np.diff(data[:,1])))
-
-			# Add target to TODO-list:
-			#diag.write("{variance:.16e},{rms_hour:.16e},{ptp:.16e}\n".format(
-			#	variance=variance,
-			#	rms_hour=rms_hour,
-			#	ptp=ptp
-			#))
 
 			pri += 1
 			self.generate_todolist_insert(cursor,

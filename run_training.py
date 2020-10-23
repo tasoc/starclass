@@ -60,20 +60,17 @@ def main():
 		# TODO: Run in parallel?
 		with starclass.TaskManager(tset.input_folder, overwrite=args.overwrite) as tm:
 			for cla_key in tm.all_classifiers:
-				if tm.get_task(classifier=cla_key) is not None:
-					# Split the tset object into cross-validation folds.
-					# These are objects with exactly the same properties as the original one,
-					# except that they will run through different subsets of the training and test sets:
-					cla = starclass.get_classifier(cla_key)
-					for tset_fold in tset.folds(tf=0.2):
-						print(tset_fold)
-						data_dir = tset.key + '/meta_fold{0:02d}'.format(tset_fold.fold)
-						print(data_dir)
-						with cla(tset=tset, features_cache=tset.features_cache, data_dir=data_dir) as stcl:
-							logger.info('Training %s on Fold %d/%d...', stcl.classifier_key, tset_fold.fold, tset_fold.crossval_folds)
-							stcl.train(tset_fold)
-							logger.info("Classifying test-set...")
-							stcl.test(tset_fold, save=True, save_func=tm.save_results)
+				# Split the tset object into cross-validation folds.
+				# These are objects with exactly the same properties as the original one,
+				# except that they will run through different subsets of the training and test sets:
+				cla = starclass.get_classifier(cla_key)
+				for tset_fold in tset.folds(tf=0.2):
+					data_dir = tset.key + '/meta_fold{0:02d}'.format(tset_fold.fold)
+					with cla(tset=tset, features_cache=tset.features_cache, data_dir=data_dir) as stcl:
+						logger.info('Training %s on Fold %d/%d...', stcl.classifier_key, tset_fold.fold, tset_fold.crossval_folds)
+						stcl.train(tset_fold)
+						logger.info("Classifying test-set...")
+						stcl.test(tset_fold, save=True, save_func=tm.save_results)
 
 	# Initialize the classifier:
 	classifier = starclass.get_classifier(current_classifier)

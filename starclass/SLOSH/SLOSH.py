@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 The SLOSH method for detecting solar-like oscillations (2D deep learning methods).
@@ -10,6 +10,7 @@ The SLOSH method for detecting solar-like oscillations (2D deep learning methods
 import numpy as np
 import os
 import logging
+from tqdm import tqdm
 import tensorflow
 from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
 from sklearn.metrics import classification_report
@@ -40,6 +41,7 @@ class SLOSHClassifier(BaseClassifier):
 		self.classifier_list = []
 		#self.classifier = None
 		self.mc_iterations = mc_iterations
+		self.num_labels = len(self.StellarClasses)
 
 		# Set the global random seeds:
 		np.random.seed(self.random_seed)
@@ -83,14 +85,15 @@ class SLOSHClassifier(BaseClassifier):
 
 		logger.debug('Generating Image...')
 		img_array = preprocessing.generate_single_image(psd[0], psd[1])
-		logger.debug('Making Predictions...')
-		pred_array = np.zeros((self.mc_iterations, 8))
 
+		logger.debug('Making Predictions...')
+		pred_array = np.zeros((self.mc_iterations, self.num_labels))
 		for i in range(self.mc_iterations):
-			pred_array[i,:] = self.classifier_list[0].predict(img_array.reshape(1, 128, 128, 1))
+			pred_array[i, :] = self.classifier_list[0].predict(img_array.reshape(1, 128, 128, 1))
 		pred = np.mean(pred_array, axis=0)
 
-		#
+		# Convert the integer labels used by SLOSH to StellarClasses again
+		# and put it all together in the result dict:
 		result = {}
 		for k, stcl in enumerate(self.StellarClasses):
 			result[stcl] = pred[k]
@@ -120,25 +123,29 @@ class SLOSHClassifier(BaseClassifier):
 		if self.predictable:
 			return
 
+		# Settings for progress bar used below:
+		tqdm_settings = {
+			'disable': not logger.isEnabledFor(logging.INFO)
+		}
+
+		# Convert classification labels to integers:
+		intlookup = {key.value: value for value, key in enumerate(self.StellarClasses)}
+		intlabels = [intlookup[lbl] for lbl in self.parse_labels(tset.labels())]
+
+		logger.info('Generating Train Images...')
 		train_folder = os.path.join(self.features_cache, 'SLOSH_Train_Images')
-		if not os.path.exists(train_folder):
-			os.makedirs(train_folder)
-			logger.info('Generating Train Images...')
+		os.makedirs(train_folder, exist_ok=True)
 
-			intlabels = {key:value for value, key in enumerate(self.StellarClasses)}
-
-			for feat, lbl in zip(tset.features(), tset.labels()):
+		# Go through the training-set and ensure that all images are created:
+		filenames = []
+		for feat in tqdm(tset.features(), total=len(tset.train_idx), **tqdm_settings):
+			fpath = os.path.join(train_folder, str(feat['priority']) + '.npz')
+			filenames.append(fpath)
+			if not os.path.exists(fpath):
 				# Power density spectrum from pre-calculated features:
 				psd = feat['powerspectrum'].standard
-
-				# Convert classifications to integer labels:
-				# TODO: Don't save things into sub-directories
-				label = intlabels[lbl[0]]
-
-				preprocessing.generate_train_images(psd[0], psd[1],
-					feat['priority'], output_path=train_folder, label=label)
-		else:
-			logger.info('Train Images exist...')
+				# Generate and save image to file:
+				preprocessing.generate_train_images(psd[0], psd[1], fpath)
 
 		# Find the level of verbosity to add to tensorflow calls:
 		if logger.isEnabledFor(logging.DEBUG):
@@ -148,24 +155,25 @@ class SLOSHClassifier(BaseClassifier):
 		else:
 			verbose = 0
 
+		train_generator = preprocessing.npy_generator(filenames, intlabels,
+			subset='train', random_seed=self.random_seed)
+		valid_generator = preprocessing.npy_generator(filenames, intlabels,
+			subset='valid', random_seed=self.random_seed)
+
 		reduce_lr = ReduceLROnPlateau(factor=0.5, patience=5, verbose=verbose)
 		early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 		checkpoint = ModelCheckpoint(self.model_file, monitor='val_loss', verbose=verbose, save_best_only=True)
+		#class_accuracy = TestCallback(valid_generator)
 
-		#model = None
 		model = preprocessing.default_classifier_model()
 
-		train_generator = preprocessing.npy_generator(root=train_folder, batch_size=32,
-			dim=(128,128), extension='.npz', subset='train', random_seed=self.random_seed)
-		valid_generator = preprocessing.npy_generator(root=train_folder, batch_size=32,
-			dim=(128,128), extension='.npz', subset='valid', random_seed=self.random_seed)
-
-		#class_accuracy = TestCallback(valid_generator)
 		logger.info('Training Classifier...')
 		epochs = 50
-		model.fit_generator(train_generator, epochs=epochs, steps_per_epoch=len(train_generator),
+		model.fit(train_generator, epochs=epochs, steps_per_epoch=len(train_generator),
 			validation_data=valid_generator, validation_steps=len(valid_generator),
 			callbacks=[reduce_lr, early_stop, checkpoint], verbose=verbose)
+
+		# Save the model to file:
 		self.save_model(model, self.model_file)
 
 	#----------------------------------------------------------------------------------------------

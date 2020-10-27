@@ -221,9 +221,9 @@ class TrainingSet(object):
 
 				# Extract ZIP file:
 				logger.info("Step 2: Unpacking %s training set...", self.key)
-				with zipfile.ZipFile(zip_tmp, 'r') as zip:
-					for fileName in tqdm(zip.namelist(), disable=not logger.isEnabledFor(logging.INFO)):
-						zip.extract(fileName, input_folder)
+				with zipfile.ZipFile(zip_tmp, 'r') as myzip:
+					for fileName in tqdm(myzip.namelist(), disable=not logger.isEnabledFor(logging.INFO)):
+						myzip.extract(fileName, input_folder)
 
 			except: # noqa: E722, pragma: no cover
 				if os.path.exists(input_folder):
@@ -356,7 +356,7 @@ class TrainingSet(object):
 			lightcurve (str):
 			starid (int, optional):
 			tmag (float, optional): TESS Magnitude.
-			datasource (str, optional): 
+			datasource (str, optional):
 			variance (float, optional):
 			rms_hour (float, optional):
 			ptp (float, optional):

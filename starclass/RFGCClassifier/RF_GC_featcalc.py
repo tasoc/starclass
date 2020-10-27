@@ -21,7 +21,7 @@ def featcalc(features, som, providednfreqs=6, nfrequencies=6, cardinality=64,
 	Calculates features for set of lightcurves
 	"""
 
-	featout = np.zeros([1,nfrequencies+16], dtype='float32')
+	featout = np.zeros([1, nfrequencies+16], dtype='float32')
 	if isinstance(features, dict): # trick for single features
 		features = [features]
 

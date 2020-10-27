@@ -204,14 +204,13 @@ class BaseClassifier(object):
 		raise NotImplementedError()
 
 	#----------------------------------------------------------------------------------------------
-	def test(self, tset, save=False, save_func=None):
+	def test(self, tset, save=None):
 		"""
 		Test classifier using training-set, which has been created with a test-fraction.
 
 		Parameters:
 			tset (:class:`TrainingSet`): Training-set to run testing on.
-			save (bool, optional): Save results of test-predictions?
-			save_func (callable, optional): Function to call for saving test-predictions.
+			save (callable, optional): Function to call for saving test-predictions.
 		"""
 
 		# Start logger:
@@ -244,14 +243,14 @@ class BaseClassifier(object):
 			y_pred.append(prediction)
 
 			# Save results for this classifier/trainingset in database:
-			if save:
+			if save is not None:
 				logger.debug(res)
-				save_func(res)
+				save(res)
 
 		# Convert labels to ndarray:
 		# FIXME: Only comparing to the first label
 		y_pred = np.array(y_pred)
-		labels_test = np.array([lbl[0].value for lbl in tset.labels_test()])
+		labels_test = self.parse_labels(tset.labels_test())
 
 		# Compare to known labels:
 		acc = accuracy_score(labels_test, y_pred)

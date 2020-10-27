@@ -70,7 +70,7 @@ def main():
 						logger.info('Training %s on Fold %d/%d...', stcl.classifier_key, tset_fold.fold, tset_fold.crossval_folds)
 						stcl.train(tset_fold)
 						logger.info("Classifying test-set...")
-						stcl.test(tset_fold, save=True, save_func=tm.save_results)
+						stcl.test(tset_fold, save=tm.save_results)
 
 	# Initialize the classifier:
 	classifier = starclass.get_classifier(current_classifier)
@@ -81,7 +81,7 @@ def main():
 			stcl.train(tset)
 			logger.info("Training done...")
 			logger.info("Classifying test-set using %s...", current_classifier)
-			stcl.test(tset, save=True, save_func=tm.save_results)
+			stcl.test(tset, save=tm.save_results)
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

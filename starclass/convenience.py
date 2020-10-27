@@ -51,6 +51,8 @@ def get_trainingset(tset_key):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 	TsetClass = {
+		'keplerq9v3': tsets.keplerq9v3,
+		'keplerq9v3-instr': tsets.keplerq9v3_instr,
 		'keplerq9v2': tsets.keplerq9v2,
 		'keplerq9': tsets.keplerq9,
 		'keplerq9-linfit': tsets.keplerq9linfit,
@@ -66,15 +68,18 @@ def get_trainingset(tset_key):
 
 #--------------------------------------------------------------------------------------------------
 def trainingset_available(tset_key):
+	"""
+	Check if a training set is available, meaning that it has been downloaded and set up.
 
-	# Point this to the directory where the training sets are stored
-	INPUT_DIR = os.environ.get('STARCLASS_TSETS')
-	if INPUT_DIR is None:
-		INPUT_DIR = os.path.join(os.path.dirname(__file__), 'training_sets', 'data')
-	elif not os.path.isdir(INPUT_DIR):
-		raise IOError("The environment variable STARCLASS_TSETS is set, but points to a non-existent directory.")
+	Parameters:
+		tset_key (str): Training set keyword. Choices can be found in :func:`trainingset_list`.
 
+	Returns:
+		bool: True if the trainingset is available.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
 	# Use the other function to ensure that tset_key is correct:
-	get_trainingset(tset_key)
-
-	return os.path.isfile(os.path.join(INPUT_DIR, tset_key, 'todo.sqlite'))
+	tset = get_trainingset(tset_key)
+	# Check if the todo.sqlite file has been created:
+	return os.path.isfile(os.path.join(tset.find_input_folder(), 'todo.sqlite'))

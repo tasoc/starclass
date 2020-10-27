@@ -24,9 +24,6 @@ def test_baseclassifier_import():
 def test_baseclassifier_import_exceptions(SHARED_INPUT_DIR):
 
 	with pytest.raises(ValueError):
-		BaseClassifier(level='nonsense')
-
-	with pytest.raises(ValueError):
 		BaseClassifier(features_cache=os.path.join(SHARED_INPUT_DIR, 'does-not-exist'))
 
 #--------------------------------------------------------------------------------------------------
@@ -101,6 +98,6 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR):
 				assert lc.ccd == 4
 				assert lc.sector == 1
 
-#----------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	pytest.main([__file__])

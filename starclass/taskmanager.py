@@ -11,23 +11,26 @@ import os
 import sqlite3
 import logging
 from astropy.table import Table
-from . import STATUS, StellarClasses
+from . import STATUS
 from .constants import classifier_list
 
+#--------------------------------------------------------------------------------------------------
 class TaskManager(object):
 	"""
 	A TaskManager which keeps track of which targets to process.
 	"""
 
-	def __init__(self, todo_file, cleanup=False, readonly=False, overwrite=False):
+	def __init__(self, todo_file, cleanup=False, readonly=False, overwrite=False, classes=None):
 		"""
 		Initialize the TaskManager which keeps track of which targets to process.
 
 		Parameters:
-			todo_file (string): Path to the TODO-file.
-			cleanup (boolean): Perform cleanup/optimization of TODO-file before
+			todo_file (str): Path to the TODO-file.
+			cleanup (bool): Perform cleanup/optimization of TODO-file before
 				doing initialization. Default=False.
-			overwrite (boolean): Overwrite any previously calculated results. Default=False.
+			overwrite (bool): Overwrite any previously calculated results. Default=False.
+			classes (Enum): Possible stellar classes. This is only used for for translating
+				saved stellar classes in the ``other_classifiers`` table into proper enums.
 
 		Raises:
 			FileNotFoundError: If TODO-file could not be found.
@@ -39,6 +42,7 @@ class TaskManager(object):
 		if not os.path.exists(todo_file):
 			raise FileNotFoundError('Could not find TODO-file')
 
+		self.StellarClasses = classes
 		self.readonly = readonly
 
 		# Keep a list of all the possible classifiers here:
@@ -228,9 +232,10 @@ class TaskManager(object):
 				self.cursor.execute("SELECT starclass_results.classifier,class,prob FROM starclass_results INNER JOIN starclass_diagnostics ON starclass_results.priority=starclass_diagnostics.priority AND starclass_results.classifier=starclass_diagnostics.classifier WHERE starclass_results.priority=? AND status=? AND starclass_results.classifier != 'meta' ORDER BY starclass_results.classifier, class;", (task['priority'], STATUS.OK.value))
 
 				# Add as a Table to the task list:
+				# TODO: Level 1 classes hardcoded!
 				rows = []
 				for r in self.cursor.fetchall():
-					rows.append([r['classifier'], StellarClasses[r['class']], r['prob']])
+					rows.append([r['classifier'], self.StellarClasses[r['class']], r['prob']])
 				if not rows: rows = None
 				task['other_classifiers'] = Table(
 					rows=rows,

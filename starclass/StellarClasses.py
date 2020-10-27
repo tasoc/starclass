@@ -11,7 +11,7 @@ import enum
 __docformat__ = 'restructuredtext'
 
 #--------------------------------------------------------------------------------------------------
-class StellarClasses(enum.Enum):
+class StellarClassesLevel1(enum.Enum):
 	"""
 	Enum of all the possible Level-1 stellar classes.
 
@@ -29,6 +29,28 @@ class StellarClasses(enum.Enum):
 	APERIODIC = 'aperiodic'
 	CONSTANT = 'constant'
 	#RAPID = 'rapid'
+
+#--------------------------------------------------------------------------------------------------
+class StellarClassesLevel1Instr(enum.Enum):
+	"""
+	Enum of all the possible Level-1 stellar classes, including
+	additional instrumental class.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
+
+	# General classes (Level 1) with additional instrumental class
+	SOLARLIKE = 'solar'
+	ECLIPSE = 'transit/eclipse'
+	RRLYR_CEPHEID = 'RRLyr/Ceph'
+	DSCT_BCEP = 'dSct/bCep'
+	GDOR_SPB = 'gDor/spB'
+	#TRANSIENT = 'transient'
+	CONTACT_ROT = 'contactEB/spots'
+	APERIODIC = 'aperiodic'
+	CONSTANT = 'constant'
+	#RAPID = 'rapid'
+	INSTRUMENT = 'instrumental'
 
 #--------------------------------------------------------------------------------------------------
 class StellarClassesLevel2(enum.Enum):

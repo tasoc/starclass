@@ -18,6 +18,7 @@ def main():
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Utility function for running stellar classifiers.')
 	parser.add_argument('-c', '--classifier', help='Classifier to use.', default='rfgc', choices=starclass.classifier_list)
+	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9v3', choices=starclass.trainingset_list)
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
@@ -57,29 +58,30 @@ def main():
 	# For now, there is only one...
 	current_classifier = args.classifier
 
-	# Path to TODO file and feature cache:
-	features_cache = os.path.join(input_folder, 'features_cache_%s' % args.datalevel)
-	if not os.path.exists(features_cache):
-		os.makedirs(features_cache)
+	# Initialize training set:
+	tsetclass = starclass.get_trainingset(args.trainingset)
+	tset = tsetclass(level=args.level)
 
 	# Running:
 	# When simply running the classifier on new stars:
 	stcl = None
-	with starclass.TaskManager(input_folder, overwrite=args.overwrite) as tm:
+	with starclass.TaskManager(input_folder, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 		while True:
 			task = tm.get_task(classifier=current_classifier)
-			if task is None: break
+			if task is None:
+				break
 			tm.start_task(task)
 
 			if task['classifier'] != current_classifier or stcl is None:
 				current_classifier = task['classifier']
-				if stcl: stcl.close()
+				if stcl:
+					stcl.close()
 				stcl = starclass.get_classifier(current_classifier)
-				stcl = stcl(level=args.level, features_cache=features_cache, tset_key='keplerq9v2')
+				stcl = stcl(tset=tset, features_cache=None)
 
 			# ----------------- This code would run on each worker ------------------------
 
-			fname = os.path.join(input_folder, task['lightcurve']) # These are the lightcurves INCLUDING SYSTEMATIC NOISE
+			fname = os.path.join(input_folder, task['lightcurve'])
 			features = stcl.load_star(task, fname)
 
 			print(features)

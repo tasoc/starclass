@@ -6,8 +6,7 @@ All other specific stellar classification algorithms will inherit from BaseClass
 
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
-#import warnings
-#warnings.filterwarnings('ignore', category=DeprecationWarning, message='Using or importing the ABCs from \'collections\' instead of from \'collections.abc\' is deprecated')
+
 import numpy as np
 import os.path
 import logging
@@ -17,12 +16,12 @@ from astropy.io import fits
 from tqdm import tqdm
 import enum
 from sklearn.metrics import accuracy_score, confusion_matrix
-from .StellarClasses import StellarClasses, StellarClassesLevel2
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import savePickle, loadPickle
 from .plots import plotConfMatrix, plt
+from .StellarClasses import StellarClassesLevel1
 
 __docformat__ = 'restructuredtext'
 
@@ -58,39 +57,37 @@ class BaseClassifier(object):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	def __init__(self, tset_key=None, features_cache=None, level='L1', plot=False):
+	def __init__(self, tset=None, features_cache=None, plot=False, data_dir=None):
 		"""
 		Initialize the classifier object.
 
 		Parameters:
-			tset_key (str): From which training-set should the classifier be loaded?
+			tset (:class:`TrainingSet`): From which training-set should the classifier be loaded?
 			level (str, optional): Classification-level to load. Choices are ``'L1'`` and ``'L2'``.
 				Default is ``'L1'``.
 			features_cache (str, optional): Path to director where calculated features will be
 				saved/loaded as needed.
 			plot (bool, optional): Create plots as part of the output. Default is ``False``.
+			data_dir (str):
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-
-		# Check the input:
-		if level not in ('L1', 'L2'):
-			raise ValueError("Invalid level")
 
 		# Start logger:
 		logger = logging.getLogger(__name__)
 
 		# Store the input:
-		self.tset_key = tset_key
+		self.tset = tset
 		self.plot = plot
-		self.level = level
 		self.features_cache = features_cache
 		self._random_seed = 2187
 
-		if tset_key is not None:
-			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level, tset_key))
+		if tset is not None:
+			if data_dir is None:
+				data_dir = tset.key
+			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', tset.level, data_dir))
 		else:
-			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', level))
+			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
 
 		logger.debug("Data Directory: %s", self.data_dir)
 		os.makedirs(self.data_dir, exist_ok=True)
@@ -107,12 +104,12 @@ class BaseClassifier(object):
 			'MetaClassifier': 'meta'
 		}[self.__class__.__name__]
 
-		# Assign StellarClasses Enum depending on
-		# the classification level we are running:
-		self.StellarClasses = {
-			'L1': StellarClasses,
-			'L2': StellarClassesLevel2
-		}[level]
+		# Create a shortcut to to possible stellar classes:
+		if tset is None:
+			logger.warning("BaseClassifier initialized without TrainingSet")
+			self.StellarClasses = StellarClassesLevel1
+		else:
+			self.StellarClasses = tset.StellarClasses
 
 		# Just for catching all those places random numbers are used without explicitly requesting
 		# a random_state:
@@ -254,7 +251,7 @@ class BaseClassifier(object):
 		# Convert labels to ndarray:
 		# FIXME: Only comparing to the first label
 		y_pred = np.array(y_pred)
-		labels_test = np.array([lbl[0].value for lbl in tset.labels_test(level=self.level)])
+		labels_test = np.array([lbl[0].value for lbl in tset.labels_test()])
 
 		# Compare to known labels:
 		acc = accuracy_score(labels_test, y_pred)
@@ -266,8 +263,8 @@ class BaseClassifier(object):
 		# Create plot of confusion matrix:
 		fig = plt.figure(figsize=(12,12))
 		plotConfMatrix(cf, all_classes)
-		plt.title(self.classifier_key + ' - ' + tset.key + ' - ' + self.level)
-		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + self.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
+		plt.title(self.classifier_key + ' - ' + tset.key + ' - ' + tset.level)
+		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 
 	#----------------------------------------------------------------------------------------------

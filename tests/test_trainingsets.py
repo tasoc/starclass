@@ -10,13 +10,16 @@ import pytest
 import os
 import shutil
 import tempfile
+import types
 import conftest # noqa: F401
 import starclass.training_sets as tsets
 from starclass import trainingset_available, get_trainingset
 
 AVAILABLE_TSETS = [
-	'keplerq9v2',
-	'keplerq9',
+	'keplerq9v3',
+	'keplerq9v3-instr',
+	pytest.param('keplerq9v2', marks=pytest.mark.skipif(not trainingset_available('keplerq9v2'), reason='TrainingSet not available')),
+	pytest.param('keplerq9', marks=pytest.mark.skipif(not trainingset_available('keplerq9'), reason='TrainingSet not available')),
 	pytest.param('keplerq9-linfit', marks=pytest.mark.skipif(not trainingset_available('keplerq9-linfit'), reason='TrainingSet not available')),
 	pytest.param('tdasim', marks=pytest.mark.skip),
 	pytest.param('tdasim-raw', marks=pytest.mark.skip),
@@ -35,8 +38,13 @@ def test_trainingset(tsetkey):
 		print(tset)
 
 		assert tset.key == tsetkey
+		assert tset.level == 'L1'
 		assert tset.datalevel == 'corr'
 		assert tset.testfraction == testfraction
+
+	# Invalid level should give ValueError:
+	with pytest.raises(ValueError):
+		tsetclass(level='nonsense')
 
 	# Test-fractions which should all return in a ValueError:
 	with pytest.raises(ValueError):
@@ -48,7 +56,7 @@ def test_trainingset(tsetkey):
 
 	# Calling with invalid datalevel should throw an error as well:
 	with pytest.raises(ValueError):
-		tset = tsets.keplerq9linfit(datalevel='nonsense')
+		tset = tsetclass(datalevel='nonsense')
 
 	tset = tsetclass(tf=0)
 	print(tset)
@@ -75,16 +83,15 @@ def test_trainingset_generate_todolist(monkeypatch, tsetkey):
 
 	# Get training set class using conv. function:
 	tsetclass = get_trainingset(tsetkey)
+	tset = tsetclass()
+	input_folder = tset.input_folder
+	print("Training Set input folder: %s" % input_folder)
 
 	with tempfile.TemporaryDirectory(prefix='pytest-private-tsets-') as tmpdir:
-
-		tset = tsetclass()
-		input_folder = tset.input_folder
-		print(input_folder)
-
 		# Create a copy of the root fies of the trainings set (ignore that actual data)
 		# in the temp. directory:
-		tsetdir = os.path.join(tmpdir, tsetkey)
+		tsetdir = os.path.join(tmpdir, os.path.basename(input_folder))
+		print("New dummy input folder: %s" % tsetdir)
 		os.makedirs(tsetdir)
 		for f in os.listdir(input_folder):
 			fpath = os.path.join(input_folder, f)
@@ -104,6 +111,35 @@ def test_trainingset_generate_todolist(monkeypatch, tsetkey):
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
+def test_trainingset_features(tsetkey):
+
+	# Get training set class using conv. function:
+	tsetclass = get_trainingset(tsetkey)
+	tset = tsetclass(tf=0.2)
+
+	features = tset.features()
+	assert isinstance(features, types.GeneratorType)
+
+	features_test = tset.features_test()
+	assert isinstance(features_test, types.GeneratorType)
+
+	for tries in range(2):
+		feat = next(features)
+		print(feat)
+		assert isinstance(feat, dict)
+		assert 'lightcurve' in feat
+		assert 'powerspectrum' in feat
+		assert 'frequencies' in feat
+
+		feat = next(features_test)
+		print(feat)
+		assert isinstance(feat, dict)
+		assert 'lightcurve' in feat
+		assert 'powerspectrum' in feat
+		assert 'frequencies' in feat
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
 def test_trainingset_folds(tsetkey):
 
 	# Get training set class using conv. function:
@@ -115,6 +151,7 @@ def test_trainingset_folds(tsetkey):
 		assert fold.crossval_folds == 5
 		assert fold.fold == k + 1
 		assert fold.testfraction == 0.2
+		assert fold.level == tset.level
 		assert len(fold.train_idx) > 0
 		assert len(fold.test_idx) > 0
 		assert len(fold.train_idx) > len(fold.test_idx)

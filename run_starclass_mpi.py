@@ -37,6 +37,7 @@ def main():
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='Run TESS Corrections in parallel using MPI.')
 	parser.add_argument('-c', '--classifier', help='Classifier to use.', default=None, choices=starclass.classifier_list)
+	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9v3', choices=starclass.trainingset_list)
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
@@ -52,10 +53,9 @@ def main():
 	if not input_folder:
 		parser.error("Please specify an INPUT_FOLDER.")
 
-	# Setup the location of the features cache:
-	#features_cache = os.path.join(input_folder, 'features_cache_%s' % args.datalevel)
-	#if not os.path.exists(features_cache):
-	#	os.makedirs(features_cache)
+	# Initialize the training set:
+	tsetclass = starclass.get_trainingset(args.trainingset)
+	tset = tsetclass(level=args.level)
 
 	# Define MPI message tags
 	tags = enum.IntEnum('tags', ('READY', 'DONE', 'EXIT', 'START'))
@@ -68,7 +68,7 @@ def main():
 
 	if rank == 0:
 		try:
-			with starclass.TaskManager(input_folder, cleanup=True, overwrite=args.overwrite) as tm:
+			with starclass.TaskManager(input_folder, cleanup=True, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 				# Get list of tasks:
 				#numtasks = tm.get_number_tasks()
 				#tm.logger.info("%d tasks to be run", numtasks)
@@ -160,9 +160,10 @@ def main():
 					try:
 						if task['classifier'] != current_classifier or stcl is None:
 							current_classifier = task['classifier']
-							if stcl: stcl.close()
+							if stcl:
+								stcl.close()
 							stcl = starclass.get_classifier(current_classifier)
-							stcl = stcl(level=args.level, features_cache=None, tset_key='keplerq9v2')
+							stcl = stcl(tset=tset, features_cache=None)
 
 						fname = os.path.join(input_folder, task['lightcurve'])
 						features = stcl.load_star(task, fname)

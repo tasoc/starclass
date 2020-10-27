@@ -12,6 +12,7 @@ Training Sets
 .. toctree::
 
 	starclass.training_sets.TrainingSet
+	starclass.training_sets.keplerq9v3
 	starclass.training_sets.keplerq9v2
 	starclass.training_sets.keplerq9
 	starclass.training_sets.tdasim

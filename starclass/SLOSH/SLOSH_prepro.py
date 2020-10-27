@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Utilities for SLOSH (2D deep learning methods).
@@ -6,7 +6,6 @@ Utilities for SLOSH (2D deep learning methods).
 .. codeauthor:: Marc Hon <mtyh555@uowmail.edu.au>
 """
 
-import os
 import numpy as np
 import tensorflow
 from tensorflow.keras.layers import Dropout, MaxPool2D, Flatten, Conv2D, LeakyReLU, Dense
@@ -26,36 +25,43 @@ class npy_generator(tensorflow.keras.utils.Sequence):
 
 	.. codeauthor:: Marc Hon <mtyh555@uowmail.edu.au>
 	"""
-	def __init__(self, root, batch_size, dim, extension='.npz', shuffle=True, indices=[],
-			subset=None, random_seed=42):
-		self.root = root # root folder containing subfolders
+	def __init__(self, filenames, labels, batch_size=32, dim=(128,128), shuffle=True, subset=None,
+		random_seed=42):
+		"""
+		Initialize generator.
+
+		Parameters:
+			filenames (list): List of file paths to the NPZ files containing the images created
+				using :func:`generate_train_images`.
+			labels (list): List of integer labels corresponding to the images in ``filenames``.
+			batch_size (int, optional): Batch size.
+			dim (tuple, optional): Image/2D array dimensions.
+			shuffle (bool, optional): Shuffle data after every epoch?
+			subset (str, optional):
+			random_seed (int, optional): Random seed for splitting and shuffeling.
+		"""
 		self.batch_size = batch_size
-		self.extension = extension # file extension
-		self.filenames = []
-		self.subfolder_labels = [] # for binary classification
+		self.filenames = filenames
+		self.labels = labels # for binary classification
 		self.shuffle = shuffle # shuffles data after every epoch
 		self.dim = dim # image/2D array dimensions
-		self.subset = subset # Training subset, validation subset or none
 		self.seed = random_seed # Add random seed to ensure split for validation and training set is the same
 
-		for dirpath, dirnames, filenames in os.walk(root):
-			for file in filenames:
-				if file.endswith(extension) and dirpath[-1].isdigit(): # I infer the class label '0' or '1' according to subfolder names
-					self.filenames.append(os.path.join(dirpath, file))
-					self.subfolder_labels.append(int(dirpath[-1]))
-		# Get labels from filenames
-		labels = np.array([i.split(os.path.sep)[-2] for i in self.filenames])
-		if len(indices) == 0: # otherwise pass a list of training/validation indices
-			self.indexes = np.arange(len(self.filenames))
-		else:
-			self.indexes = np.array(indices)
+		# Number of unique labels:
+		self.num_classes = len(np.unique(labels))
+
+		self.indexes = np.arange(len(self.filenames), dtype=int)
 		if shuffle:
 			self.indexes = sklearn_shuffle(self.indexes, random_state=self.seed)
 
 		# This is a hacky way to do it, but the only way under the current framework
 		if subset is not None:
-			train_indices, valid_indices = train_test_split(self.indexes, test_size=0.2, stratify=labels)
-			#random_state=self.seed, stratify=labels)
+			train_indices, valid_indices = train_test_split(
+				self.indexes,
+				test_size=0.2, # FIXME: Should the be allowed to change?
+				stratify=labels,
+				random_state=self.seed)
+
 			if subset == 'train':
 				self.indexes = train_indices
 			elif subset == 'valid':
@@ -73,17 +79,17 @@ class npy_generator(tensorflow.keras.utils.Sequence):
 		batch_indices = self.indexes[index*self.batch_size:(index+1)*self.batch_size]
 		# Get a list of filenames of the batch
 		batch_filenames = [self.filenames[k] for k in batch_indices]
-		batch_labels = [self.subfolder_labels[k] for k in batch_indices]
+		batch_labels = [self.labels[k] for k in batch_indices]
 		# Generate data
 		X, y = self.__data_generation(batch_filenames, batch_labels)
-		return X, tensorflow.keras.utils.to_categorical(y, num_classes=8)
+		return X, tensorflow.keras.utils.to_categorical(y, num_classes=self.num_classes)
 
 	#----------------------------------------------------------------------------------------------
 	def on_epoch_end(self):
 		# Shuffles indices after every epoch
-		self.indexes = np.arange(len(self.filenames))
+		self.indexes = np.arange(len(self.filenames), dtype=int)
 		if self.shuffle:
-			np.random.shuffle(self.indexes)
+			self.indexes = sklearn_shuffle(self.indexes, random_state=self.seed)
 
 	#----------------------------------------------------------------------------------------------
 	def __data_generation(self, batch_filenames, batch_labels):
@@ -239,11 +245,10 @@ def generate_single_image(freq, power):
 	:param power: Array of power values for the PSD
 	:return: image: 2D binary array containing the PSD 'image'
 	'''
-	image = ps_to_array(freq, power)
-	return image
+	return ps_to_array(freq, power)
 
 #--------------------------------------------------------------------------------------------------
-def generate_train_images(freq, power, star_id, output_path, label):
+def generate_train_images(freq, power, save_path):
 	'''
 	Generates images from PSD in an input folder. Handles two column files with frequency as one column and power as the other.
 	For ease of naming files, source files should be named with the Star ID.
@@ -255,13 +260,8 @@ def generate_train_images(freq, power, star_id, output_path, label):
 	:param numax: Numax value for star for regressor training (for later implementation)
 	:return: None
 	'''
-
 	image = generate_single_image(freq, power)
-	if label is None:
-		np.savez_compressed(file=os.path.join(output_path, str(star_id)), im=image)
-	else:
-		os.makedirs(os.path.join(output_path, str(label)), exist_ok=True)
-		np.savez_compressed(file=os.path.join(output_path, str(label), str(star_id)), im=image)
+	np.savez_compressed(file=save_path, im=image)
 
 #--------------------------------------------------------------------------------------------------
 def default_classifier_model():

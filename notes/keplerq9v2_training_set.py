@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Create new Kepler Q9 version 2 training set.
@@ -13,19 +13,48 @@ import numpy as np
 from bottleneck import nanmedian, nanvar
 from tqdm import tqdm
 import requests
+from astropy.io import fits
 from lightkurve import LightCurve
-sys.path.insert(0, os.path.abspath('..'))
+if sys.path[0] != os.path.abspath('..'):
+	sys.path.insert(0, os.path.abspath('..'))
 from starclass.utilities import rms_timescale
 #from starclass.plots import plt
 
+#--------------------------------------------------------------------------------------------------
+def download_file(url, fpath):
+	tqdm_settings = {
+		'unit': 'B',
+		'unit_scale': True,
+		'unit_divisor': 1024,
+		'position': 1,
+		'leave': False
+	}
+
+	try:
+		res = requests.get(url, stream=True)
+		res.raise_for_status()
+		total_size = int(res.headers.get('content-length', 0))
+		block_size = 1024
+		with tqdm(total=total_size, **tqdm_settings) as pbar:
+			with open(fpath, 'wb') as fid:
+				for data in res.iter_content(block_size):
+					datasize = fid.write(data)
+					pbar.update(datasize)
+
+	except: # noqa: E722, pragma: no cover
+		if os.path.isfile(fpath):
+			os.remove(fpath)
+		raise
+
+#--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	# Directory where KeplerQ9 ASCII files are stored:
 	# This can either contain all files in this directory,
 	# or be divided into sub-directories.
-	thisdir = r'E:\keplerq9\full'
+	thisdir = r'G:\keplerq9\full_fits'
 
 	# Where output will be saved:
-	output_dir = r'E:\keplerq9\keplerq9v2'
+	output_dir = r'G:\keplerq9\keplerq9v3'
 
 	# Make sure directories exists:
 	os.makedirs(output_dir, exist_ok=True)
@@ -33,7 +62,7 @@ if __name__ == '__main__':
 
 	# Load the list of KIC numbers and stellar classes:
 	starlist = np.genfromtxt(os.path.join(output_dir, 'targets.txt'),
-		delimiter=',', comments='#', dtype=None, encoding='utf-8')
+		delimiter=',', comments='#', dtype='str', encoding='utf-8')
 
 	# Make sure that there are not duplicate entries:
 	starlist_unique, cnt = np.unique(starlist, return_counts=True, axis=0)
@@ -66,67 +95,74 @@ if __name__ == '__main__':
 
 		for starid, sclass in tqdm(starlist):
 			sclass = sclass.upper()
-			if starid.startswith('constant_') or starid.startswith('fakerrlyr_'):
+			if starid.startswith('constant_'):
 				fname_save = starid + '.txt'
-				starid = -1
+				starid = -10000 - int(starid[9:])
+			elif starid.startswith('fakerrlyr_'):
+				fname_save = starid + '.txt'
+				starid = -20000 - int(starid[10:])
 			else:
 				starid = int(starid)
 				fname_save = '{starid:09d}.txt'.format(starid=starid)
 
 			# The path to save the final timeseries:
 			fpath_save = os.path.join(output_dir, sclass, fname_save)
-			#if os.path.exists(fpath_save):
-			#	continue
 
-			if starid == -1:
+			if os.path.isfile(fpath_save):
 				# Load file that should already exist:
-				data = np.loadtxt(fpath_save, usecols=(0,1,2))
+				time, flux, flux_err = np.loadtxt(fpath_save, usecols=(0,1,2), unpack=True, comments='#')
 			else:
-				# Find the Kepler Q9 ASCII file for this target:
-				fname = 'kplr{starid:09d}-2011177032512_llc.dat'.format(
-					starid=starid
-				)
+				fname = 'kplr{starid:09d}-2011177032512_llc.fits'.format(starid=starid)
+				subdir = os.path.join(thisdir, '{0:09d}'.format(starid)[:5])
+				fpath = os.path.join(subdir, fname)
 
-				subdir = '{0:09d}'.format(starid)[:5]
-				fpath = os.path.join(thisdir, subdir, fname)
-
-				# If it doesn't exist in subdir (to not have too many files in one directory)
-				# check of it is in the root dir instead:
-				if not os.path.exists(fpath) and os.path.exists(os.path.join(thisdir, fname)):
-					fpath = os.path.join(thisdir, fname)
+				# Check if the file is available as gzipped FITS:
+				if os.path.isfile(fpath + '.gz'):
+					fpath += '.gz'
 
 				# Print if file does not exist, instead of failing one
 				# at a time. Making debugging a little easier:
+				#tqdm.write(fpath)
 				if not os.path.isfile(fpath):
-					# Check if the target was actually observed in Q9:
-					r = requests.get('https://kasoc.phys.au.dk/catalog/sectors.php',
-						params={'starid': starid})
-					r.raise_for_status()
-					if 'Q9' not in r.json():
-						tqdm.write("Not observed in Q9: %d,%s" % (starid, sclass))
-					else:
-						tqdm.write("Data file does not exist: %d,%s" % (starid, sclass))
+					url = 'https://mast.stsci.edu/api/v0.1/Download/file?uri=mast:Kepler/url/missions/kepler/lightcurves/{subdir:s}/{starid:09d}/{fname:s}'.format(
+						subdir='{0:09d}'.format(starid)[:4],
+						starid=starid,
+						fname=fname)
+					os.makedirs(subdir, exist_ok=True)
+					download_file(url, fpath)
 
-					continue
+				# Load Kepler Q9 FITS file (PDC corrected):
+				with fits.open(fpath, mode='readonly', memmap=True) as hdu:
+					time = np.asarray(hdu[1].data['TIME'])
+					flux = np.asarray(hdu[1].data['PDCSAP_FLUX'])
+					flux_err = np.asarray(hdu[1].data['PDCSAP_FLUX_ERR'])
+					quality = np.asarray(hdu[1].data['SAP_QUALITY'], dtype='int32')
 
-				# Load Kepler Q9 ASCII file (PDC corrected):
-				data = np.loadtxt(fpath, usecols=(0,3,4), comments='#')
+				# Remove anything without a timestamp:
+				indx = np.isfinite(time)
+				time, flux, flux_err, quality = time[indx], flux[indx], flux_err[indx], quality[indx]
 
-				# Remove anything with quality > 0:
-				indx = ~np.isfinite(data[:,1]) | ~np.isfinite(data[:,2])
-				data[indx, 1:3] = np.NaN
-				data = data[1:, :] # Just removing the first data point as it is always NaN anyway
+				# Remove anything with bad quality:
+				indx = ~np.isfinite(flux) | ~np.isfinite(flux_err) | (quality & 1130799 != 0)
+				flux[indx] = np.NaN
+				flux_err[indx] = np.NaN
+
+				# Just removing the first data point as it is always NaN anyway
+				time = time[1:]
+				flux = flux[1:]
+				flux_err = flux_err[1:]
 
 				# Subtract the first timestamp from all timestamps:
-				data[:, 0] -= data[0, 0]
+				time -= time[0]
 
 				# Only keep the first 27.4 days of data:
-				data = data[data[:, 0] <= 27.4, :]
+				indx = (time <= 27.4)
+				time, flux, flux_err = time[indx], flux[indx], flux_err[indx]
 
 				# Convert to ppm:
-				m = nanmedian(data[:,1])
-				data[:,1] = 1e6*(data[:,1]/m - 1)
-				data[:,2] = 1e6*data[:,2]/m
+				m = nanmedian(flux)
+				flux = 1e6*(flux/m - 1)
+				flux_err = 1e6*flux_err/m
 
 				#fig, ax = plt.subplots()
 				#ax.plot(data[:,0], data[:,1])
@@ -135,13 +171,14 @@ if __name__ == '__main__':
 
 				# Save file:
 				os.makedirs(os.path.dirname(fpath_save), exist_ok=True)
-				np.savetxt(fpath_save, data, delimiter='  ', fmt=('%.8f', '%.16e', '%.16e'))
+				np.savetxt(fpath_save, np.column_stack((time, flux, flux_err)),
+					delimiter='  ', fmt=('%.8f', '%.16e', '%.16e'))
 
 			# Calculate diagnostics:
-			lc = LightCurve(time=data[:,0], flux=data[:,1], flux_err=data[:,2])
-			variance = nanvar(data[:,1], ddof=1)
+			lc = LightCurve(time=time, flux=flux, flux_err=flux_err)
+			variance = nanvar(flux, ddof=1)
 			rms_hour = rms_timescale(lc, timescale=3600/86400)
-			ptp = nanmedian(np.abs(np.diff(data[:,1])))
+			ptp = nanmedian(np.abs(np.diff(flux)))
 
 			# Add target to TODO-list:
 			diag.write("{variance:.16e},{rms_hour:.16e},{ptp:.16e}\n".format(

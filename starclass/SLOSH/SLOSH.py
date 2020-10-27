@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 The SLOSH method for detecting solar-like oscillations (2D deep learning methods).
@@ -10,16 +10,17 @@ The SLOSH method for detecting solar-like oscillations (2D deep learning methods
 import numpy as np
 import os
 import logging
+from tqdm import tqdm
 import tensorflow
+from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
 from sklearn.metrics import classification_report
-
 from . import SLOSH_prepro as preprocessing
-from .. import BaseClassifier, StellarClasses
+from .. import BaseClassifier
 
 #--------------------------------------------------------------------------------------------------
 class SLOSHClassifier(BaseClassifier):
 	"""
-	Solar-like Oscillation Shape Hunter (SLOSH) Classifier
+	Solar-like Oscillation Shape Hunter (SLOSH) Classifier.
 
 	.. codeauthor:: Marc Hon <mtyh555@uowmail.edu.au>
 	.. codeauthor:: James Kuszlewicz <kuszlewicz@mps.mpg.de>
@@ -40,6 +41,7 @@ class SLOSHClassifier(BaseClassifier):
 		self.classifier_list = []
 		#self.classifier = None
 		self.mc_iterations = mc_iterations
+		self.num_labels = len(self.StellarClasses)
 
 		# Set the global random seeds:
 		np.random.seed(self.random_seed)
@@ -75,105 +77,103 @@ class SLOSHClassifier(BaseClassifier):
 			dict: Dictionary of stellar classifications.
 		"""
 		logger = logging.getLogger(__name__)
-		assert self.predictable, 'No saved models provided. Predict functions are disabled.'
+		if not self.predictable:
+			raise ValueError('No saved models provided. Predict functions are disabled.')
 
 		# Pre-calculated power density spectrum:
 		psd = features['powerspectrum'].standard
 
 		logger.debug('Generating Image...')
 		img_array = preprocessing.generate_single_image(psd[0], psd[1])
+
 		logger.debug('Making Predictions...')
-		pred_array = np.zeros((self.mc_iterations, 8))
-
+		pred_array = np.zeros((self.mc_iterations, self.num_labels))
 		for i in range(self.mc_iterations):
-			pred_array[i,:] = self.classifier_list[0].predict(img_array.reshape(1, 128, 128, 1))
-		average_over_mc_iterations = np.mean(pred_array, axis=0)
-		pred = average_over_mc_iterations
+			pred_array[i, :] = self.classifier_list[0].predict(img_array.reshape(1, 128, 128, 1))
+		pred = np.mean(pred_array, axis=0)
 
-		# Must be a better way to do this!
+		# Convert the integer labels used by SLOSH to StellarClasses again
+		# and put it all together in the result dict:
 		result = {}
-		result[StellarClasses.RRLYR_CEPHEID] = pred[0]
-		result[StellarClasses.APERIODIC] = pred[1]
-		result[StellarClasses.CONSTANT] = pred[2]
-		result[StellarClasses.CONTACT_ROT] = pred[3]
-		result[StellarClasses.DSCT_BCEP] = pred[4]
-		result[StellarClasses.GDOR_SPB] = pred[5]
-		result[StellarClasses.SOLARLIKE] = pred[6]
-		result[StellarClasses.ECLIPSE] = pred[7]
+		for k, stcl in enumerate(self.StellarClasses):
+			result[stcl] = pred[k]
 
 		return result
 
 	#----------------------------------------------------------------------------------------------
 	def train(self, tset):
-		'''
+		"""
 		Trains a fresh classifier using a default NN architecture and parameters as of the Hon et al. (2018) paper.
 
 		Parameters:
-			train_folder: The folder where training images are kept. These must be separated into subfolders by the
-				image categories. For example: Train_Folder/1/ - Positive Detections; Train_Folder/0/ - Non-Detections
-			features (iterator of dicts): Iterator of features-dictionaries similar to those in ``do_classify``.
-			labels (iterator of lists): For each feature, provides a list of the assigned known ``StellarClasses`` identifications.
+			train_folder: The folder where training images are kept. These must be separated into
+				subfolders by the image categories. For example:
+				Train_Folder/1/ - Positive Detections; Train_Folder/0/ - Non-Detections
+			features (iterator of dicts): Iterator of features-dictionaries similar to those
+				in :meth:`do_classify`.
+			labels (iterator of lists): For each feature, provides a list of the assigned known
+				:class:`StellarClasses` identifications.
 
 		Returns:
 			model: A trained classifier model.
-		'''
+		"""
 
 		logger = logging.getLogger(__name__)
 
 		if self.predictable:
 			return
 
-		train_folder = os.path.join(self.features_cache, 'SLOSH_Train_Images')
-		if not os.path.exists(train_folder):
-			os.makedirs(train_folder)
-			logger.info('Generating Train Images...')
+		# Settings for progress bar used below:
+		tqdm_settings = {
+			'disable': not logger.isEnabledFor(logging.INFO)
+		}
 
-			for feat, lbl in zip(tset.features(), tset.labels()):
+		# Convert classification labels to integers:
+		intlookup = {key.value: value for value, key in enumerate(self.StellarClasses)}
+		intlabels = [intlookup[lbl] for lbl in self.parse_labels(tset.labels())]
+
+		logger.info('Generating Train Images...')
+		train_folder = os.path.join(self.features_cache, 'SLOSH_Train_Images')
+		os.makedirs(train_folder, exist_ok=True)
+
+		# Go through the training-set and ensure that all images are created:
+		filenames = []
+		for feat in tqdm(tset.features(), total=len(tset.train_idx), **tqdm_settings):
+			fpath = os.path.join(train_folder, str(feat['priority']) + '.npz')
+			filenames.append(fpath)
+			if not os.path.exists(fpath):
 				# Power density spectrum from pre-calculated features:
 				psd = feat['powerspectrum'].standard
-				# Convert classifications to integer labels:
-				if StellarClasses.RRLYR_CEPHEID in lbl:
-					label = 0
-				elif StellarClasses.APERIODIC in lbl:
-					label = 1
-				elif StellarClasses.CONSTANT in lbl:
-					label = 2
-				elif StellarClasses.CONTACT_ROT in lbl:
-					label = 3
-				elif StellarClasses.DSCT_BCEP in lbl:
-					label = 4
-				elif StellarClasses.GDOR_SPB in lbl:
-					label = 5
-				elif StellarClasses.SOLARLIKE in lbl:
-					label = 6
-				elif StellarClasses.ECLIPSE in lbl:
-					label = 7
-				else:
-					logger.error("Label doesn't exist")
-				preprocessing.generate_train_images(psd[0], psd[1],
-					feat['priority'], output_path=train_folder, label=label)
+				# Generate and save image to file:
+				preprocessing.generate_train_images(psd[0], psd[1], fpath)
+
+		# Find the level of verbosity to add to tensorflow calls:
+		if logger.isEnabledFor(logging.DEBUG):
+			verbose = 2
+		elif logger.isEnabledFor(logging.INFO):
+			verbose = 1
 		else:
-			logger.info('Train Images exist...')
+			verbose = 0
 
-		reduce_lr = tensorflow.keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=5, verbose=1)
-		early_stop = tensorflow.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-		checkpoint = tensorflow.keras.callbacks.ModelCheckpoint(self.model_file,
-			monitor='val_loss', verbose=1, save_best_only=True)
+		train_generator = preprocessing.npy_generator(filenames, intlabels,
+			subset='train', random_seed=self.random_seed)
+		valid_generator = preprocessing.npy_generator(filenames, intlabels,
+			subset='valid', random_seed=self.random_seed)
 
-		#model = None
+		reduce_lr = ReduceLROnPlateau(factor=0.5, patience=5, verbose=verbose)
+		early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+		checkpoint = ModelCheckpoint(self.model_file, monitor='val_loss', verbose=verbose, save_best_only=True)
+		#class_accuracy = TestCallback(valid_generator)
+
 		model = preprocessing.default_classifier_model()
 
-		train_generator = preprocessing.npy_generator(root=train_folder, batch_size=32,
-			dim=(128,128), extension='.npz', subset='train')
-		valid_generator = preprocessing.npy_generator(root=train_folder, batch_size=32,
-			dim=(128,128), extension='.npz', subset='valid')
-
-		#class_accuracy = TestCallback(valid_generator)
 		logger.info('Training Classifier...')
 		epochs = 50
-		model.fit_generator(train_generator, epochs=epochs, steps_per_epoch=len(train_generator),
+		model.fit(train_generator, epochs=epochs, steps_per_epoch=len(train_generator),
 			validation_data=valid_generator, validation_steps=len(valid_generator),
-			callbacks=[reduce_lr, early_stop, checkpoint], verbose=2)
+			callbacks=[reduce_lr, early_stop, checkpoint], verbose=verbose)
+
+		# Save the model to file:
 		self.save_model(model, self.model_file)
 
 	#----------------------------------------------------------------------------------------------

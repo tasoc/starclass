@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Training Sets.
@@ -14,14 +14,29 @@ import zipfile
 import shutil
 import logging
 import tempfile
+import sqlite3
+from contextlib import closing
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
-from .. import BaseClassifier, TaskManager, utilities, StellarClasses
+from .. import BaseClassifier, TaskManager, utilities
+from ..StellarClasses import StellarClassesLevel1, StellarClassesLevel2
 
 #--------------------------------------------------------------------------------------------------
 class TrainingSet(object):
+	"""
+	Generic Training Set.
 
-	def __init__(self, datalevel='corr', tf=0.0, random_seed=42):
+	Attributes:
+		testfraction (float):
+		random_seed (int):
+		features_cache (str):
+		train_idx (ndarray):
+		test_idx (ndarray):
+		crossval_folds (int):
+		fold (int):
+	"""
+
+	def __init__(self, level='L1', datalevel='corr', tf=0.0, random_seed=42):
 		"""
 		Parameters:
 			datalevel (string, optional):
@@ -29,7 +44,13 @@ class TrainingSet(object):
 			random_seed (optional): Random seed. Default=42.
 		"""
 
+		if not hasattr(self, 'key'):
+			raise Exception("Training set class does not have 'key' definied.")
+
 		# Basic checks of input:
+		if level not in ('L1', 'L2'):
+			raise ValueError("Invalid LEVEL")
+
 		if tf < 0 or tf >= 1:
 			raise ValueError("Invalid TESTFRACTION provided.")
 
@@ -37,9 +58,18 @@ class TrainingSet(object):
 			raise ValueError("Invalid DATALEVEL provided.")
 
 		# Store input:
+		self.level = level
 		self.datalevel = datalevel
 		self.testfraction = tf
 		self.random_seed = random_seed
+
+		# Assign StellarClasses Enum depending on
+		# the classification level we are running:
+		if not hasattr(self, 'StellarClasses'):
+			self.StellarClasses = {
+				'L1': StellarClassesLevel1,
+				'L2': StellarClassesLevel2
+			}[self.level]
 
 		# Define cache location where we will save common features:
 		self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)
@@ -47,32 +77,36 @@ class TrainingSet(object):
 
 		# Generate TODO file if it is needed:
 		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
-		if not os.path.exists(sqlite_file):
+		if not os.path.isfile(sqlite_file):
 			self.generate_todolist()
 
 		# Generate training/test indices
-		self.train_idx = np.arange(self.nobjects, dtype=int) # Define here because it is needed by self.labels() used below
+		# Define here because it is needed by self.labels() used below
+		if hasattr(self, '_valid_indicies'):
+			self.train_idx = self._valid_indicies
+		else:
+			self.train_idx = np.arange(self.nobjects, dtype=int)
 		self.test_idx = np.array([], dtype=int)
 		if self.testfraction > 0:
 			self.train_idx, self.test_idx = train_test_split(
-				np.arange(self.nobjects),
+				self.train_idx,
 				test_size=self.testfraction,
 				random_state=self.random_seed,
 				stratify=self.labels()
 			)
-			# Have to sort as train_test_split shuffles and we don't want that
-			self.train_idx = np.sort(self.train_idx)
-			self.test_idx = np.sort(self.test_idx)
+
 		# Cross Validation
 		self.fold = 0
 		self.crossval_folds = 0
 
 	#----------------------------------------------------------------------------------------------
 	def __str__(self):
-		return "<TrainingSet({key:s}, {datalevel:s}, tf={tf:.2f})>".format(
+		str_fold = '' if self.fold == 0 else ', fold={0:d}/{1:d}'.format(self.fold, self.crossval_folds)
+		return "<TrainingSet({key:s}, {datalevel:s}, tf={tf:.2f}{fold:s})>".format(
 			key=self.key,
 			datalevel=self.datalevel,
-			tf=self.testfraction
+			tf=self.testfraction,
+			fold=str_fold
 		)
 
 	#----------------------------------------------------------------------------------------------
@@ -85,11 +119,12 @@ class TrainingSet(object):
 		Split training set object into stratified folds.
 
 		Parameters:
-			n_splits (integer, optional): Number of folds to split training set into. Default=5.
-			tf (real, optional): Test-fraction, between 0 and 1, to split from each fold.
+			n_splits (int, optional): Number of folds to split training set into. Default=5.
+			tf (float, optional): Test-fraction, between 0 and 1, to split from each fold.
 
 		Returns:
-			Iterator of ``TrainingSet`` objects: Iterator of folds, which are also ``TrainingSet`` objects.
+			Iterator of :class:`TrainingSet` objects: Iterator of folds, which are also
+				:class:`TrainingSet` objects.
 		"""
 
 		logger = logging.getLogger(__name__)
@@ -109,7 +144,7 @@ class TrainingSet(object):
 
 			# Set tf to be zero here so the training set isn't further split
 			# as want to run all the data through CV
-			newtset = self.__class__(datalevel=self.datalevel, tf=0.0)
+			newtset = self.__class__(level=self.level, datalevel=self.datalevel, tf=0.0)
 
 			# Set testfraction to value from CV i.e. 1/n_splits
 			newtset.testfraction = tf
@@ -118,6 +153,27 @@ class TrainingSet(object):
 			newtset.crossval_folds = n_splits
 			newtset.fold = fold + 1
 			yield newtset
+
+	#----------------------------------------------------------------------------------------------
+	@classmethod
+	def find_input_folder(cls):
+		"""
+		Find the folder containing the data for the training set.
+
+		This is a class method, so it can be called without having to initialize the training set.
+		"""
+		if not hasattr(cls, 'key'):
+			raise Exception("Training set class does not have 'key' definied.")
+
+		# Point this to the directory where the training set data are stored
+		INPUT_DIR = os.environ.get('STARCLASS_TSETS')
+		if INPUT_DIR is None:
+			INPUT_DIR = os.path.join(os.path.dirname(__file__), 'data')
+		elif not os.path.exists(INPUT_DIR) or not os.path.isdir(INPUT_DIR):
+			raise IOError("The environment variable STARCLASS_TSETS is set, but points to a non-existent directory.")
+
+		datadir = cls.key if not hasattr(cls, 'datadir') else cls.datadir
+		return os.path.join(INPUT_DIR, datadir)
 
 	#----------------------------------------------------------------------------------------------
 	def tset_datadir(self, url):
@@ -133,25 +189,19 @@ class TrainingSet(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
 		if not hasattr(self, 'key'):
-			raise ValueError("Trainingset does not have a defined key")
+			raise Exception("Training set class does not have 'key' definied.")
 
-		# Point this to the directory where the TDA simulations are stored
-		INPUT_DIR = os.environ.get('STARCLASS_TSETS')
-		if INPUT_DIR is None:
-			INPUT_DIR = os.path.join(os.path.dirname(__file__), 'data')
-		elif not os.path.exists(INPUT_DIR) or not os.path.isdir(INPUT_DIR):
-			raise IOError("The environment variable STARCLASS_TSETS is set, but points to a non-existent directory.")
-
-		input_folder = os.path.join(INPUT_DIR, self.key)
-
+		logger = logging.getLogger(__name__)
 		tqdm_settings = {
 			'unit': 'B',
 			'unit_scale': True,
 			'unit_divisor': 1024,
 			'disable': not logger.isEnabledFor(logging.INFO)
 		}
+
+		# Find folder where training set is stored:
+		input_folder = self.find_input_folder()
 
 		if not os.path.exists(input_folder):
 			logger.info("Step 1: Downloading %s training set...", self.key)
@@ -188,10 +238,70 @@ class TrainingSet(object):
 
 	#----------------------------------------------------------------------------------------------
 	def generate_todolist(self):
-		raise NotImplementedError()
+		"""
+		Generate todo.sqlite file in training set directory.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		logger = logging.getLogger(__name__)
+
+		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
+		with closing(sqlite3.connect(sqlite_file)) as conn:
+			conn.row_factory = sqlite3.Row
+			cursor = conn.cursor()
+
+			# Create the basic file structure of a TODO-list:
+			self.generate_todolist_structure(conn)
+
+			logger.info("Step 3: Reading file and extracting information...")
+			pri = 0
+
+			diagnostics = np.genfromtxt(os.path.join(self.input_folder, 'diagnostics.txt'),
+				delimiter=',', comments='#', dtype=None, encoding='utf-8')
+
+			for k, star in tqdm(enumerate(self.starlist), total=len(self.starlist)):
+				# Get starid:
+				starname = star[0]
+				starclass = star[1]
+				if starname.startswith('constant_'):
+					starid = -10000 - int(starname[9:])
+				elif starname.startswith('fakerrlyr_'):
+					starid = -20000 - int(starname[10:])
+				else:
+					starid = int(starname)
+					starname = '{0:09d}'.format(starid)
+
+				# Path to lightcurve:
+				lightcurve = starclass + '/' + starname + '.txt'
+
+				# Load diagnostics from file, to speed up the process:
+				variance, rms_hour, ptp = diagnostics[k]
+
+				pri += 1
+				self.generate_todolist_insert(cursor,
+					priority=pri,
+					starid=starid,
+					lightcurve=lightcurve,
+					datasource='ffi',
+					variance=variance,
+					rms_hour=rms_hour,
+					ptp=ptp)
+
+			conn.commit()
+			cursor.close()
+
+		logger.info("%s training set successfully built.", self.key)
 
 	#----------------------------------------------------------------------------------------------
 	def generate_todolist_structure(self, conn):
+		"""
+		Generate overall database structure for todo.sqlite.
+
+		Parameters:
+			conn (sqlite3.connection): Connection to SQLite file.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 
 		cursor = conn.cursor()
 		cursor.execute("PRAGMA foreign_keys=ON;")
@@ -235,18 +345,36 @@ class TrainingSet(object):
 		conn.commit()
 
 	#----------------------------------------------------------------------------------------------
-	def generate_todolist_insert(self, cursor, priority=None, starid=None, tmag=None,
-		lightcurve=None, datasource=None, variance=None, rms_hour=None, ptp=None):
+	def generate_todolist_insert(self, cursor, priority=None, lightcurve=None, starid=None,
+		tmag=None, datasource=None, variance=None, rms_hour=None, ptp=None):
+		"""
+		Insert an entry in the todo.sqlite file.
+
+		Parameters:
+			cursor (sqlite3.Cursor): Cursor in SQLite file.
+			priority (int):
+			lightcurve (str):
+			starid (int, optional):
+			tmag (float, optional): TESS Magnitude.
+			datasource (str, optional): 
+			variance (float, optional):
+			rms_hour (float, optional):
+			ptp (float, optional):
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 
 		if priority is None:
-			raise ValueError("priority is required")
+			raise ValueError("PRIORITY is required.")
+		if lightcurve is None:
+			raise ValueError("LIGHTCURVE is required.")
 		if starid is None:
 			starid = priority
 
 		# Try to load the lightcurve using the BaseClassifier method.
 		# This will ensure that the lightcurve can actually be read by the system.
 		if not all([datasource, variance, rms_hour, ptp]):
-			with BaseClassifier(tset_key=self.key, features_cache=None) as bc:
+			with BaseClassifier(tset=self, features_cache=None) as bc:
 				fake_task = {
 					'priority': priority,
 					'starid': starid
@@ -317,11 +445,13 @@ class TrainingSet(object):
 					shutil.copyfileobj(fid, tmpdir)
 				tmpdir.flush()
 
-				with TaskManager(tmpdir.name, readonly=True, overwrite=False, cleanup=False) as tm:
-					with BaseClassifier(tset_key=self.key, features_cache=self.features_cache) as stcl:
+				with TaskManager(tmpdir.name, overwrite=True, cleanup=False, classes=self.StellarClasses) as tm:
+					# NOTE: This does not propergate the 'data_dir' keyword to the BaseClassifier,
+					#       But since we are not doing anything other than loading data,
+					#       this should not cause any problems.
+					with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
 						for rowidx in self.train_idx:
 							task = tm.get_task(priority=rowidx+1, change_classifier=False)
-							if task is None: break
 
 							# Lightcurve file to load:
 							# We do not use the one from the database because in the simulations the
@@ -359,11 +489,13 @@ class TrainingSet(object):
 					shutil.copyfileobj(fid, tmpdir)
 				tmpdir.flush()
 
-				with TaskManager(tmpdir.name, readonly=True, overwrite=False, cleanup=False) as tm:
-					with BaseClassifier(tset_key=self.key, features_cache=self.features_cache) as stcl:
+				with TaskManager(tmpdir.name, overwrite=True, cleanup=False, classes=self.StellarClasses) as tm:
+					# NOTE: This does not propergate the 'data_dir' keyword to the BaseClassifier,
+					#       But since we are not doing anything other than loading data,
+					#       this should not cause any problems.
+					with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
 						for rowidx in self.test_idx:
 							task = tm.get_task(priority=rowidx+1, change_classifier=False)
-							if task is None: break
 
 							# Lightcurve file to load:
 							# We do not use the one from the database because in the simulations the
@@ -378,34 +510,43 @@ class TrainingSet(object):
 				os.remove(tmpdir.name + '-journal')
 
 	#----------------------------------------------------------------------------------------------
-	def labels(self, level='L1'):
+	def labels(self):
+		"""
+		Labels of training-set.
 
+		Returns:
+			tuple: Tuple of labels associated with features in :meth:`features`.
+				Each element is itself a tuple of enums of :class:`StellarClasses`.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 		# Create list of all the classes for each star:
 		lookup = []
-		for rowidx, row in enumerate(self.starlist):
+		for rowidx in self.train_idx:
+			row = self.starlist[rowidx, :]
 			labels = row[1].strip().split(';')
-			lbls = [StellarClasses[lbl.strip()] for lbl in labels]
-
-			if self.testfraction > 0:
-				if rowidx in self.train_idx:
-					lookup.append(tuple(set(lbls)))
-			else:
-				lookup.append(tuple(set(lbls)))
+			lbls = [self.StellarClasses[lbl.strip()] for lbl in labels]
+			lookup.append(tuple(set(lbls)))
 
 		return tuple(lookup)
 
 	#----------------------------------------------------------------------------------------------
-	def labels_test(self, level='L1'):
+	def labels_test(self):
+		"""
+		Labels of test-set.
 
-		if self.testfraction <= 0:
-			return []
+		Returns:
+			tuple: Tuple of labels associated with features in :meth:`features_test`.
+				Each element is itself a tuple of enums of :class:`StellarClasses`.
 
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
 		# Create list of all the classes for each star:
 		lookup = []
-		for rowidx, row in enumerate(self.starlist):
-			if rowidx in self.test_idx:
-				labels = row[1].strip().split(';')
-				lbls = [StellarClasses[lbl.strip()] for lbl in labels]
-				lookup.append(tuple(set(lbls)))
+		for rowidx in self.test_idx:
+			row = self.starlist[rowidx, :]
+			labels = row[1].strip().split(';')
+			lbls = [self.StellarClasses[lbl.strip()] for lbl in labels]
+			lookup.append(tuple(set(lbls)))
 
 		return tuple(lookup)

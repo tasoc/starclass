@@ -7,6 +7,7 @@ Utilities for SLOSH (2D deep learning methods).
 """
 
 import numpy as np
+import h5py
 import tensorflow
 from tensorflow.keras.layers import Dropout, MaxPool2D, Flatten, Conv2D, LeakyReLU, Dense
 from tensorflow.keras.regularizers import l2
@@ -25,13 +26,13 @@ class npy_generator(tensorflow.keras.utils.Sequence):
 
 	.. codeauthor:: Marc Hon <mtyh555@uowmail.edu.au>
 	"""
-	def __init__(self, filenames, labels, batch_size=32, dim=(128,128), shuffle=True, subset=None,
-		random_seed=42):
+	def __init__(self, datasets, labels, hdf5_file=None, batch_size=32, dim=(128,128),
+		shuffle=True, subset=None, random_seed=42):
 		"""
 		Initialize generator.
 
 		Parameters:
-			filenames (list): List of file paths to the NPZ files containing the images created
+			datasets (list): List of file paths to the NPZ files containing the images created
 				using :func:`generate_train_images`.
 			labels (list): List of integer labels corresponding to the images in ``filenames``.
 			batch_size (int, optional): Batch size.
@@ -41,7 +42,7 @@ class npy_generator(tensorflow.keras.utils.Sequence):
 			random_seed (int, optional): Random seed for splitting and shuffeling.
 		"""
 		self.batch_size = batch_size
-		self.filenames = filenames
+		self.filenames = datasets # Yes, we know this is badly named!
 		self.labels = labels # for binary classification
 		self.shuffle = shuffle # shuffles data after every epoch
 		self.dim = dim # image/2D array dimensions
@@ -50,6 +51,10 @@ class npy_generator(tensorflow.keras.utils.Sequence):
 		# Number of unique labels:
 		self.num_classes = len(np.unique(labels))
 
+		# Open the HDF5 file in read-only mode:
+		self.hdf = h5py.File(hdf5_file, 'r')
+
+		# Create list if indicies and optionally shuffle them:
 		self.indexes = np.arange(len(self.filenames), dtype=int)
 		if shuffle:
 			self.indexes = sklearn_shuffle(self.indexes, random_state=self.seed)
@@ -93,12 +98,12 @@ class npy_generator(tensorflow.keras.utils.Sequence):
 
 	#----------------------------------------------------------------------------------------------
 	def __data_generation(self, batch_filenames, batch_labels):
-		# Generates data - this example is repurposed for .npy files
+		# Generates data - this example is repurposed for .hdf5 files
 		X = np.empty((len(batch_filenames), self.dim[0], self.dim[1]))
 		y = np.empty((len(batch_filenames)), dtype=int)
 
 		for i, ID in enumerate(batch_filenames):
-			X[i, :] = np.load(ID)['im']
+			X[i, :] = np.asarray(self.hdf['images/' + ID])
 			y[i] = batch_labels[i]
 		return np.expand_dims(X,-1), y
 
@@ -246,22 +251,6 @@ def generate_single_image(freq, power):
 	:return: image: 2D binary array containing the PSD 'image'
 	'''
 	return ps_to_array(freq, power)
-
-#--------------------------------------------------------------------------------------------------
-def generate_train_images(freq, power, save_path):
-	'''
-	Generates images from PSD in an input folder. Handles two column files with frequency as one column and power as the other.
-	For ease of naming files, source files should be named with the Star ID.
-	:param freq: Frequency values for the PSD
-	:param power: Power values for the PSD
-	:param star_list: For generating images for a training set, a list to cross-match with known parameters
-	:param output_path: Image output path
-	:param label: Training label
-	:param numax: Numax value for star for regressor training (for later implementation)
-	:return: None
-	'''
-	image = generate_single_image(freq, power)
-	np.savez_compressed(file=save_path, im=image)
 
 #--------------------------------------------------------------------------------------------------
 def default_classifier_model():

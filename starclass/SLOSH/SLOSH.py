@@ -8,9 +8,10 @@ The SLOSH method for detecting solar-like oscillations (2D deep learning methods
 """
 
 import numpy as np
-import os
+import os.path
 import logging
 from tqdm import tqdm
+import h5py
 import tensorflow
 from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
 from sklearn.metrics import classification_report
@@ -24,6 +25,7 @@ class SLOSHClassifier(BaseClassifier):
 
 	.. codeauthor:: Marc Hon <mtyh555@uowmail.edu.au>
 	.. codeauthor:: James Kuszlewicz <kuszlewicz@mps.mpg.de>
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
 	def __init__(self, clfile='SLOSH_Classifier_Model.h5', mc_iterations=10, *args, **kwargs):
@@ -127,6 +129,13 @@ class SLOSHClassifier(BaseClassifier):
 		tqdm_settings = {
 			'disable': not logger.isEnabledFor(logging.INFO)
 		}
+		dset_settings = {
+			'compression': 'lzf',
+			'shuffle': True,
+			'fletcher32': True,
+			'chunks': (128, 128),
+			'dtype': 'float32'
+		}
 
 		# Convert classification labels to integers:
 		intlookup = {key.value: value for value, key in enumerate(self.StellarClasses)}
@@ -137,15 +146,21 @@ class SLOSHClassifier(BaseClassifier):
 		os.makedirs(train_folder, exist_ok=True)
 
 		# Go through the training-set and ensure that all images are created:
-		filenames = []
-		for feat in tqdm(tset.features(), total=len(tset.train_idx), **tqdm_settings):
-			fpath = os.path.join(train_folder, str(feat['priority']) + '.npz')
-			filenames.append(fpath)
-			if not os.path.exists(fpath):
-				# Power density spectrum from pre-calculated features:
-				psd = feat['powerspectrum'].standard
-				# Generate and save image to file:
-				preprocessing.generate_train_images(psd[0], psd[1], fpath)
+		# Images are stored in a HDF5 file as individual datasets.
+		hdf5_file = os.path.join(train_folder, 'SLOSH_Train_Images.hdf5')
+		datasets = []
+		with h5py.File(hdf5_file, 'a') as hdf:
+			images = hdf.require_group('images')
+			for feat in tqdm(tset.features(), total=len(tset.train_idx), **tqdm_settings):
+				dset_name = str(feat['priority'])
+				datasets.append(dset_name)
+				if dset_name not in images:
+					# Power density spectrum from pre-calculated features:
+					psd = feat['powerspectrum'].standard
+					# Generate and save image to file:
+					img = preprocessing.generate_single_image(psd[0], psd[1])
+					images.create_dataset(dset_name, data=img, **dset_settings)
+					hdf.flush()
 
 		# Find the level of verbosity to add to tensorflow calls:
 		if logger.isEnabledFor(logging.DEBUG):
@@ -155,10 +170,10 @@ class SLOSHClassifier(BaseClassifier):
 		else:
 			verbose = 0
 
-		train_generator = preprocessing.npy_generator(filenames, intlabels,
-			subset='train', random_seed=self.random_seed)
-		valid_generator = preprocessing.npy_generator(filenames, intlabels,
-			subset='valid', random_seed=self.random_seed)
+		train_generator = preprocessing.npy_generator(datasets, intlabels,
+			hdf5_file=hdf5_file, subset='train', random_seed=self.random_seed)
+		valid_generator = preprocessing.npy_generator(datasets, intlabels,
+			hdf5_file=hdf5_file, subset='valid', random_seed=self.random_seed)
 
 		reduce_lr = ReduceLROnPlateau(factor=0.5, patience=5, verbose=verbose)
 		early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)

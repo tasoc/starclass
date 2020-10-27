@@ -10,6 +10,7 @@ import pytest
 import os
 import shutil
 import tempfile
+import types
 import conftest # noqa: F401
 import starclass.training_sets as tsets
 from starclass import trainingset_available, get_trainingset
@@ -107,6 +108,35 @@ def test_trainingset_generate_todolist(monkeypatch, tsetkey):
 
 		assert tset.input_folder == tsetdir
 		assert os.path.isfile(os.path.join(tsetdir, 'todo.sqlite'))
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
+def test_trainingset_features(tsetkey):
+
+	# Get training set class using conv. function:
+	tsetclass = get_trainingset(tsetkey)
+	tset = tsetclass(tf=0.2)
+
+	features = tset.features()
+	assert isinstance(features, types.GeneratorType)
+
+	features_test = tset.features_test()
+	assert isinstance(features_test, types.GeneratorType)
+
+	for tries in range(2):
+		feat = next(features)
+		print(feat)
+		assert isinstance(feat, dict)
+		assert 'lightcurve' in feat
+		assert 'powerspectrum' in feat
+		assert 'frequencies' in feat
+
+		feat = next(features_test)
+		print(feat)
+		assert isinstance(feat, dict)
+		assert 'lightcurve' in feat
+		assert 'powerspectrum' in feat
+		assert 'frequencies' in feat
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)

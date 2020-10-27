@@ -53,6 +53,10 @@ def main():
 	if not input_folder:
 		parser.error("Please specify an INPUT_FOLDER.")
 
+	# Initialize the training set:
+	tsetclass = starclass.get_trainingset(args.trainingset)
+	tset = tsetclass(level=args.level)
+
 	# Define MPI message tags
 	tags = enum.IntEnum('tags', ('READY', 'DONE', 'EXIT', 'START'))
 
@@ -64,7 +68,7 @@ def main():
 
 	if rank == 0:
 		try:
-			with starclass.TaskManager(input_folder, cleanup=True, overwrite=args.overwrite) as tm:
+			with starclass.TaskManager(input_folder, cleanup=True, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 				# Get list of tasks:
 				#numtasks = tm.get_number_tasks()
 				#tm.logger.info("%d tasks to be run", numtasks)
@@ -138,10 +142,6 @@ def main():
 		current_classifier = None
 		stcl = None
 
-		# Initialize the training set:
-		tsetclass = starclass.get_trainingset(args.trainingset)
-		tset = tsetclass(level=args.level)
-
 		try:
 			# Send signal that we are ready for task:
 			comm.send(None, dest=0, tag=tags.READY)
@@ -160,7 +160,8 @@ def main():
 					try:
 						if task['classifier'] != current_classifier or stcl is None:
 							current_classifier = task['classifier']
-							if stcl: stcl.close()
+							if stcl:
+								stcl.close()
 							stcl = starclass.get_classifier(current_classifier)
 							stcl = stcl(tset=tset, features_cache=None)
 

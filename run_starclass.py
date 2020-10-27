@@ -65,7 +65,7 @@ def main():
 	# Running:
 	# When simply running the classifier on new stars:
 	stcl = None
-	with starclass.TaskManager(input_folder, overwrite=args.overwrite) as tm:
+	with starclass.TaskManager(input_folder, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 		while True:
 			task = tm.get_task(classifier=current_classifier)
 			if task is None:

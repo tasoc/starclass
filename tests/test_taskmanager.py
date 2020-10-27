@@ -113,7 +113,7 @@ def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE):
 def test_taskmanager_meta_classifier(PRIVATE_TODO_FILE):
 	"""Test of TaskManager when running with MetaClassifier"""
 
-	with TaskManager(PRIVATE_TODO_FILE, overwrite=True) as tm:
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
 
 		# Create fake results from SLOSH:
 		tm.save_results({'priority': 17, 'classifier': 'slosh', 'status': STATUS.OK, 'starclass_results': {
@@ -133,6 +133,9 @@ def test_taskmanager_meta_classifier(PRIVATE_TODO_FILE):
 
 		tab = task1['other_classifiers']
 		print(tab)
+
+		for row in tab:
+			assert isinstance(row['class'], StellarClassesLevel1)
 
 		assert tab[tab['class'] == StellarClassesLevel1.SOLARLIKE]['prob'] == 0.2
 		assert tab[tab['class'] == StellarClassesLevel1.DSCT_BCEP]['prob'] == 0.1

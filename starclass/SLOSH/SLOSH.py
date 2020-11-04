@@ -170,23 +170,27 @@ class SLOSHClassifier(BaseClassifier):
 		else:
 			verbose = 0
 
-		train_generator = preprocessing.npy_generator(datasets, intlabels,
-			hdf5_file=hdf5_file, subset='train', random_seed=self.random_seed)
-		valid_generator = preprocessing.npy_generator(datasets, intlabels,
-			hdf5_file=hdf5_file, subset='valid', random_seed=self.random_seed)
+		# Open the HDF5 file containing the features cache in read-only mode
+		# so it can be passed to the generators:
+		with h5py.File(hdf5_file, 'r') as hdf:
 
-		reduce_lr = ReduceLROnPlateau(factor=0.5, patience=5, verbose=verbose)
-		early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-		checkpoint = ModelCheckpoint(self.model_file, monitor='val_loss', verbose=verbose, save_best_only=True)
-		#class_accuracy = TestCallback(valid_generator)
+			train_generator = preprocessing.npy_generator(datasets, intlabels,
+				hdf5_file=hdf, subset='train', random_seed=self.random_seed)
+			valid_generator = preprocessing.npy_generator(datasets, intlabels,
+				hdf5_file=hdf, subset='valid', random_seed=self.random_seed)
 
-		model = preprocessing.default_classifier_model()
+			reduce_lr = ReduceLROnPlateau(factor=0.5, patience=5, verbose=verbose)
+			early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+			checkpoint = ModelCheckpoint(self.model_file, monitor='val_loss', verbose=verbose, save_best_only=True)
+			#class_accuracy = TestCallback(valid_generator)
 
-		logger.info('Training Classifier...')
-		epochs = 50
-		model.fit(train_generator, epochs=epochs, steps_per_epoch=len(train_generator),
-			validation_data=valid_generator, validation_steps=len(valid_generator),
-			callbacks=[reduce_lr, early_stop, checkpoint], verbose=verbose)
+			model = preprocessing.default_classifier_model()
+
+			logger.info('Training Classifier...')
+			epochs = 50
+			model.fit(train_generator, epochs=epochs, steps_per_epoch=len(train_generator),
+				validation_data=valid_generator, validation_steps=len(valid_generator),
+				callbacks=[reduce_lr, early_stop, checkpoint], verbose=verbose)
 
 		# Save the model to file:
 		self.save_model(model, self.model_file)

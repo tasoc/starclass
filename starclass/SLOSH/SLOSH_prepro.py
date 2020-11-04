@@ -35,6 +35,7 @@ class npy_generator(tensorflow.keras.utils.Sequence):
 			datasets (list): List of file paths to the NPZ files containing the images created
 				using :func:`generate_train_images`.
 			labels (list): List of integer labels corresponding to the images in ``filenames``.
+			hdf5_file (h5py.File): Opened HDF5 file containing images as datasets.
 			batch_size (int, optional): Batch size.
 			dim (tuple, optional): Image/2D array dimensions.
 			shuffle (bool, optional): Shuffle data after every epoch?
@@ -52,7 +53,10 @@ class npy_generator(tensorflow.keras.utils.Sequence):
 		self.num_classes = len(np.unique(labels))
 
 		# Open the HDF5 file in read-only mode:
-		self.hdf = h5py.File(hdf5_file, 'r')
+		if isinstance(hdf5_file, h5py.File):
+			self.hdf = hdf5_file
+		else:
+			self.hdf = h5py.File(hdf5_file, 'r')
 
 		# Create list if indicies and optionally shuffle them:
 		self.indexes = np.arange(len(self.filenames), dtype=int)

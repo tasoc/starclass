@@ -232,7 +232,6 @@ class TaskManager(object):
 				self.cursor.execute("SELECT starclass_results.classifier,class,prob FROM starclass_results INNER JOIN starclass_diagnostics ON starclass_results.priority=starclass_diagnostics.priority AND starclass_results.classifier=starclass_diagnostics.classifier WHERE starclass_results.priority=? AND status=? AND starclass_results.classifier != 'meta' ORDER BY starclass_results.classifier, class;", (task['priority'], STATUS.OK.value))
 
 				# Add as a Table to the task list:
-				# TODO: Level 1 classes hardcoded!
 				rows = []
 				for r in self.cursor.fetchall():
 					rows.append([r['classifier'], self.StellarClasses[r['class']], r['prob']])

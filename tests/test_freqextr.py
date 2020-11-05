@@ -58,9 +58,11 @@ def test_freqextr_simple():
 
 	np.random.seed(42)
 	time = np.arange(0, 27.0, 1800/86400)
-	flux = 10*np.sin(2*np.pi*50e-6*time*86400) \
-		+ 2*np.sin(2*np.pi*100e-6*time*86400) \
-		+ np.random.normal(0, 2, size=len(time))
+	omega = 2 * np.pi * 86400e-6 * time
+	flux = 10*np.sin(50*omega)
+	flux += 2*np.sin(100*omega)
+	flux += np.random.normal(0, 2, size=len(time))
+
 	lc = lk.LightCurve(time=time, flux=flux)
 
 	tab = freqextr(lc, n_peaks=5, n_harmonics=0)
@@ -125,11 +127,13 @@ def test_freqextr():
 
 	np.random.seed(42)
 	time = np.arange(0, 27.0, 1800/86400)
-	flux = 10*np.sin(2*np.pi*50e-6*time*86400) + 2*np.sin(2*np.pi*100e-6*time*86400) \
-		+ 3*np.sin(2*np.pi*89e-6*time*86400 + 0.5) \
-		+ 12*np.sin(2*np.pi*91.3e-6*time*86400 + 0.32) \
-		+ 6*np.sin(2*np.pi*2*91.3e-6*time*86400 + 0.32) \
-		+ 2.4*np.random.randn(len(time))
+	omega = 2 * np.pi * 86400e-6 * time
+	flux = 10*np.sin(50*omega)
+	flux += 2*np.sin(100*omega)
+	flux += 3*np.sin(89*omega)
+	flux += 12*np.sin(91.3*omega + 0.32)
+	flux += 6*np.sin(2*91.3*omega + 0.32)
+	flux += 2.4*np.random.randn(len(time))
 
 	lc = lk.TessLightCurve(time=time, flux=flux)
 

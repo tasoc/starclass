@@ -381,14 +381,17 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 
 	# Gather into table:
 	num, harmonic = np.meshgrid(range(1, n_peaks+1), range(n_harmonics+1))
-	tab = Table(data=[num.flatten(order='F'),
-		harmonic.flatten(order='F'),
-		nu.flatten(),
-		amp.flatten(),
-		phase.flatten(),
-		alpha.flatten(),
-		beta.flatten(),
-		deviation.flatten()],
+	tab = Table(
+		data=[
+			num.flatten(order='F'),
+			harmonic.flatten(order='F'),
+			nu.flatten(),
+			amp.flatten(),
+			phase.flatten(),
+			alpha.flatten(),
+			beta.flatten(),
+			deviation.flatten()
+		],
 		names=['num', 'harmonic', 'frequency', 'amplitude', 'phase', 'alpha', 'beta', 'deviation'],
 		dtype=['int32', 'int32', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64'])
 

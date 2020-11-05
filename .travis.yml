@@ -22,17 +22,6 @@ jobs:
     - name: "Python 3.8 on Linux"
       python: "3.8"
 
-#    - name: "Python 3.6 on Mac"
-#      os: osx
-#      osx_image: xcode9.4 # Python 3.6.5
-#      language: shell
-#      before_install:
-#        - brew install git-lfs
-#        - python3 --version
-#        - git lfs install
-#        - git lfs pull
-#      env: PYTHON="python3" PIP="sudo pip3"
-
     - name: "Python 3.7 on Mac"
       os: osx
       osx_image: xcode11.2 # Python 3.7.4 running on macOS 10.14.4
@@ -43,17 +32,6 @@ jobs:
         - git lfs install
         - git lfs pull
       env: PYTHON="python3" PIP="sudo pip3"
-
-#    - name: "Python 3.8 on Mac"
-#      os: osx
-#      osx_image: xcode11.2 # Python 3.7.4 running on macOS 10.14.4
-#      language: shell
-#      before_install:
-#        - brew install git-lfs python@3.8
-#        - python3 --version  # Actually not running Python 3.8 ???
-#        - git lfs install
-#        - git lfs pull
-#      env: PYTHON="python3" PIP="sudo pip3"
 
     - name: "Python 3.6 on Windows"
       os: windows
@@ -89,8 +67,7 @@ jobs:
       python: "3.6"
       git:
         lfs_skip_smudge: true
-      install:
-        - pip install flake8
+      before_script: skip
       script:
         - flake8
 
@@ -107,6 +84,7 @@ install:
   - $PYTHON -m pip install --upgrade pip
   - $PIP install -r requirements.txt
   - $PIP install codecov pytest-cov
+before_script:
   - travis_wait $PYTHON run_download_cache.py -q
 script:
   - $PYTHON -m pytest --cov=starclass/

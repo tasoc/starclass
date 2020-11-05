@@ -58,6 +58,7 @@ def main():
 	if current_classifier == 'meta':
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in parallel?
+		# TODO: Check if results are already present
 		with starclass.TaskManager(tset.input_folder, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 			for cla_key in tm.all_classifiers:
 				# Split the tset object into cross-validation folds.

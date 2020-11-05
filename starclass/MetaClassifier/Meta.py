@@ -122,7 +122,7 @@ class MetaClassifier(BaseClassifier):
 			features (dict): Dictionary of features.
 
 		Returns:
-			dict: Dictionary of stellar classifications. -10 for NA results.
+			dict: Dictionary of stellar classifications.
 		"""
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
@@ -135,6 +135,9 @@ class MetaClassifier(BaseClassifier):
 		# TODO: What about NaN values?
 		logger.debug("Importing features...")
 		featarray = self.build_features_table([features], total=1)
+
+		if anynan(featarray):
+			raise ValueError("Features contains NaNs")
 
 		logger.debug("We are starting the magic...")
 		# Comes out with shape (1,8), but instead want shape (8,) so squeeze

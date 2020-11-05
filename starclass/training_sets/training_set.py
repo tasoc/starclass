@@ -445,7 +445,9 @@ class TrainingSet(object):
 					shutil.copyfileobj(fid, tmpdir)
 				tmpdir.flush()
 
-				with TaskManager(tmpdir.name, overwrite=True, cleanup=False, classes=self.StellarClasses) as tm:
+				# Make sure cleanup=False, or else previous results will be deleted,
+				# meaning there would be no results for the MetaClassifier to work with
+				with TaskManager(tmpdir.name, overwrite=False, cleanup=False, classes=self.StellarClasses) as tm:
 					# NOTE: This does not propergate the 'data_dir' keyword to the BaseClassifier,
 					#       But since we are not doing anything other than loading data,
 					#       this should not cause any problems.

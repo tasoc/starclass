@@ -87,7 +87,7 @@ install:
 before_script:
   - travis_wait $PYTHON run_download_cache.py -q
 script:
-  - $PYTHON -m pytest --cov=starclass/
+  - $PYTHON -m pytest --cov=./
 after_success:
   - $PYTHON -m codecov
 

@@ -59,7 +59,6 @@ class SLOSHClassifier(BaseClassifier):
 			logger.info("Loading pre-trained model...")
 			# load pre-trained classifier
 			self.predictable = True
-			tensorflow.keras.backend.set_learning_phase(1)
 			self.classifier_list.append(tensorflow.keras.models.load_model(self.model_file))
 		else:
 			logger.info('No saved models provided. Predict functions are disabled.')
@@ -87,11 +86,12 @@ class SLOSHClassifier(BaseClassifier):
 
 		logger.debug('Generating Image...')
 		img_array = preprocessing.generate_single_image(psd[0], psd[1])
+		img_array = img_array.reshape(1, 128, 128, 1)
 
 		logger.debug('Making Predictions...')
 		pred_array = np.zeros((self.mc_iterations, self.num_labels))
 		for i in range(self.mc_iterations):
-			pred_array[i, :] = self.classifier_list[0].predict(img_array.reshape(1, 128, 128, 1))
+			pred_array[i, :] = self.classifier_list[0](img_array, training=False)
 		pred = np.mean(pred_array, axis=0)
 
 		# Convert the integer labels used by SLOSH to StellarClasses again
@@ -229,7 +229,6 @@ class SLOSHClassifier(BaseClassifier):
 		:param infile: Path to trained model
 		:return: None
 		'''
-		tensorflow.keras.backend.set_learning_phase(1)
 		self.classifier_list.append(tensorflow.keras.models.load_model(infile))
 		self.predictable = True
 

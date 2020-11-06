@@ -3,6 +3,8 @@
 """
 Command-line script for training classifiers.
 
+The default is to train the Meta Classifier, which includes training all other classifiers as well.
+
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
@@ -18,7 +20,7 @@ def main():
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9v3', choices=starclass.trainingset_list)
-	parser.add_argument('-tf', '--testfraction', help='Test-set fraction', type=float, default=0.0)
+	parser.add_argument('-tf', '--testfraction', help='Holdout/test-set fraction', type=float, default=0.0)
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
@@ -65,7 +67,7 @@ def main():
 				# These are objects with exactly the same properties as the original one,
 				# except that they will run through different subsets of the training and test sets:
 				cla = starclass.get_classifier(cla_key)
-				for tset_fold in tset.folds(tf=0.2):
+				for tset_fold in tset.folds(n_splits=5, tf=0.2):
 					data_dir = tset.key + '/meta_fold{0:02d}'.format(tset_fold.fold)
 					with cla(tset=tset, features_cache=tset.features_cache, data_dir=data_dir) as stcl:
 						logger.info('Training %s on Fold %d/%d...', stcl.classifier_key, tset_fold.fold, tset_fold.crossval_folds)
@@ -73,12 +75,20 @@ def main():
 						logger.info("Classifying test-set...")
 						stcl.test(tset_fold, save=tm.save_results)
 
+				# Now train all classifiers on the full training-set (minus the holdout-set),
+				# and test on the holdout set:
+				with cla(tset=tset, features_cache=tset.features_cache) as stcl:
+					logger.info('Training %s on full training-set...', stcl.classifier_key)
+					stcl.train(tset)
+					logger.info("Classifying test-set using %s...", stcl.classifier_key)
+					stcl.test(tset, save=tm.save_results)
+
 	# Initialize the classifier:
 	classifier = starclass.get_classifier(current_classifier)
 	with starclass.TaskManager(tset.input_folder, overwrite=False, classes=tset.StellarClasses) as tm:
 		with classifier(tset=tset, features_cache=tset.features_cache) as stcl:
 			# Run the training of the classifier:
-			logger.info("Training %s...", current_classifier)
+			logger.info("Training %s on full training-set...", current_classifier)
 			stcl.train(tset)
 			logger.info("Training done...")
 			logger.info("Classifying test-set using %s...", current_classifier)

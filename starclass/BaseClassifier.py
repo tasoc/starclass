@@ -293,9 +293,19 @@ class BaseClassifier(object):
 		# The Meta-classifier is only using features from the other classifiers,
 		# so there is no reason to load lightcurves and calculate/load any other classifiers:
 		if self.classifier_key != 'meta':
+			# Load features from cache file, or calculate them
+			# and put them into cache file for other classifiers
+			# to use later on:
+			if self.features_cache:
+				features_file = os.path.join(self.features_cache, 'features-' + str(task['priority']) + '.pickle')
+				if os.path.exists(features_file):
+					features = loadPickle(features_file)
 
 			# Load lightcurve file and create a TessLightCurve object:
-			if fname.endswith('.noisy') or fname.endswith('.sysnoise') or fname.endswith('.txt') or fname.endswith('.clean'):
+			if 'lightcurve' in features:
+				lightcurve = features['lightcurve']
+
+			elif fname.endswith('.noisy') or fname.endswith('.sysnoise') or fname.endswith('.txt') or fname.endswith('.clean'):
 				data = np.loadtxt(fname)
 				if data.shape[1] == 4:
 					quality = np.asarray(data[:,3], dtype='int32')
@@ -342,19 +352,14 @@ class BaseClassifier(object):
 			else:
 				raise ValueError("Invalid file format")
 
-			# Load features from cache file, or calculate them
-			# and put them into cache file for other classifiers
-			# to use later on:
-			if self.features_cache:
-				features_file = os.path.join(self.features_cache, 'features-' + str(task['priority']) + '.pickle')
-				if os.path.exists(features_file):
-					features = loadPickle(features_file)
-
 			# No features found in cache, so calculate them:
 			if not features:
 				save_to_cache = True
 				features = self.calc_features(lightcurve)
-				logger.debug(features)
+
+		# Save features in cache file for later use:
+		if save_to_cache and self.features_cache:
+			savePickle(features_file, features)
 
 		# Add the fields from the task to the list of features:
 		features['priority'] = task['priority']
@@ -366,10 +371,7 @@ class BaseClassifier(object):
 				logger.warning("Key '%s' not found in task.", key)
 				features[key] = np.NaN
 
-		# Save features in cache file for later use:
-		if save_to_cache and self.features_cache:
-			savePickle(features_file, features)
-
+		logger.debug(features)
 		return features
 
 	#----------------------------------------------------------------------------------------------

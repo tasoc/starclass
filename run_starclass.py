@@ -19,6 +19,7 @@ def main():
 	parser = argparse.ArgumentParser(description='Utility function for running stellar classifiers.')
 	parser.add_argument('-c', '--classifier', help='Classifier to use.', default='rfgc', choices=starclass.classifier_list)
 	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9v3', choices=starclass.trainingset_list)
+	parser.add_argument('--linfit', help='', action='store_true')
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
@@ -60,7 +61,7 @@ def main():
 
 	# Initialize training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
-	tset = tsetclass(level=args.level)
+	tset = tsetclass(level=args.level, linfit=args.linfit)
 
 	# Running:
 	# When simply running the classifier on new stars:

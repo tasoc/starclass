@@ -20,7 +20,6 @@ AVAILABLE_TSETS = [
 	'keplerq9v3-instr',
 	pytest.param('keplerq9v2', marks=pytest.mark.skipif(not trainingset_available('keplerq9v2'), reason='TrainingSet not available')),
 	pytest.param('keplerq9', marks=pytest.mark.skipif(not trainingset_available('keplerq9'), reason='TrainingSet not available')),
-	pytest.param('keplerq9-linfit', marks=pytest.mark.skipif(not trainingset_available('keplerq9-linfit'), reason='TrainingSet not available')),
 	pytest.param('tdasim', marks=pytest.mark.skip),
 	pytest.param('tdasim-raw', marks=pytest.mark.skip),
 	pytest.param('tdasim-clean', marks=pytest.mark.skip)
@@ -178,16 +177,6 @@ def test_keplerq9v2():
 		tsets.keplerq9v2(datalevel='raw')
 	with pytest.raises(ValueError):
 		tsets.keplerq9v2(datalevel='clean')
-
-#--------------------------------------------------------------------------------------------------
-@pytest.mark.skipif(not trainingset_available('keplerq9-linfit'), reason='TrainingSet not available')
-def test_keplerq9linfit():
-
-	# KeplerQ9 does not support anything other than datalevel=corr
-	with pytest.raises(ValueError):
-		tsets.keplerq9linfit(datalevel='raw')
-	with pytest.raises(ValueError):
-		tsets.keplerq9linfit(datalevel='clean')
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.skip()

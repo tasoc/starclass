@@ -20,6 +20,7 @@ def main():
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9v3', choices=starclass.trainingset_list)
+	parser.add_argument('--linfit', help='', action='store_true')
 	parser.add_argument('-tf', '--testfraction', help='Holdout/test-set fraction', type=float, default=0.0)
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
@@ -53,7 +54,7 @@ def main():
 
 	# Pick the training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
-	tset = tsetclass(level=args.level, tf=args.testfraction)
+	tset = tsetclass(level=args.level, tf=args.testfraction, linfit=args.linfit)
 
 	# The Meta-classifier requires us to first train all of the other classifiers
 	# using cross-validation

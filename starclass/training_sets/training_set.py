@@ -36,7 +36,7 @@ class TrainingSet(object):
 		fold (int):
 	"""
 
-	def __init__(self, level='L1', datalevel='corr', tf=0.0, random_seed=42):
+	def __init__(self, level='L1', datalevel='corr', tf=0.0, linfit=False, random_seed=42):
 		"""
 		Parameters:
 			datalevel (string, optional):
@@ -62,6 +62,7 @@ class TrainingSet(object):
 		self.datalevel = datalevel
 		self.testfraction = tf
 		self.random_seed = random_seed
+		self.linfit = linfit
 
 		# Assign StellarClasses Enum depending on
 		# the classification level we are running:
@@ -72,7 +73,10 @@ class TrainingSet(object):
 			}[self.level]
 
 		# Define cache location where we will save common features:
-		self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)
+		features_cache_name = 'features_cache_%s' % self.datalevel
+		if self.linfit:
+			features_cache_name += '_linfit'
+		self.features_cache = os.path.join(self.input_folder, features_cache_name)
 		os.makedirs(self.features_cache, exist_ok=True)
 
 		# Generate TODO file if it is needed:

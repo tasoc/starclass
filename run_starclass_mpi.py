@@ -38,6 +38,7 @@ def main():
 	parser = argparse.ArgumentParser(description='Run TESS Corrections in parallel using MPI.')
 	parser.add_argument('-c', '--classifier', help='Classifier to use.', default=None, choices=starclass.classifier_list)
 	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9v3', choices=starclass.trainingset_list)
+	parser.add_argument('--linfit', help='', action='store_true')
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
@@ -55,7 +56,7 @@ def main():
 
 	# Initialize the training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
-	tset = tsetclass(level=args.level)
+	tset = tsetclass(level=args.level, linfit=args.linfit)
 
 	# Define MPI message tags
 	tags = enum.IntEnum('tags', ('READY', 'DONE', 'EXIT', 'START'))

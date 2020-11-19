@@ -109,7 +109,6 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit):
 					assert 'detrend_coeff' in feat
 					assert len(feat['detrend_coeff']) == 2
 					assert np.all(np.isfinite(feat['detrend_coeff']))
-					assert False
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

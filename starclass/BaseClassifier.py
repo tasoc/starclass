@@ -416,7 +416,7 @@ class BaseClassifier(object):
 					lc = lc - np.polyval(p, lc.time)
 				except np.RankWarning:
 					p = [0, 0]
-		
+
 			# Store the coefficients of the above detrending as a seperate feature:
 			features['detrend_coeff'] = p
 

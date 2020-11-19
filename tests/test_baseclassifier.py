@@ -12,7 +12,7 @@ from lightkurve import TessLightCurve
 from astropy.table import Table
 import numpy as np
 import conftest # noqa: F401
-from starclass import BaseClassifier, TaskManager
+from starclass import BaseClassifier, TaskManager, get_trainingset
 from starclass.features.powerspectrum import powerspectrum
 
 #--------------------------------------------------------------------------------------------------
@@ -27,7 +27,12 @@ def test_baseclassifier_import_exceptions(SHARED_INPUT_DIR):
 		BaseClassifier(features_cache=os.path.join(SHARED_INPUT_DIR, 'does-not-exist'))
 
 #--------------------------------------------------------------------------------------------------
-def test_baseclassifier_load_star(PRIVATE_INPUT_DIR):
+@pytest.mark.parametrize('linfit', [False, True])
+def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit):
+
+	# Use the following training set as input:
+	tsetclass = get_trainingset('keplerq9v3')
+	tset = tsetclass(linfit=linfit)
 
 	# Set a dummy features cache inside the private input dir:
 	features_cache = os.path.join(PRIVATE_INPUT_DIR, 'features_cache')
@@ -38,7 +43,7 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR):
 
 	with TaskManager(PRIVATE_INPUT_DIR) as tm:
 		for k in range(2): # Try loading twice - second time we should load from cache
-			with BaseClassifier(features_cache=features_cache) as cl:
+			with BaseClassifier(tset=tset, features_cache=features_cache) as cl:
 				# Check that the second time there is something in the features cache:
 				if k > 0:
 					assert os.listdir(features_cache) == ['features-17.pickle']
@@ -97,6 +102,14 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR):
 				assert lc.camera == 1
 				assert lc.ccd == 4
 				assert lc.sector == 1
+
+				# When running with linfit enabled, the features should contain
+				# an extra set of coefficients from the detrending:
+				if linfit:
+					assert 'detrend_coeff' in feat
+					assert len(feat['detrend_coeff']) == 2
+					assert np.all(np.isfinite(feat['detrend_coeff']))
+					assert False
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

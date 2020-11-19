@@ -27,13 +27,14 @@ AVAILABLE_TSETS = [
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
-def test_trainingset(tsetkey):
+@pytest.mark.parametrize('linfit', [False, True])
+def test_trainingset(tsetkey, linfit):
 
 	# Get training set class using conv. function:
 	tsetclass = get_trainingset(tsetkey)
 
 	for testfraction in (0, 0.2):
-		tset = tsetclass(tf=testfraction)
+		tset = tsetclass(tf=testfraction, linfit=linfit)
 		print(tset)
 
 		assert tset.key == tsetkey
@@ -57,7 +58,7 @@ def test_trainingset(tsetkey):
 	with pytest.raises(ValueError):
 		tset = tsetclass(datalevel='nonsense')
 
-	tset = tsetclass(tf=0)
+	tset = tsetclass(tf=0, linfit=linfit)
 	print(tset)
 	lbls = tset.labels()
 	lbls_test = tset.labels_test()
@@ -67,7 +68,7 @@ def test_trainingset(tsetkey):
 	assert len(lbls) == tset.nobjects
 	assert len(lbls_test) == 0
 
-	tset = tsetclass(tf=0.2)
+	tset = tsetclass(tf=0.2, linfit=linfit)
 	print(tset)
 	lbls = tset.labels()
 	lbls_test = tset.labels_test()
@@ -110,11 +111,12 @@ def test_trainingset_generate_todolist(monkeypatch, tsetkey):
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
-def test_trainingset_features(tsetkey):
+@pytest.mark.parametrize('linfit', [False, True])
+def test_trainingset_features(tsetkey, linfit):
 
 	# Get training set class using conv. function:
 	tsetclass = get_trainingset(tsetkey)
-	tset = tsetclass(tf=0.2)
+	tset = tsetclass(tf=0.2, linfit=linfit)
 
 	features = tset.features()
 	assert isinstance(features, types.GeneratorType)

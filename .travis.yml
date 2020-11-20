@@ -70,6 +70,7 @@ jobs:
       before_script: skip
       script:
         - flake8
+      after_success: skip
 
   # Allow some newer versions of Python to fail for now
   # This will be changed once the required packages starts

@@ -379,9 +379,15 @@ class TrainingSet(object):
 		# This will ensure that the lightcurve can actually be read by the system.
 		if not all([datasource, variance, rms_hour, ptp]):
 			with BaseClassifier(tset=self, features_cache=None) as bc:
+				# Most of the input is None, simply to silence warnings
 				fake_task = {
 					'priority': priority,
-					'starid': starid
+					'starid': starid,
+					'tmag': None,
+					'variance': None,
+					'rms_hour': None,
+					'ptp': None,
+					'other_classifiers': None
 				}
 				features = bc.load_star(fake_task, os.path.join(self.input_folder, lightcurve))
 				lc = features['lightcurve']

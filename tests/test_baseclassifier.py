@@ -14,6 +14,7 @@ import numpy as np
 import conftest # noqa: F401
 from starclass import BaseClassifier, TaskManager, get_trainingset
 from starclass.features.powerspectrum import powerspectrum
+from starclass.plots import plt, plots_interactive
 
 #--------------------------------------------------------------------------------------------------
 def test_baseclassifier_import():
@@ -31,11 +32,14 @@ def test_baseclassifier_import_exceptions(SHARED_INPUT_DIR):
 def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit):
 
 	# Use the following training set as input:
-	tsetclass = get_trainingset('keplerq9v3')
+	tsetclass = get_trainingset()
 	tset = tsetclass(linfit=linfit)
 
 	# Set a dummy features cache inside the private input dir:
-	features_cache = os.path.join(PRIVATE_INPUT_DIR, 'features_cache')
+	features_cache_name = 'features_cache'
+	if linfit:
+		features_cache_name += '_linfit'
+	features_cache = os.path.join(PRIVATE_INPUT_DIR, features_cache_name)
 	os.makedirs(features_cache, exist_ok=True)
 
 	# The features cache should be empty to begin with:
@@ -109,7 +113,73 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit):
 					assert 'detrend_coeff' in feat
 					assert len(feat['detrend_coeff']) == 2
 					assert np.all(np.isfinite(feat['detrend_coeff']))
+				else:
+					assert 'detrend_coeff' not in feat
+
+#--------------------------------------------------------------------------------------------------
+def test_linfit(PRIVATE_INPUT_DIR):
+
+	fname = os.path.join(PRIVATE_INPUT_DIR, 'tess00029281992-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz')
+
+	# Use the following training set as input:
+	tsetclass = get_trainingset()
+	tset = tsetclass(linfit=True)
+
+	with BaseClassifier(tset=tset) as cl:
+		# This is only used to easier load the original lightcurve:
+		task = {'priority': 1, 'starid': 29281992, 'tmag': None, 'variance': None, 'rms_hour': None, 'ptp': None, 'other_classifiers': None}
+		feat = cl.load_star(task, fname)
+		lc = feat['lightcurve']
+		p_rem = feat['detrend_coeff']
+
+		# Remove any trend from the lightcurve:
+		indx = np.isfinite(lc.time) & np.isfinite(lc.flux) & np.isfinite(lc.flux_err)
+		mintime = np.nanmin(lc.time[indx])
+		lc -= np.polyval(p_rem, lc.time - mintime)
+
+		# Insert a new known trend in the lightcurve:
+		p_ins = [500, 1234]
+		time_orig = lc.time
+		lintrend_input = np.polyval(p_ins, lc.time - mintime)
+		lc.flux += lintrend_input
+
+		# Save the modified lightcurve to a file:
+		fname_modified = fname.replace('.fits.gz', '.txt')
+		with open(fname_modified, 'wt') as fid:
+			for k in range(len(lc)):
+				fid.write("{0:.12f},{1:.18e},{2:.18e}\n".format(lc.time[k], lc.flux[k], lc.flux_err[k]))
+
+		# Now load the modified
+		feat = cl.load_star(task, fname_modified)
+		lc = feat['lightcurve']
+		psd2 = feat['powerspectrum']
+		p = feat['detrend_coeff']
+		print(p)
+
+		lintrend_recovered = np.polyval(p, lc.time - mintime)
+
+		psd = powerspectrum(lc)
+
+		# Create debugging figure:
+		fig, (ax1, ax2) = plt.subplots(2, figsize=(12,12))
+		ax1.plot(lc.time, lc.flux, lw=0.5, label='Original')
+		ax1.plot(time_orig, lintrend_input, lw=0.5, label='Input')
+		ax1.plot(lc.time, lintrend_recovered, lw=0.5, label='Recovered')
+		ax1.legend()
+		ax2.plot(psd.standard[0], psd.standard[1], lw=0.5, label='Original')
+		ax2.plot(psd2.standard[0], psd2.standard[1], lw=0.5, label='Detrended')
+		ax2.set_yscale('log')
+		ax2.legend()
+
+		# Make sure we recover the trend that we put in:
+		np.testing.assert_allclose(p, p_ins)
+
+		# Compare the power spectra:
+		np.testing.assert_allclose(psd.standard[0], psd2.standard[0])
+		assert np.all(psd2.standard[1][0:2] < psd.standard[1][0:2])
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
+	plots_interactive()
 	pytest.main([__file__])
+	plt.show()

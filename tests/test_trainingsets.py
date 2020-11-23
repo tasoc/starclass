@@ -131,7 +131,7 @@ def test_trainingset_generate_todolist_insert(SHARED_INPUT_DIR, tsetkey):
 				tset.generate_todolist_insert(cursor, priority=None)
 
 			with pytest.raises(ValueError):
-				tset.generate_todolist_insert(cursor, lightcurve=None)
+				tset.generate_todolist_insert(cursor, priority=1, lightcurve=None)
 
 			lightcurve = os.path.join(SHARED_INPUT_DIR, 'tess00029281992-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz')
 			tset.generate_todolist_insert(cursor,

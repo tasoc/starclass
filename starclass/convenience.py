@@ -38,7 +38,7 @@ def get_classifier(classifier_key):
 	return ClassificationClass
 
 #--------------------------------------------------------------------------------------------------
-def get_trainingset(tset_key):
+def get_trainingset(tset_key='keplerq9v3'):
 	"""
 	Get training set class for given training set key.
 

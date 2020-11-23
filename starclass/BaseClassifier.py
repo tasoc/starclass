@@ -394,6 +394,8 @@ class BaseClassifier(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
+		logger = logging.getLogger(__name__)
+
 		# We start out with an empty list of features:
 		features = {}
 
@@ -409,13 +411,15 @@ class BaseClassifier(object):
 			# Do a robust fitting with a first-order polynomial,
 			# where we are catching cases where the fitting goes bad.
 			indx = np.isfinite(lc.time) & np.isfinite(lc.flux) & np.isfinite(lc.flux_err)
+			mintime = np.nanmin(lc.time[indx])
 			with warnings.catch_warnings():
 				warnings.filterwarnings('error', category=np.RankWarning)
 				try:
-					p = np.polyfit(lc.time[indx], lc.flux[indx], 1, w=1/lc.flux_err[indx])
-					lc = lc - np.polyval(p, lc.time)
+					p = np.polyfit(lc.time[indx] - mintime, lc.flux[indx], 1, w=1/lc.flux_err[indx])
+					lc -= np.polyval(p, lc.time - mintime)
 				except np.RankWarning:
-					p = [0, 0]
+					logger.warning("Could not detrend light curve")
+					p = np.array([0, 0])
 
 			# Store the coefficients of the above detrending as a seperate feature:
 			features['detrend_coeff'] = p

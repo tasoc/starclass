@@ -182,9 +182,9 @@ class SLOSHClassifier(BaseClassifier):
 			reduce_lr = ReduceLROnPlateau(factor=0.5, patience=5, verbose=verbose)
 			early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 			checkpoint = ModelCheckpoint(self.model_file, monitor='val_loss', verbose=verbose, save_best_only=True)
-			#class_accuracy = TestCallback(valid_generator)
+			#class_accuracy = TestCallback(valid_generator, classes=self.StellarClasses)
 
-			model = preprocessing.default_classifier_model()
+			model = preprocessing.default_classifier_model(num_classes=len(self.StellarClasses))
 
 			logger.info('Training Classifier...')
 			epochs = 50
@@ -244,9 +244,11 @@ class SLOSHClassifier(BaseClassifier):
 #--------------------------------------------------------------------------------------------------
 class TestCallback(tensorflow.keras.callbacks.Callback):
 
-	def __init__(self, val_data):
+	def __init__(self, val_data, classes):
 		self.validation_data = val_data
 		self.batch_size = 32
+		self.num_classes = len(classes)
+		self.class_names = [cl.name for cl in classes]
 
 	def on_train_begin(self, logs={}):
 		print(self.validation_data)
@@ -256,24 +258,18 @@ class TestCallback(tensorflow.keras.callbacks.Callback):
 		#batches = len(self.validation_data)
 		#total = batches * self.batch_size
 
-		#val_pred = np.zeros((total, 8))
-		#val_true = np.zeros((total, 8))
-		val_pred = np.zeros((1,8))
-		val_true = np.zeros((1,8))
+		val_pred = np.zeros((1, self.num_classes))
+		val_true = np.zeros((1, self.num_classes))
 
-		i = 0
-		for batch in self.validation_data:
-			xVal, yVal = batch
+		for xVal, yVal in self.validation_data:
 			val_pred = np.vstack([val_pred, self.model.predict(xVal)])
 			val_true = np.vstack([val_true, yVal])
-			i += 1
+
 		val_pred = np.argmax(val_pred[1:,:], axis=1)
 		val_true = np.argmax(val_true[1:,:], axis=1)
+
 		print(np.shape(val_pred), np.shape(val_true))
 		#print(np.argmax(val_pred, axis=1))
 		#print(np.argmax(val_true, axis=1))
-		target_names = ['RRLyr/Cepheid', 'Aperiodic', 'Constant',
-			'ContactBinary/Rotation', 'deltaSct/BetaCeph',
-			'GammaDor/SPB', 'Solarlike', 'Eclipse']
 		print(classification_report(val_true, val_pred,
-			target_names=target_names))
+			target_names=self.class_names))

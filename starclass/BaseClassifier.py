@@ -311,7 +311,7 @@ class BaseClassifier(object):
 			if 'lightcurve' in features:
 				lightcurve = features['lightcurve']
 
-			elif fname.endswith('.noisy') or fname.endswith('.sysnoise') or fname.endswith('.txt') or fname.endswith('.clean'):
+			elif fname.endswith(('.txt', '.noisy', '.sysnoise', '.clean')):
 				data = np.loadtxt(fname)
 				if data.shape[1] == 4:
 					quality = np.asarray(data[:,3], dtype='int32')
@@ -331,7 +331,7 @@ class BaseClassifier(object):
 					meta={}
 				)
 
-			elif fname.endswith('.fits') or fname.endswith('.fits.gz'):
+			elif fname.endswith(('.fits.gz', '.fits')):
 				with fits.open(fname, mode='readonly', memmap=True) as hdu:
 					lightcurve = TessLightCurve(
 						time=hdu['LIGHTCURVE'].data['TIME'],

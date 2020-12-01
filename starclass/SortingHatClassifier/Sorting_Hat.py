@@ -71,6 +71,7 @@ class SortingHatClassifier(BaseClassifier):
 				max_features=max_features,
 				min_samples_split=min_samples_split,
 				random_state=self.random_state)
+			self.features_names = fc.feature_names()
 
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):

@@ -74,6 +74,7 @@ class XGBClassifier(BaseClassifier):
 				subsample=0.8
 			)
 			self.trained = False
+			self.features_names = xgb_features.feature_names()
 
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):

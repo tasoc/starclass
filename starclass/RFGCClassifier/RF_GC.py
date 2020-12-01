@@ -83,6 +83,7 @@ class RFGCClassifier(BaseClassifier):
 				max_features=max_features,
 				min_samples_split=min_samples_split,
 				random_state=self.random_state)
+			self.features_names = fc.feature_names()
 			if self.classifier.som is None and self.somfile is not None:
 				# load som
 				if os.path.exists(self.somfile):

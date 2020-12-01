@@ -192,6 +192,7 @@ class MetaClassifier(BaseClassifier):
 		keepcols = ~allnan(features, axis=0)
 		features = features[:, keepcols]
 		self.features_used = [x for i, x in enumerate(self.features_used) if keepcols[i]]
+		self.features_names = ['{0:s}_{1:s}'.format(classifier, stcl.name) for classifier, stcl in self.features_used]
 
 		# Throw an error if a classifier is not run at all:
 		run_classifiers = set([fu[0] for fu in self.features_used])

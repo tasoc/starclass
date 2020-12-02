@@ -26,7 +26,7 @@ class Classifier_obj(RandomForestClassifier):
 			n_estimators=n_estimators,
 			min_samples_split=min_samples_split,
 			class_weight='balanced',
-			max_depth=3,
+			max_depth=8,
 			random_state=random_state
 		)
 		self.trained = False

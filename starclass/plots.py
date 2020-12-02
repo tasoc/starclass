@@ -11,7 +11,6 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import shap
-import os.path
 
 # Change to a non-GUI backend since this
 # should be able to run on a cluster:

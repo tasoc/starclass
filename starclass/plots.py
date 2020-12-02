@@ -133,13 +133,3 @@ def plot_feature_importance(shap_values, X_test, feature_names, class_names):
 #--------------------------------------------------------------------------------------------------
 def plot_feature_scatter_density(shap_values, X_test, feature_names, class_name):
 	shap.summary_plot(shap_values, X_test, feature_names=feature_names, class_names=class_name)
-
-#--------------------------------------------------------------------------------------------------
-def write_metrics_to_file(data_dir, info, metrics):
-	with open(os.path.join(data_dir, 'performance_metrics.txt'), mode='wt', encoding='utf-8') as file:
-		file.write(info)
-		file.write('\n')
-		for k,v in metrics.items():
-			file.write(k + ': ' + str(v))
-			file.write('\n')
-		file.write('------ \n')

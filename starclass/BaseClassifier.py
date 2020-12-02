@@ -21,7 +21,7 @@ from .features.freqextr import freqextr
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import savePickle, loadPickle
-from .plots import plotConfMatrix, plt, plotROC, write_metrics_to_file
+from .plots import plotConfMatrix, plt, plotROC
 from .StellarClasses import StellarClassesLevel1
 
 __docformat__ = 'restructuredtext'
@@ -287,21 +287,9 @@ class BaseClassifier(object):
 				else:
 					new_pred[i] = 'UNKOWN'
 
-		# Write performance metrics to file
+		# Classification report for meta
 		if self.classifier_key == 'meta':
-			c_report = classification_report(labels_test, y_pred)
-			logger.info(c_report)
-			metrics = {'accuracy': acc, 'Macro F1 score': f1_macro, 'Weighted F1 score': f1_weighted, 'Classification report': c_report}
-			metrics = [acc, f1_macro, f1_weighted, c_report]
-		else:
-			metrics = {'accuracy': acc, 'Macro F1 score': f1_macro, 'Weighted F1 score': f1_weighted}
-
-		if tset.fold:
-			info = self.classifier_key + ' - fold: ' + str(tset.fold) + '/' + str(tset.crossval_folds)
-		else:
-			info = self.classifier_key + ' - full test set'
-
-		write_metrics_to_file(self.data_dir, info, metrics)
+			logger.info(classification_report(labels_test, y_pred))
 
 		# Confusion Matrix:
 		cf = confusion_matrix(labels_test, y_pred, labels=all_classes)
@@ -533,10 +521,10 @@ class BaseClassifier(object):
 		Parameters:
 			y_test (dict):
 			y_prob ():
-			class_names ():
+			class_names (list):
 
 		Returns:
-			tuple: 
+			tuple:
 				- fpr (dict)
 				- tpr (dict)
 				- roc_auc (dict)

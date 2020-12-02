@@ -41,11 +41,15 @@ def main():
 	formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 	console = logging.StreamHandler()
 	console.setFormatter(formatter)
+	filehandler = logging.FileHandler("debug.log", mode="w")
+	filehandler.setFormatter(formatter)
 	logger = logging.getLogger(__name__)
 	logger.addHandler(console)
+	logger.addHandler(filehandler)
 	logger.setLevel(logging_level)
 	logger_parent = logging.getLogger('starclass')
 	logger_parent.addHandler(console)
+	logger_parent.addHandler(filehandler)
 	logger_parent.setLevel(logging_level)
 
 	# Choose which classifier to use

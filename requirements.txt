@@ -12,6 +12,7 @@ scikit-learn == 0.23
 Bottleneck == 1.3.2
 requests
 setuptools >= 41.0.0 # Required by tensorflow
+shap
 tensorflow == 2.3.1
 Pillow
 xgboost == 0.90

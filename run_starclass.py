@@ -102,6 +102,7 @@ def main():
 
 			# Pad results with metadata and return to TaskManager to be saved:
 			res.update({
+				'tset': tset.key,
 				'status': starclass.STATUS.OK,
 				'elaptime': toc_predict - tic_predict
 			})

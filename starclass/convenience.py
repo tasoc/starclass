@@ -82,4 +82,4 @@ def trainingset_available(tset_key):
 	# Use the other function to ensure that tset_key is correct:
 	tset = get_trainingset(tset_key)
 	# Check if the todo.sqlite file has been created:
-	return os.path.isfile(os.path.join(tset.find_input_folder(), 'todo.sqlite'))
+	return os.path.isfile(os.path.join(tset.find_input_folder(), tset._todo_name + '.sqlite'))

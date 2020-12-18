@@ -96,8 +96,6 @@ class BaseClassifier(object):
 		if tset is not None:
 			if data_dir is None:
 				data_dir = tset.key
-			if self.linfit:
-				data_dir += '-linfit'
 			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', tset.level, data_dir))
 		else:
 			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
@@ -238,6 +236,7 @@ class BaseClassifier(object):
 			res = {
 				'priority': features['priority'],
 				'classifier': self.classifier_key,
+				'tset': tset.key,
 				'status': STATUS.OK
 			}
 

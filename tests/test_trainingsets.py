@@ -98,7 +98,7 @@ def test_trainingset_generate_todolist(monkeypatch, tsetkey):
 		os.makedirs(tsetdir)
 		for f in os.listdir(input_folder):
 			fpath = os.path.join(input_folder, f)
-			if os.path.isdir(fpath) or f == 'todo.sqlite':
+			if os.path.isdir(fpath) or f.endswith('.sqlite'):
 				continue
 			shutil.copy(fpath, tsetdir)
 
@@ -110,7 +110,7 @@ def test_trainingset_generate_todolist(monkeypatch, tsetkey):
 		tset = tsetclass()
 
 		assert tset.input_folder == tsetdir
-		assert os.path.isfile(os.path.join(tsetdir, 'todo.sqlite'))
+		assert os.path.isfile(os.path.join(tsetdir, tset._todo_name + '.sqlite'))
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)

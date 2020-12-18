@@ -44,6 +44,7 @@ class TaskManager(object):
 
 		self.StellarClasses = classes
 		self.readonly = readonly
+		self.tset = None
 
 		# Keep a list of all the possible classifiers here:
 		self.all_classifiers = list(classifier_list)
@@ -76,9 +77,23 @@ class TaskManager(object):
 
 		# Reset the status of everything for a new run:
 		if overwrite:
+			self.cursor.execute("DROP TABLE IF EXISTS starclass_settings;")
 			self.cursor.execute("DROP TABLE IF EXISTS starclass_diagnostics;")
 			self.cursor.execute("DROP TABLE IF EXISTS starclass_results;")
 			self.conn.commit()
+			cleanup = True # Enforce a cleanup after deleting old results
+
+		# Create table for settings if it doesn't already exits:
+		self.cursor.execute("""CREATE TABLE IF NOT EXISTS starclass_settings (
+			tset TEXT NOT NULL
+		);""")
+		self.conn.commit()
+
+		# Load settings from setting tables:
+		self.cursor.execute("SELECT * FROM starclass_settings LIMIT 1;")
+		row = self.cursor.fetchone()
+		if row is not None:
+			self.tset = row['tset']
 
 		# Create table for diagnostics:
 		self.cursor.execute("""CREATE TABLE IF NOT EXISTS starclass_diagnostics (
@@ -293,6 +308,21 @@ class TaskManager(object):
 		return task
 
 	#----------------------------------------------------------------------------------------------
+	def save_settings(self):
+		"""
+		Save settings to TODO-file and create method-specific columns in ``diagnostics_corr`` table.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		try:
+			self.cursor.execute("DELETE FROM starclass_settings;")
+			self.cursor.execute("INSERT INTO starclass_settings (tset) VALUES (?);", [self.tset])
+			self.conn.commit()
+		except: # noqa: E722, pragma: no cover
+			self.conn.rollback()
+			raise
+
+	#----------------------------------------------------------------------------------------------
 	def save_results(self, result):
 		"""
 		Save results and diagnostics. This will update the TODO list.
@@ -300,6 +330,15 @@ class TaskManager(object):
 		Parameters:
 			results (dict): Dictionary of results and diagnostics.
 		"""
+
+		# If the training set has not already been set for this TODO-file,
+		# update the settings, and if it has check that we are not
+		# mixing results from different correctors in one TODO-file.
+		if self.tset is None and result.get('tset'):
+			self.tset = result.get('tset')
+			self.save_settings()
+		elif result.get('tset') != self.tset:
+			raise ValueError("Attempting to mix results from multiple training sets")
 
 		priority = result.get('priority')
 		classifier = result.get('classifier')

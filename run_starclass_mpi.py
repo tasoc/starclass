@@ -185,6 +185,7 @@ def main():
 
 					# Pad results with metadata and return to TaskManager to be saved:
 					result.update({
+						'tset': tset.key,
 						'worker_wait_time': toc_wait - tic_wait
 					})
 

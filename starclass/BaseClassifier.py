@@ -279,6 +279,8 @@ class BaseClassifier(object):
 
 		# Save new classification thresholds and make final predictions based on those
 		if self.classifier_key == 'meta':
+			self.classification_thresholds = best_thresholds
+			# TODO: move this part to the meta-classifier that will use the saved thresholds to make a final list with predictions (only during runtime, not train/test)
 			new_pred = np.zeros(len(y_pred), dtype='<U15')
 			for i in range(len(y_prob)):
 				idx, max_prob = np.argmax(y_prob[i,:]), np.max(y_prob[i,:])

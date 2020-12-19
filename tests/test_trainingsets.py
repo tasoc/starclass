@@ -39,7 +39,10 @@ def test_trainingset(tsetkey, linfit):
 		tset = tsetclass(tf=testfraction, linfit=linfit)
 		print(tset)
 
-		assert tset.key == tsetkey
+		if linfit:
+			assert tset.key == tsetkey + '-linfit'
+		else:
+			assert tset.key == tsetkey
 		assert tset.level == 'L1'
 		assert tset.datalevel == 'corr'
 		assert tset.testfraction == testfraction

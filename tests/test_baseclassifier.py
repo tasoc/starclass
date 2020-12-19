@@ -147,7 +147,7 @@ def test_linfit(PRIVATE_INPUT_DIR):
 		fname_modified = fname.replace('.fits.gz', '.txt')
 		with open(fname_modified, 'wt') as fid:
 			for k in range(len(lc)):
-				fid.write("{0:.12f},{1:.18e},{2:.18e}\n".format(lc.time[k], lc.flux[k], lc.flux_err[k]))
+				fid.write("{0:.12f}  {1:.18e}  {2:.18e}\n".format(lc.time[k], lc.flux[k], lc.flux_err[k]))
 
 		# Now load the modified
 		feat = cl.load_star(task, fname_modified)

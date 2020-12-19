@@ -374,7 +374,7 @@ class TaskManager(object):
 				})
 
 			self.conn.commit()
-		except: # noqa: E722
+		except: # noqa: E722, pragma: no cover
 			self.conn.rollback()
 			raise
 
@@ -390,6 +390,6 @@ class TaskManager(object):
 				'status': STATUS.STARTED.value
 			})
 			self.conn.commit()
-		except: # noqa: E722
+		except: # noqa: E722, pragma: no cover
 			self.conn.rollback()
 			raise

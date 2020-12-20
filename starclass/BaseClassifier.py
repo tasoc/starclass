@@ -416,7 +416,7 @@ class BaseClassifier(object):
 				try:
 					p = np.polyfit(lc.time[indx] - mintime, lc.flux[indx], 1, w=1/lc.flux_err[indx])
 					lc -= np.polyval(p, lc.time - mintime)
-				except np.RankWarning:
+				except np.RankWarning: # pragma: no cover
 					logger.warning("Could not detrend light curve")
 					p = np.array([0, 0])
 

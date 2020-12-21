@@ -24,25 +24,35 @@ def featcalc(features, som, providednfreqs=6, nfrequencies=6, cardinality=64,
 	if isinstance(features, dict): # trick for single features
 		features = [features]
 
-	# Find the number of featues to use:
-	Nfeat = nfrequencies + 16
-	linfit = ('detrend_coeff' in features[0])
-	if linfit:
-		Nfeat += 1
-
 	# Loop through the provided features and build feature table:
-	featout = np.zeros([1, Nfeat], dtype='float32')
+	linfit = None
 	for obj in features:
+		# We have to do it in this (inelegant) way, since we have are in a independent
+		# function and therefore have to examine the first feature dict to see
+		# if linfit was enabled:
+		if linfit is None:
+			linfit = ('detrend_coeff' in obj)
+
+			# Find the number of featues to use:
+			Nfeat = nfrequencies + 16
+			if linfit:
+				Nfeat += 1
+
+			# Create full table to gather feature into:
+			featout = np.zeros([1, Nfeat], dtype='float32')
+
+		# Load from cache if it exists:
+		# The cache will never contain the slope feature, which
+		# is only calculated when linfit is enabled.
 		precalc = False
 		if savefeat is not None:
-			featfile = os.path.join(savefeat, str(obj['priority'])+'.txt')
-			if os.path.exists(featfile) and not recalc:
-				#logger.info(str(obj['priority'])+": Loading precalculated features...")
+			featfile = os.path.join(savefeat, str(obj['priority']) + '.txt')
+			if not recalc and os.path.exists(featfile):
 				objfeatures = np.loadtxt(featfile, delimiter=',')
 				precalc = True
 
 		if not precalc:
-			objfeatures = np.zeros(Nfeat, dtype='float32')
+			objfeatures = np.zeros(nfrequencies+16, dtype='float32')
 			lc = prepLCs(obj['lightcurve'], linflatten=linflatten)
 
 			periods, n_usedfreqs, usedfreqs = get_periods(obj, nfrequencies, lc.time, ignore_harmonics=True)
@@ -63,14 +73,15 @@ def featcalc(features, som, providednfreqs=6, nfrequencies=6, cardinality=64,
 			objfeatures[nfrequencies+11] = zc[0]
 			objfeatures[nfrequencies+12:nfrequencies+16] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
 
-			# If we are running with linfit enabled, add an extra feature
-			# which is the absoulte value of the fitted linear trend, divided
-			# with the point-to-point scatter:
-			if linfit:
-				objfeatures[nfrequencies+16] = np.abs(obj['detrend_coeff'][0]) / obj['ptp']
-
 			if savefeat is not None:
 				np.savetxt(featfile, objfeatures, delimiter=',')
+
+		# If we are running with linfit enabled, add an extra feature
+		# which is the absoulte value of the fitted linear trend, divided
+		# with the point-to-point scatter:
+		if linfit:
+			slope_feature = np.abs(obj['detrend_coeff'][0]) / obj['ptp']
+			objfeatures = np.append(objfeatures, slope_feature)
 
 		featout = np.vstack((featout, objfeatures))
 

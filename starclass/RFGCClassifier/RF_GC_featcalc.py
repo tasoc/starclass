@@ -21,10 +21,17 @@ def featcalc(features, som, providednfreqs=6, nfrequencies=6, cardinality=64,
 	Calculates features for set of lightcurves
 	"""
 
-	featout = np.zeros([1, nfrequencies+16], dtype='float32')
 	if isinstance(features, dict): # trick for single features
 		features = [features]
 
+	# Find the number of featues to use:
+	Nfeat = nfrequencies + 16
+	linfit = ('detrend_coeff' in features[0])
+	if linfit:
+		Nfeat += 1
+
+	# Loop through the provided features and build feature table:
+	featout = np.zeros([1, Nfeat], dtype='float32')
 	for obj in features:
 		precalc = False
 		if savefeat is not None:
@@ -35,7 +42,7 @@ def featcalc(features, som, providednfreqs=6, nfrequencies=6, cardinality=64,
 				precalc = True
 
 		if not precalc:
-			objfeatures = np.zeros(nfrequencies+16, dtype='float32')
+			objfeatures = np.zeros(Nfeat, dtype='float32')
 			lc = prepLCs(obj['lightcurve'], linflatten=linflatten)
 
 			periods, n_usedfreqs, usedfreqs = get_periods(obj, nfrequencies, lc.time, ignore_harmonics=True)
@@ -54,10 +61,19 @@ def featcalc(features, som, providednfreqs=6, nfrequencies=6, cardinality=64,
 			psi, zc = compute_hocs(lc.time, lc.flux, 5)
 			objfeatures[nfrequencies+10] = psi
 			objfeatures[nfrequencies+11] = zc[0]
-			objfeatures[nfrequencies+12:] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
+			objfeatures[nfrequencies+12:nfrequencies+16] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
+
+			# If we are running with linfit enabled, add an extra feature
+			# which is the absoulte value of the fitted linear trend, divided
+			# with the point-to-point scatter:
+			if linfit:
+				objfeatures[nfrequencies+16] = np.abs(obj['detrend_coeff'][0]) / obj['ptp']
+
 			if savefeat is not None:
 				np.savetxt(featfile, objfeatures, delimiter=',')
+
 		featout = np.vstack((featout, objfeatures))
+
 	return featout[1:,:]
 
 #--------------------------------------------------------------------------------------------------
@@ -502,7 +518,7 @@ def phase_features(time, flux, per):
 	"""
 	phase = phasefold(time,per)
 	p2p = np.abs(np.diff(flux[np.argsort(phase)]))
-	return np.percentile(p2p,98),np.mean(p2p)
+	return np.percentile(p2p, 98), np.mean(p2p)
 
 #--------------------------------------------------------------------------------------------------
 def p2p_features(flux):

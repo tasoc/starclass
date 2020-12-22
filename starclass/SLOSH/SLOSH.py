@@ -12,6 +12,7 @@ import os.path
 import logging
 from tqdm import tqdm
 import h5py
+import tempfile
 import tensorflow
 from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
 from sklearn.metrics import classification_report
@@ -142,8 +143,12 @@ class SLOSHClassifier(BaseClassifier):
 		intlabels = [intlookup[lbl] for lbl in self.parse_labels(tset.labels())]
 
 		logger.info('Generating Train Images...')
-		train_folder = os.path.join(self.features_cache, 'SLOSH_Train_Images')
-		os.makedirs(train_folder, exist_ok=True)
+		if self.features_cache:
+			train_folder = os.path.join(self.features_cache, 'SLOSH_Train_Images')
+			os.makedirs(train_folder, exist_ok=True)
+		else:
+			tmpdir = tempfile.TemporaryDirectory()
+			train_folder = tmpdir.name
 
 		# Go through the training-set and ensure that all images are created:
 		# Images are stored in a HDF5 file as individual datasets.

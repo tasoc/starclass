@@ -142,5 +142,65 @@ def test_taskmanager_meta_classifier(PRIVATE_TODO_FILE):
 		assert tab[tab['class'] == StellarClassesLevel1.ECLIPSE]['prob'] == 0.7
 
 #--------------------------------------------------------------------------------------------------
+def test_taskmanager_save_and_settings(PRIVATE_TODO_FILE):
+	"""Test of TaskManager saving results and settings."""
+
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
+		# Check the settings table:
+		assert tm.tset is None
+		tm.cursor.execute("SELECT * FROM starclass_settings;")
+		settings = tm.cursor.fetchone()
+		assert settings is None
+
+		# Start a random task:
+		task = tm.get_task(classifier='meta')
+		print(task)
+		tm.start_task(task)
+
+		# Make a fake result we can save;
+		starclass_results = {
+			StellarClassesLevel1.SOLARLIKE: 0.8,
+			StellarClassesLevel1.APERIODIC: 0.2
+		}
+		result = task.copy()
+		result['tset'] = 'keplerq9v3'
+		result['classifier'] = 'meta'
+		result['status'] = STATUS.OK
+		result['elaptime'] = 3.14
+		result['worker_wait_time'] = 1.0
+		result['details'] = {'errors': ['There was actually no error']}
+		result['starclass_results'] = starclass_results
+
+		# Save the result:
+		tm.save_results(result)
+
+		# Check the setting again - it should now have changed:
+		assert tm.tset == 'keplerq9v3'
+		tm.cursor.execute("SELECT * FROM starclass_settings;")
+		settings = tm.cursor.fetchone()
+		assert settings['tset'] == 'keplerq9v3'
+
+		# Check that the additional diagnostic was saved correctly:
+		tm.cursor.execute("SELECT * FROM starclass_diagnostics WHERE priority=?;", [result['priority']])
+		row = tm.cursor.fetchone()
+		print(dict(row))
+		assert row['status'] == STATUS.OK.value
+		assert row['classifier'] == 'meta'
+		assert row['elaptime'] == 3.14
+		assert row['worker_wait_time'] == 1.0
+		assert row['errors'] == 'There was actually no error'
+
+		# Check that the results were saved correctly:
+		tm.cursor.execute("SELECT class,prob FROM starclass_results WHERE priority=? AND classifier=?;", [result['priority'], 'meta'])
+		for row in tm.cursor.fetchall():
+			assert row['prob'] == starclass_results[StellarClassesLevel1[row['class']]]
+
+		# This should fail when we try to save it:
+		result['tset'] = 'another'
+		with pytest.raises(ValueError) as e:
+			tm.save_results(result)
+		assert str(e.value) == "Attempting to mix results from multiple training sets"
+
+#--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	pytest.main([__file__])

@@ -57,6 +57,7 @@ class keplerq9v3_instr(TrainingSet):
 	"""
 	# Class constants:
 	key = 'keplerq9v3-instr'
+	_todo_name = 'todo-instr'
 	datadir = 'keplerq9v3'
 
 	def __init__(self, *args, datalevel='corr', **kwargs):

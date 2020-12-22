@@ -38,7 +38,7 @@ def get_classifier(classifier_key):
 	return ClassificationClass
 
 #--------------------------------------------------------------------------------------------------
-def get_trainingset(tset_key):
+def get_trainingset(tset_key='keplerq9v3'):
 	"""
 	Get training set class for given training set key.
 
@@ -50,12 +50,12 @@ def get_trainingset(tset_key):
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
+
 	TsetClass = {
 		'keplerq9v3': tsets.keplerq9v3,
 		'keplerq9v3-instr': tsets.keplerq9v3_instr,
 		'keplerq9v2': tsets.keplerq9v2,
 		'keplerq9': tsets.keplerq9,
-		'keplerq9-linfit': tsets.keplerq9linfit,
 		'tdasim': tsets.tdasim,
 		'tdasim-raw': tsets.tdasim_raw,
 		'tdasim-clean': tsets.tdasim_clean
@@ -82,4 +82,4 @@ def trainingset_available(tset_key):
 	# Use the other function to ensure that tset_key is correct:
 	tset = get_trainingset(tset_key)
 	# Check if the todo.sqlite file has been created:
-	return os.path.isfile(os.path.join(tset.find_input_folder(), 'todo.sqlite'))
+	return os.path.isfile(os.path.join(tset.find_input_folder(), tset._todo_name + '.sqlite'))

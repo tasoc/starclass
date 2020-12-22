@@ -9,10 +9,12 @@ Tests of MetaClassifier.
 import pytest
 import conftest # noqa: F401
 from starclass import MetaClassifier
+from starclass.training_sets.testing_tset import testing_tset
 
 #--------------------------------------------------------------------------------------------------
 def test_metaclassifier_import():
-	with MetaClassifier() as cl:
+	tset = testing_tset()
+	with MetaClassifier(tset=tset) as cl:
 		assert(cl.__class__.__name__ == 'MetaClassifier')
 
 #--------------------------------------------------------------------------------------------------

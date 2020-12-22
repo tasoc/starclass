@@ -26,6 +26,7 @@ def main():
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	#parser.add_argument('--starid', type=int, help='TIC identifier of target.', nargs='?', default=None)
+	parser.add_argument('-ct', '--todo', help='Create new todo file. Enable this option for non-TESS data', action='store_true')
 	parser.add_argument('input_folder', type=str, help='Input directory to run classification on.', nargs='?', default=None)
 	args = parser.parse_args()
 
@@ -63,6 +64,10 @@ def main():
 	tsetclass = starclass.get_trainingset(args.trainingset)
 	tset = tsetclass(level=args.level, linfit=args.linfit)
 
+	create_todo = args.todo
+	if create_todo:
+		starclass.todofile.generate_todolist_newdata(input_folder)
+
 	# Running:
 	# When simply running the classifier on new stars:
 	stcl = None
@@ -86,11 +91,11 @@ def main():
 			features = stcl.load_star(task, fname)
 
 			print(features)
-			lc = features['lightcurve']
-			lc.show_properties()
+			#lc = features['lightcurve']
+			#lc.show_properties()
 
-			plt.close('all')
-			lc.plot()
+			#plt.close('all')
+			#lc.plot()
 
 			res = task.copy()
 

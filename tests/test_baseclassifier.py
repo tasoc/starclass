@@ -15,17 +15,19 @@ import conftest # noqa: F401
 from starclass import BaseClassifier, TaskManager, get_trainingset
 from starclass.features.powerspectrum import powerspectrum
 from starclass.plots import plt, plots_interactive
+from starclass.training_sets.testing_tset import testing_tset
 
 #--------------------------------------------------------------------------------------------------
 def test_baseclassifier_import():
-	with BaseClassifier() as cl:
+	tset = testing_tset() # Just to suppress warning
+	with BaseClassifier(tset=tset) as cl:
 		assert(cl.__class__.__name__ == 'BaseClassifier')
 
 #--------------------------------------------------------------------------------------------------
 def test_baseclassifier_import_exceptions(SHARED_INPUT_DIR):
-
+	tset = testing_tset() # Just to suppress warning
 	with pytest.raises(ValueError):
-		BaseClassifier(features_cache=os.path.join(SHARED_INPUT_DIR, 'does-not-exist'))
+		BaseClassifier(tset=tset, features_cache=os.path.join(SHARED_INPUT_DIR, 'does-not-exist'))
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize('linfit', [False, True])

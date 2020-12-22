@@ -12,6 +12,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Download all axillary data for pipeline.')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
+	parser.add_argument('--all', help='Download all training sets.', action='store_true')
 	args = parser.parse_args()
 
 	# Set logging level:
@@ -33,4 +34,4 @@ if __name__ == '__main__':
 	logger_parent.setLevel(logging_level)
 
 	# Download all data:
-	starclass.download_cache()
+	starclass.download_cache(all_trainingsets=args.all)

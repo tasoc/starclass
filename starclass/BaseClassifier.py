@@ -15,6 +15,7 @@ from lightkurve import TessLightCurve
 from astropy.io import fits
 from tqdm import tqdm
 import enum
+import warnings
 from sklearn.metrics import accuracy_score, confusion_matrix
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
@@ -82,6 +83,16 @@ class BaseClassifier(object):
 		self.features_cache = features_cache
 		self._random_seed = 2187
 
+		# Inherit settings from the Training Set, just as a conveience:
+		if tset is None:
+			logger.warning("BaseClassifier initialized without TrainingSet")
+			self.StellarClasses = StellarClassesLevel1
+			self.linfit = False
+		else:
+			self.StellarClasses = tset.StellarClasses
+			self.linfit = tset.linfit
+
+		# Set the data directory, where results (trained models) will be saved:
 		if tset is not None:
 			if data_dir is None:
 				data_dir = tset.key
@@ -103,13 +114,6 @@ class BaseClassifier(object):
 			'SortingHatClassifier': 'sortinghat',
 			'MetaClassifier': 'meta'
 		}[self.__class__.__name__]
-
-		# Create a shortcut to to possible stellar classes:
-		if tset is None:
-			logger.warning("BaseClassifier initialized without TrainingSet")
-			self.StellarClasses = StellarClassesLevel1
-		else:
-			self.StellarClasses = tset.StellarClasses
 
 		# Just for catching all those places random numbers are used without explicitly requesting
 		# a random_state:
@@ -232,6 +236,7 @@ class BaseClassifier(object):
 			res = {
 				'priority': features['priority'],
 				'classifier': self.classifier_key,
+				'tset': tset.key,
 				'status': STATUS.OK
 			}
 
@@ -388,6 +393,8 @@ class BaseClassifier(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
+		logger = logging.getLogger(__name__)
+
 		# We start out with an empty list of features:
 		features = {}
 
@@ -398,6 +405,23 @@ class BaseClassifier(object):
 		# NOTE: Lightcurves are now in relative flux (ppm) with zero mean!
 		lc = lightcurve.remove_nans()
 		#lc = lc.remove_outliers(5.0, stdfunc=mad_std) # Sigma clipping
+
+		if self.linfit:
+			# Do a robust fitting with a first-order polynomial,
+			# where we are catching cases where the fitting goes bad.
+			indx = np.isfinite(lc.time) & np.isfinite(lc.flux) & np.isfinite(lc.flux_err)
+			mintime = np.nanmin(lc.time[indx])
+			with warnings.catch_warnings():
+				warnings.filterwarnings('error', category=np.RankWarning)
+				try:
+					p = np.polyfit(lc.time[indx] - mintime, lc.flux[indx], 1, w=1/lc.flux_err[indx])
+					lc -= np.polyval(p, lc.time - mintime)
+				except np.RankWarning: # pragma: no cover
+					logger.warning("Could not detrend light curve")
+					p = np.array([0, 0])
+
+			# Store the coefficients of the above detrending as a seperate feature:
+			features['detrend_coeff'] = p
 
 		# Calculate power spectrum:
 		psd = powerspectrum(lc)

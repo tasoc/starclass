@@ -27,21 +27,34 @@ class TrainingSet(object):
 	Generic Training Set.
 
 	Attributes:
-		testfraction (float):
-		random_seed (int):
-		features_cache (str):
+		key (str): Unique identifier for training set.
+		linfit (bool): Indicating if linfit mechanism is enabled.
+		testfraction (float): Test-fraction.
+		StellarClasses (enum): Enum of the classes associated with this training set.
+		random_seed (int): Random seed in use.
+		features_cache (str): Path to directory where cache of extracted features is being stored.
 		train_idx (ndarray):
 		test_idx (ndarray):
-		crossval_folds (int):
-		fold (int):
+		crossval_folds (int): Number of cross-validation folds the training set has
+			been split into. If ´0´ the training set has not been split.
+		fold (int): The current cross-validation fold. This is ´0´ in the original training set.
 	"""
 
-	def __init__(self, level='L1', datalevel='corr', tf=0.0, random_seed=42):
+	# Name of the TODO-file used by this training set:
+	_todo_name = 'todo'
+
+	def __init__(self, level='L1', datalevel='corr', tf=0.0, linfit=False, random_seed=42):
 		"""
 		Parameters:
-			datalevel (string, optional):
-			tf (float, optional): Test-fraction. Default=0.
-			random_seed (optional): Random seed. Default=42.
+			level (str): Level of the classification. Choises are `'L1'` and `'L2'`.
+				Default is level 1.
+			tf (float): Test-fraction. Default=0.
+			linfit (bool): Should linfit be enabled for the trainingset?
+				If ``linfit`` is enabled, lightcurves will be detrended using a linear
+				trend before passed on to have frequencies extracted.
+				See :meth:`BaseClassifier.calc_features` for details.
+			random_seed (int): Random seed. Default=42.
+			datalevel (str): Deprecated.
 		"""
 
 		if not hasattr(self, 'key'):
@@ -62,6 +75,7 @@ class TrainingSet(object):
 		self.datalevel = datalevel
 		self.testfraction = tf
 		self.random_seed = random_seed
+		self.linfit = linfit
 
 		# Assign StellarClasses Enum depending on
 		# the classification level we are running:
@@ -72,12 +86,17 @@ class TrainingSet(object):
 			}[self.level]
 
 		# Define cache location where we will save common features:
-		self.features_cache = os.path.join(self.input_folder, 'features_cache_%s' % self.datalevel)
+		features_cache_name = 'features_cache_%s' % self.datalevel
+		if self.linfit:
+			self.key += '-linfit'
+			self._todo_name += '-linfit'
+			features_cache_name += '_linfit'
+		self.features_cache = os.path.join(self.input_folder, features_cache_name)
 		os.makedirs(self.features_cache, exist_ok=True)
 
 		# Generate TODO file if it is needed:
-		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
-		if not os.path.isfile(sqlite_file):
+		self.todo_file = os.path.join(self.input_folder, self._todo_name + '.sqlite')
+		if not os.path.isfile(self.todo_file):
 			self.generate_todolist()
 
 		# Generate training/test indices
@@ -245,50 +264,59 @@ class TrainingSet(object):
 		"""
 		logger = logging.getLogger(__name__)
 
-		sqlite_file = os.path.join(self.input_folder, 'todo.sqlite')
-		with closing(sqlite3.connect(sqlite_file)) as conn:
-			conn.row_factory = sqlite3.Row
-			cursor = conn.cursor()
+		try:
+			with closing(sqlite3.connect(self.todo_file)) as conn:
+				conn.row_factory = sqlite3.Row
+				cursor = conn.cursor()
 
-			# Create the basic file structure of a TODO-list:
-			self.generate_todolist_structure(conn)
+				# Create the basic file structure of a TODO-list:
+				self.generate_todolist_structure(conn)
 
-			logger.info("Step 3: Reading file and extracting information...")
-			pri = 0
+				logger.info("Step 3: Reading file and extracting information...")
+				pri = 0
 
-			diagnostics = np.genfromtxt(os.path.join(self.input_folder, 'diagnostics.txt'),
-				delimiter=',', comments='#', dtype=None, encoding='utf-8')
+				diagnostics = np.genfromtxt(os.path.join(self.input_folder, 'diagnostics.txt'),
+					delimiter=',', comments='#', dtype=None, encoding='utf-8')
 
-			for k, star in tqdm(enumerate(self.starlist), total=len(self.starlist)):
-				# Get starid:
-				starname = star[0]
-				starclass = star[1]
-				if starname.startswith('constant_'):
-					starid = -10000 - int(starname[9:])
-				elif starname.startswith('fakerrlyr_'):
-					starid = -20000 - int(starname[10:])
-				else:
-					starid = int(starname)
-					starname = '{0:09d}'.format(starid)
+				for k, star in tqdm(enumerate(self.starlist), total=len(self.starlist)):
+					# Get starid:
+					starname = star[0]
+					starclass = star[1]
+					if starname.startswith('constant_'):
+						starid = -10000 - int(starname[9:])
+					elif starname.startswith('fakerrlyr_'):
+						starid = -20000 - int(starname[10:])
+					else:
+						starid = int(starname)
+						starname = '{0:09d}'.format(starid)
 
-				# Path to lightcurve:
-				lightcurve = starclass + '/' + starname + '.txt'
+					# Path to lightcurve:
+					lightcurve = starclass + '/' + starname + '.txt'
 
-				# Load diagnostics from file, to speed up the process:
-				variance, rms_hour, ptp = diagnostics[k]
+					# Check that the file actually exists:
+					if not os.path.exists(os.path.join(self.input_folder, lightcurve)):
+						raise FileNotFoundError(lightcurve)
 
-				pri += 1
-				self.generate_todolist_insert(cursor,
-					priority=pri,
-					starid=starid,
-					lightcurve=lightcurve,
-					datasource='ffi',
-					variance=variance,
-					rms_hour=rms_hour,
-					ptp=ptp)
+					# Load diagnostics from file, to speed up the process:
+					variance, rms_hour, ptp = diagnostics[k]
 
-			conn.commit()
-			cursor.close()
+					pri += 1
+					self.generate_todolist_insert(cursor,
+						priority=pri,
+						starid=starid,
+						lightcurve=lightcurve,
+						datasource='ffi',
+						variance=variance,
+						rms_hour=rms_hour,
+						ptp=ptp)
+
+				conn.commit()
+				cursor.close()
+
+		except: # noqa: E722, pragma: no cover
+			if os.path.exists(self.todo_file):
+				os.remove(self.todo_file)
+			raise
 
 		logger.info("%s training set successfully built.", self.key)
 
@@ -447,7 +475,7 @@ class TrainingSet(object):
 		try:
 			with tempfile.NamedTemporaryFile(dir=self.input_folder, suffix='.sqlite', delete=False) as tmpdir:
 				# Copy the original TODO-file to the new temp file:
-				with open(os.path.join(self.input_folder, 'todo.sqlite'), 'rb') as fid:
+				with open(self.todo_file, 'rb') as fid:
 					shutil.copyfileobj(fid, tmpdir)
 				tmpdir.flush()
 
@@ -493,7 +521,7 @@ class TrainingSet(object):
 		try:
 			with tempfile.NamedTemporaryFile(dir=self.input_folder, suffix='.sqlite', delete=False) as tmpdir:
 				# Copy the original TODO-file to the new temp file:
-				with open(os.path.join(self.input_folder, 'todo.sqlite'), 'rb') as fid:
+				with open(self.todo_file, 'rb') as fid:
 					shutil.copyfileobj(fid, tmpdir)
 				tmpdir.flush()
 

@@ -21,16 +21,33 @@ def featcalc(features, som, providednfreqs=6, nfrequencies=6, cardinality=64,
 	Calculates features for set of lightcurves
 	"""
 
-	featout = np.zeros([1, nfrequencies+16], dtype='float32')
 	if isinstance(features, dict): # trick for single features
 		features = [features]
 
+	# Loop through the provided features and build feature table:
+	linfit = None
 	for obj in features:
+		# We have to do it in this (inelegant) way, since we have are in a independent
+		# function and therefore have to examine the first feature dict to see
+		# if linfit was enabled:
+		if linfit is None:
+			linfit = ('detrend_coeff' in obj)
+
+			# Find the number of featues to use:
+			Nfeat = nfrequencies + 16
+			if linfit:
+				Nfeat += 1
+
+			# Create full table to gather feature into:
+			featout = np.zeros([1, Nfeat], dtype='float32')
+
+		# Load from cache if it exists:
+		# The cache will never contain the slope feature, which
+		# is only calculated when linfit is enabled.
 		precalc = False
 		if savefeat is not None:
-			featfile = os.path.join(savefeat, str(obj['priority'])+'.txt')
-			if os.path.exists(featfile) and not recalc:
-				#logger.info(str(obj['priority'])+": Loading precalculated features...")
+			featfile = os.path.join(savefeat, str(obj['priority']) + '.txt')
+			if not recalc and os.path.exists(featfile):
 				objfeatures = np.loadtxt(featfile, delimiter=',')
 				precalc = True
 
@@ -54,10 +71,20 @@ def featcalc(features, som, providednfreqs=6, nfrequencies=6, cardinality=64,
 			psi, zc = compute_hocs(lc.time, lc.flux, 5)
 			objfeatures[nfrequencies+10] = psi
 			objfeatures[nfrequencies+11] = zc[0]
-			objfeatures[nfrequencies+12:] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
+			objfeatures[nfrequencies+12:nfrequencies+16] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
+
 			if savefeat is not None:
 				np.savetxt(featfile, objfeatures, delimiter=',')
+
+		# If we are running with linfit enabled, add an extra feature
+		# which is the absoulte value of the fitted linear trend, divided
+		# with the point-to-point scatter:
+		if linfit:
+			slope_feature = np.abs(obj['detrend_coeff'][0]) / obj['ptp']
+			objfeatures = np.append(objfeatures, slope_feature)
+
 		featout = np.vstack((featout, objfeatures))
+
 	return featout[1:,:]
 
 #--------------------------------------------------------------------------------------------------
@@ -502,7 +529,7 @@ def phase_features(time, flux, per):
 	"""
 	phase = phasefold(time,per)
 	p2p = np.abs(np.diff(flux[np.argsort(phase)]))
-	return np.percentile(p2p,98),np.mean(p2p)
+	return np.percentile(p2p, 98), np.mean(p2p)
 
 #--------------------------------------------------------------------------------------------------
 def p2p_features(flux):

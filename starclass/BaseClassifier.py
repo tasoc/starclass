@@ -11,10 +11,11 @@ import numpy as np
 import os.path
 import logging
 from astropy.units import cds
-from lightkurve import TessLightCurve
+import lightkurve as lk
 from astropy.io import fits
 from tqdm import tqdm
 import enum
+import warnings
 from sklearn.metrics import accuracy_score, confusion_matrix
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
@@ -82,6 +83,16 @@ class BaseClassifier(object):
 		self.features_cache = features_cache
 		self._random_seed = 2187
 
+		# Inherit settings from the Training Set, just as a conveience:
+		if tset is None:
+			logger.warning("BaseClassifier initialized without TrainingSet")
+			self.StellarClasses = StellarClassesLevel1
+			self.linfit = False
+		else:
+			self.StellarClasses = tset.StellarClasses
+			self.linfit = tset.linfit
+
+		# Set the data directory, where results (trained models) will be saved:
 		if tset is not None:
 			if data_dir is None:
 				data_dir = tset.key
@@ -103,13 +114,6 @@ class BaseClassifier(object):
 			'SortingHatClassifier': 'sortinghat',
 			'MetaClassifier': 'meta'
 		}[self.__class__.__name__]
-
-		# Create a shortcut to to possible stellar classes:
-		if tset is None:
-			logger.warning("BaseClassifier initialized without TrainingSet")
-			self.StellarClasses = StellarClassesLevel1
-		else:
-			self.StellarClasses = tset.StellarClasses
 
 		# Just for catching all those places random numbers are used without explicitly requesting
 		# a random_state:
@@ -232,6 +236,7 @@ class BaseClassifier(object):
 			res = {
 				'priority': features['priority'],
 				'classifier': self.classifier_key,
+				'tset': tset.key,
 				'status': STATUS.OK
 			}
 
@@ -305,14 +310,14 @@ class BaseClassifier(object):
 			if 'lightcurve' in features:
 				lightcurve = features['lightcurve']
 
-			elif fname.endswith('.noisy') or fname.endswith('.sysnoise') or fname.endswith('.txt') or fname.endswith('.clean'):
+			elif fname.endswith(('.txt', '.noisy', '.sysnoise', '.clean')):
 				data = np.loadtxt(fname)
 				if data.shape[1] == 4:
 					quality = np.asarray(data[:,3], dtype='int32')
 				else:
 					quality = np.zeros(data.shape[0], dtype='int32')
 
-				lightcurve = TessLightCurve(
+				lightcurve = lk.TessLightCurve(
 					time=data[:,0],
 					flux=data[:,1],
 					flux_err=data[:,2],
@@ -325,30 +330,41 @@ class BaseClassifier(object):
 					meta={}
 				)
 
-			elif fname.endswith('.fits') or fname.endswith('.fits.gz'):
+			elif fname.endswith(('.fits.gz', '.fits')):
 				with fits.open(fname, mode='readonly', memmap=True) as hdu:
-					lightcurve = TessLightCurve(
-						time=hdu['LIGHTCURVE'].data['TIME'],
-						flux=hdu['LIGHTCURVE'].data['FLUX_CORR'],
-						flux_err=hdu['LIGHTCURVE'].data['FLUX_CORR_ERR'],
-						flux_unit=cds.ppm,
-						centroid_col=hdu['LIGHTCURVE'].data['MOM_CENTR1'],
-						centroid_row=hdu['LIGHTCURVE'].data['MOM_CENTR2'],
-						quality=np.asarray(hdu['LIGHTCURVE'].data['QUALITY'], dtype='int32'),
-						cadenceno=np.asarray(hdu['LIGHTCURVE'].data['CADENCENO'], dtype='int32'),
-						time_format='btjd',
-						time_scale='tdb',
-						targetid=hdu[0].header.get('TICID'),
-						label=hdu[0].header.get('OBJECT'),
-						camera=hdu[0].header.get('CAMERA'),
-						ccd=hdu[0].header.get('CCD'),
-						sector=hdu[0].header.get('SECTOR'),
-						ra=hdu[0].header.get('RA_OBJ'),
-						dec=hdu[0].header.get('DEC_OBJ'),
-						quality_bitmask=1+2+256, # CorrectorQualityFlags.DEFAULT_BITMASK
-						meta={}
-					)
-
+					telescope = hdu[0].header.get('TELESCOP')
+					if telescope == 'TESS' and hdu[0].header.get('ORIGIN') == 'TASOC/Aarhus':
+						lightcurve = lk.TessLightCurve(
+							time=hdu['LIGHTCURVE'].data['TIME'],
+							flux=hdu['LIGHTCURVE'].data['FLUX_CORR'],
+							flux_err=hdu['LIGHTCURVE'].data['FLUX_CORR_ERR'],
+							flux_unit=cds.ppm,
+							centroid_col=hdu['LIGHTCURVE'].data['MOM_CENTR1'],
+							centroid_row=hdu['LIGHTCURVE'].data['MOM_CENTR2'],
+							quality=np.asarray(hdu['LIGHTCURVE'].data['QUALITY'], dtype='int32'),
+							cadenceno=np.asarray(hdu['LIGHTCURVE'].data['CADENCENO'], dtype='int32'),
+							time_format='btjd',
+							time_scale='tdb',
+							targetid=hdu[0].header.get('TICID'),
+							label=hdu[0].header.get('OBJECT'),
+							camera=hdu[0].header.get('CAMERA'),
+							ccd=hdu[0].header.get('CCD'),
+							sector=hdu[0].header.get('SECTOR'),
+							ra=hdu[0].header.get('RA_OBJ'),
+							dec=hdu[0].header.get('DEC_OBJ'),
+							quality_bitmask=1+2+256, # CorrectorQualityFlags.DEFAULT_BITMASK
+							meta={}
+						)
+					elif telescope == 'TESS':
+						lightcurve = lk.TESSLightCurveFile(hdu).PDCSAP_FLUX
+						lightcurve = 1e6 * (lightcurve.normalize() - 1)
+						lightcurve.flux_unit = cds.ppm
+					elif telescope == 'Kepler':
+						lightcurve = lk.KeplerLightCurveFile(hdu).PDCSAP_FLUX
+						lightcurve = 1e6 * (lightcurve.normalize() - 1)
+						lightcurve.flux_unit = cds.ppm
+					else:
+						raise ValueError("Could not determine FITS lightcurve type")
 			else:
 				raise ValueError("Invalid file format")
 
@@ -388,6 +404,8 @@ class BaseClassifier(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
+		logger = logging.getLogger(__name__)
+
 		# We start out with an empty list of features:
 		features = {}
 
@@ -398,6 +416,23 @@ class BaseClassifier(object):
 		# NOTE: Lightcurves are now in relative flux (ppm) with zero mean!
 		lc = lightcurve.remove_nans()
 		#lc = lc.remove_outliers(5.0, stdfunc=mad_std) # Sigma clipping
+
+		if self.linfit:
+			# Do a robust fitting with a first-order polynomial,
+			# where we are catching cases where the fitting goes bad.
+			indx = np.isfinite(lc.time) & np.isfinite(lc.flux) & np.isfinite(lc.flux_err)
+			mintime = np.nanmin(lc.time[indx])
+			with warnings.catch_warnings():
+				warnings.filterwarnings('error', category=np.RankWarning)
+				try:
+					p = np.polyfit(lc.time[indx] - mintime, lc.flux[indx], 1, w=1/lc.flux_err[indx])
+					lc -= np.polyval(p, lc.time - mintime)
+				except np.RankWarning: # pragma: no cover
+					logger.warning("Could not detrend light curve")
+					p = np.array([0, 0])
+
+			# Store the coefficients of the above detrending as a seperate feature:
+			features['detrend_coeff'] = p
 
 		# Calculate power spectrum:
 		psd = powerspectrum(lc)

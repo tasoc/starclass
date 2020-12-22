@@ -257,11 +257,16 @@ def generate_single_image(freq, power):
 	return ps_to_array(freq, power)
 
 #--------------------------------------------------------------------------------------------------
-def default_classifier_model():
-	'''
-	Default classifier model architecture
-	:return: model: untrained classifier model
-	'''
+def default_classifier_model(num_classes=8):
+	"""
+	Default classifier model architecture.
+
+	Parameters:
+		num_classes (int): Number of output classes.
+
+	Returns:
+		:class:`tensorflow.keras.Model`: Untrained classifier model.
+	"""
 	reg = l2(2.5E-3)
 	adam = Adam(clipnorm=1.)
 	input1 = tensorflow.keras.Input(shape=(128, 128, 1))
@@ -282,7 +287,7 @@ def default_classifier_model():
 	flat = Flatten()(pool3)
 	drop1 = Dropout(0.5)(flat)
 	dense1 = Dense(128, kernel_initializer='glorot_uniform', activation='relu', kernel_regularizer=reg)(drop1)
-	output = Dense(8, kernel_initializer='glorot_uniform', activation='softmax')(dense1)
+	output = Dense(num_classes, kernel_initializer='glorot_uniform', activation='softmax')(dense1)
 	model = tensorflow.keras.Model(input1, output)
 
 	model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['accuracy'])

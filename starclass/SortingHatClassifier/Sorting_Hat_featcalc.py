@@ -15,9 +15,21 @@ import pyentrp.entropy as ent
 from . import npeet_entropy_estimators as npeet
 from ..utilities import get_periods
 
+NFREQUENCIES = 3
+
 #--------------------------------------------------------------------------------------------------
-def featcalc(features, providednfreqs=6, nfrequencies=3,
-	linflatten=False, savefeat=None, recalc=False):
+def feature_names():
+	"""
+	Returns a list with the feature names.
+	"""
+	names = []
+	for i in range(NFREQUENCIES):
+		names.append('f' + str(i+1))
+	names.extend(['varrat', 'number_significantharmonic','skewness', 'flux_ratio', 'diff_entropy_lc', 'diff_entropy_as', 'mse_mean', 'mse_max', 'mse_std', 'mse_power'])
+	return names
+
+#--------------------------------------------------------------------------------------------------
+def featcalc(features, nfrequencies=3, linflatten=False, savefeat=None, recalc=False):
 	"""
 	Calculates features for set of lightcurves
 	"""

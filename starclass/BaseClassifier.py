@@ -16,12 +16,13 @@ from astropy.io import fits
 from tqdm import tqdm
 import enum
 import warnings
-from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, classification_report, roc_curve, auc
+from sklearn.preprocessing import label_binarize
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import savePickle, loadPickle
-from .plots import plotConfMatrix, plt
+from .plots import plotConfMatrix, plt, plotROC
 from .StellarClasses import StellarClassesLevel1
 
 __docformat__ = 'restructuredtext'
@@ -231,6 +232,7 @@ class BaseClassifier(object):
 
 		# Classify test set (has to be one by one unless we change classifiers)
 		y_pred = []
+		y_prob = []
 		for features in tqdm(tset.features_test(), total=len(tset.test_idx)):
 			# Create result-dict that is understood by the TaskManager:
 			res = {
@@ -247,6 +249,9 @@ class BaseClassifier(object):
 			prediction = max(res['starclass_results'], key=lambda key: res['starclass_results'][key]).value
 			y_pred.append(prediction)
 
+			probs = list({key: res['starclass_results'][key] for key in list(self.StellarClasses)}.values())
+			y_prob.append(probs)
+
 			# Save results for this classifier/trainingset in database:
 			if save is not None:
 				logger.debug(res)
@@ -255,11 +260,43 @@ class BaseClassifier(object):
 		# Convert labels to ndarray:
 		# FIXME: Only comparing to the first label
 		y_pred = np.array(y_pred)
+		y_prob = np.array(y_prob)
 		labels_test = self.parse_labels(tset.labels_test())
 
 		# Compare to known labels:
 		acc = accuracy_score(labels_test, y_pred)
 		logger.info('Accuracy: %.2f%%', acc*100)
+
+		f1_macro = f1_score(labels_test, y_pred, average='macro')
+		f1_weighted = f1_score(labels_test, y_pred, average='weighted')
+		logger.info('Macro F1 score: %.2f%%', f1_macro*100)
+		logger.info('Weighted F1 score: %.2f%%', f1_weighted*100)
+
+		# Prepare input for ROC/AUC
+		fpr, tpr, roc_auc, threshold_index, best_thresholds = self.compute_ROC(labels_test, y_prob, all_classes)
+
+		# Create plot of ROC curves:
+		fig = plt.figure(figsize=(12,12))
+		plotROC(fpr, tpr, roc_auc, threshold_index, all_classes)
+		plt.title('ROC - ' + self.classifier_key + ' - ' + tset.key + ' - ' + tset.level)
+		fig.savefig(os.path.join(self.data_dir, 'ROC_Curve_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
+		plt.close(fig)
+
+		# Save new classification thresholds and make final predictions based on those
+		if self.classifier_key == 'meta':
+			self.classification_thresholds = best_thresholds
+			# TODO: move this part to the meta-classifier that will use the saved thresholds to make a final list with predictions (only during runtime, not train/test)
+			new_pred = np.zeros(len(y_pred), dtype='<U15')
+			for i in range(len(y_prob)):
+				idx, max_prob = np.argmax(y_prob[i,:]), np.max(y_prob[i,:])
+				if max_prob > best_thresholds[idx]:
+					new_pred[i] = all_classes[idx]
+				else:
+					new_pred[i] = 'UNKOWN'
+
+		# Classification report for meta
+		if self.classifier_key == 'meta':
+			logger.info(classification_report(labels_test, y_pred))
 
 		# Confusion Matrix:
 		cf = confusion_matrix(labels_test, y_pred, labels=all_classes)
@@ -270,6 +307,29 @@ class BaseClassifier(object):
 		plt.title(self.classifier_key + ' - ' + tset.key + ' - ' + tset.level)
 		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
+
+		'''if calc_feature_importances:
+			if self.classifier_key != 'slosh':
+				if self.classifier_key != 'meta':
+					X_test
+				elif self.classifier_key == 'meta':
+					#X_test = y_prob
+					feature_names = [i[0] + '_' + i[1].name for i in self.features_used]
+
+				logger.info('Calculating feature importances...')
+				explainer = shap.TreeExplainer(self.classifier)
+				shap_values = explainer.shap_values(X_test)
+
+				fig = plt.figure()
+				plot_feature_importance(shap_values, X_test, feature_names, all_classes)
+				fig.savefig(os.path.join(self.data_dir, 'feature_importance' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
+				plt.close(fig)
+
+				for i in range(len(all_classes)):
+					fig = plt.figure()
+					plot_feature_importance(shap_values, X_test, self.feature_names, all_classes)
+					plt.title(all_classes[i])
+					fig.savefig(os.path.join(self.data_dir, 'scatter_density_' + all_classes[i] + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')'''
 
 	#----------------------------------------------------------------------------------------------
 	def load_star(self, task, fname):
@@ -489,3 +549,42 @@ class BaseClassifier(object):
 			else:
 				fitlabels.append(lbl[0].value)
 		return np.array(fitlabels)
+
+#----------------------------------------------------------------------------------------------
+	def compute_ROC(self, y_test, y_prob, class_names):
+		"""
+		Calculate ROC values and return optimal thresholds
+		Parameters:
+			y_test (dict):
+			y_prob ():
+			class_names (list):
+		Returns:
+			tuple:
+				- fpr (dict)
+				- tpr (dict)
+				- roc_auc (dict)
+				- idx (dict)
+				- best_thresholds (dict)
+		"""
+		y_true_bin = label_binarize(y_test, classes=class_names)
+		fpr = dict()
+		tpr = dict()
+		idx = dict()
+		thresholds = dict()
+		J = dict()
+		roc_auc = dict()
+		for i in range(len(class_names)):
+			fpr[i], tpr[i], thresholds[i] = roc_curve(y_true_bin[:, i], y_prob[:, i])
+			J[i] = tpr[i] - fpr[i]
+			roc_auc[i] = auc(fpr[i], tpr[i])
+
+		fpr["micro"], tpr["micro"], _ = roc_curve(y_true_bin.ravel(), y_prob.ravel())
+		roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+
+		best_thresholds = []
+		for i in range(len(class_names)):
+			idx[i] = np.argmax(J[i])
+			best_threshold = thresholds[i][idx[i]]
+			best_thresholds = np.append(best_thresholds, best_threshold)
+
+		return fpr, tpr, roc_auc, idx, best_thresholds

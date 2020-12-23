@@ -10,6 +10,7 @@ import logging
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+import shap
 
 # Change to a non-GUI backend since this
 # should be able to run on a cluster:
@@ -104,3 +105,30 @@ def plotConfMatrix(confmatrix, ticklabels, ax=None, cmap='Blues'):
 	plt.xticks(np.arange(N), ticklabels, rotation='vertical')
 	plt.yticks(np.arange(N), ticklabels)
 	ax.tick_params(axis='both', which='major', labelsize=18)
+
+#--------------------------------------------------------------------------------------------------
+def plotROC(fpr, tpr, roc_auc, idx, all_classes):
+	lw = 2
+	for i in range(len(all_classes)):
+		plt.plot(fpr[i], tpr[i], lw=lw, label='%s (area = %0.4f)' % (all_classes[i], roc_auc[i]))
+		plt.scatter(fpr[i][idx[i]], tpr[i][idx[i]], marker='o')
+
+	plt.plot(fpr['micro'], tpr['micro'], lw=lw, label='%s (area = %0.4f)' % ('micro avg', roc_auc['micro']))
+	plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+	plt.xlim([0.0, 1.0])
+	plt.ylim([0.0, 1.05])
+	plt.xlabel(r'False Positive Rate')
+	plt.ylabel(r'True Positive Rate')
+	plt.legend(loc="lower right")
+
+#--------------------------------------------------------------------------------------------------
+def plot_feature_importance(shap_values, X_test, feature_names, class_names):
+	matplotlib.rcParams['hatch.linewidth'] = 0.5
+	matplotlib.rcParams['hatch.color'] = 'k'
+
+	shap.summary_plot(shap_values, X_test, feature_names=feature_names,
+		class_names=class_names, max_display=len(feature_names), plot_type="bar")
+
+#--------------------------------------------------------------------------------------------------
+def plot_feature_scatter_density(shap_values, X_test, feature_names, class_name):
+	shap.summary_plot(shap_values, X_test, feature_names=feature_names, class_names=class_name)

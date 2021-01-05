@@ -15,14 +15,14 @@ from tqdm import tqdm
 from .io import load_lightcurve
 
 #--------------------------------------------------------------------------------------------------
-def create_fake_todolist(input_folder, output_todo='todo.sqlite', pattern=None,
+def create_fake_todolist(input_folder, name='todo.sqlite', pattern=None,
 	overwrite=False):
 	"""
 	Create todo-file by scanning directory for light curve files.
 
 	Parameters:
 		input_folder (str): Path to directory containing light curves to build todo-file from.
-		output_todo (str): Name of the todo-file which will be created in ``input_folder``.
+		name (str): Name of the todo-file which will be created in ``input_folder``.
 		pattern (str): Pattern to use for searching for light curve files in ``input_folder``.
 			The pattern must be a sting which can be interpreted by the ``fnmatch`` module.
 			The default is to match all FITS files (including compressed files).
@@ -40,10 +40,10 @@ def create_fake_todolist(input_folder, output_todo='todo.sqlite', pattern=None,
 	# Basic checks of the input:
 	if not os.path.isdir(input_folder):
 		raise NotADirectoryError(input_folder)
-	if not output_todo:
+	if not name:
 		raise ValueError("Invalid todo-file name")
-	if not output_todo.endswith('.sqlite'):
-		output_todo += '.sqlite'
+	if not name.endswith('.sqlite'):
+		name += '.sqlite'
 	if pattern:
 		file_pattern = fnmatch.translate(pattern)
 	else:
@@ -64,7 +64,7 @@ def create_fake_todolist(input_folder, output_todo='todo.sqlite', pattern=None,
 		raise ValueError("No files were found")
 
 	# Check path to the TODO-file, and delete if it already exists:
-	todo_file = os.path.join(input_folder, output_todo)
+	todo_file = os.path.join(input_folder, name)
 	if os.path.exists(todo_file):
 		if overwrite:
 			os.remove(todo_file)

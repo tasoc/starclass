@@ -12,10 +12,10 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
-	parser.add_argument('-o', '--overwrite', action='store_true')
-	parser.add_argument('--pattern', type=str, default=None)
-	parser.add_argument('--output', type=str, default='todo.sqlite')
-	parser.add_argument('input_folder', type=str)
+	parser.add_argument('-o', '--overwrite', help='Overwrite existing todo-file.', action='store_true')
+	parser.add_argument('--pattern', type=str, default=None, help='File pattern to search for light curves with.')
+	parser.add_argument('--name', type=str, default='todo.sqlite', help='Name of todo-file to create.')
+	parser.add_argument('input_folder', type=str, help='Directory containing light curves to build todo-file from.')
 	args = parser.parse_args()
 
 	# Set logging level:
@@ -38,6 +38,6 @@ if __name__ == '__main__':
 
 	# Download all data:
 	starclass.todolist.create_fake_todolist(args.input_folder,
-		output_todo=args.output,
-		file_pattern=args.pattern,
+		name=args.name,
+		pattern=args.pattern,
 		overwrite=args.overwrite)

@@ -135,23 +135,33 @@ def test_todolist_create(PRIVATE_INPUT_DIR):
 	create_fake_todolist(input_folder, overwrite=True)
 
 #--------------------------------------------------------------------------------------------------
-def test_todolist_pattern(PRIVATE_INPUT_DIR):
+def test_todolist_create_pattern(PRIVATE_INPUT_DIR):
 
 	input_folder = os.path.join(PRIVATE_INPUT_DIR, 'create_todolist')
 
 	# Using a pattern which will not match any targets should give an error:
 	with pytest.raises(ValueError) as e:
-		create_fake_todolist(input_folder, output_todo='todo-nomatch', pattern='*.txt')
+		create_fake_todolist(input_folder, name='todo-nomatch', pattern='*.txt')
 	assert str(e.value) == 'No files were found'
 
 	# Use pattern which only has a single match:
-	todo_file = create_fake_todolist(input_folder, output_todo='todo-single', pattern='tess*.fits.gz')
+	todo_file = create_fake_todolist(input_folder, name='todo-single', pattern='tess*.fits.gz')
 
 	# Check that there is now only one target in the final list:
 	with closing(sqlite3.connect('file:' + todo_file + '?mode=ro', uri=True)) as conn:
 		cursor = conn.cursor()
 		cursor.execute("SELECT COUNT(*) FROM todolist;")
 		assert cursor.fetchone()[0] == 1
+
+#--------------------------------------------------------------------------------------------------
+def test_todolist_run_create(PRIVATE_INPUT_DIR):
+
+	# Private folder containing the file to build todo-file from:
+	input_folder = os.path.join(PRIVATE_INPUT_DIR, 'create_todolist')
+
+	# Run CLI version of create todolist program:
+	out, err, exitcode = conftest.capture_run_cli('run_create_todolist.py', input_folder)
+	assert exitcode == 0
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

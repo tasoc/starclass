@@ -5,27 +5,54 @@
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
+import logging
 import os
 import re
+import fnmatch
 import sqlite3
 from contextlib import closing
+from tqdm import tqdm
 from .io import load_lightcurve
 
 #--------------------------------------------------------------------------------------------------
-def create_fake_todolist(input_folder, output_todo='todo.sqlite', file_pattern=None,
+def create_fake_todolist(input_folder, output_todo='todo.sqlite', pattern=None,
 	overwrite=False):
 	"""
+	Create todo-file by scanning directory for light curve files.
+
+	Parameters:
+		input_folder (str): Path to directory containing light curves to build todo-file from.
+		output_todo (str): Name of the todo-file which will be created in ``input_folder``.
+		pattern (str): Pattern to use for searching for light curve files in ``input_folder``.
+			The pattern must be a sting which can be interpreted by the ``fnmatch`` module.
+			The default is to match all FITS files (including compressed files).
+		overwrite (bool): Overwrite existing todo-file. Default is to not overwrite.
+
+	Returns:
+		str: Path to the generated todo-file.
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
+	logger = logging.getLogger(__name__)
+	tqdm_settings = {'disable': not logger.isEnabledFor(logging.INFO)}
+
 	# Basic checks of the input:
 	if not os.path.isdir(input_folder):
 		raise NotADirectoryError(input_folder)
-	if file_pattern is None:
-		file_pattern = r'\.fits(\.gz)?$'
+	if not output_todo:
+		raise ValueError("Invalid todo-file name")
+	if not output_todo.endswith('.sqlite'):
+		output_todo += '.sqlite'
+	if pattern:
+		file_pattern = fnmatch.translate(pattern)
+	else:
+		file_pattern = r'.*\.fits(\.gz)?$'
+
+	logger.debug("Searching using RegEx pattern: %s", file_pattern)
 
 	# Go through the input directory recursively and find all files which match the pattern:
+	logger.info("Searching for files...")
 	files = []
 	regex = re.compile(file_pattern)
 	for root, dirnames, filenames in os.walk(input_folder, followlinks=True):
@@ -42,18 +69,19 @@ def create_fake_todolist(input_folder, output_todo='todo.sqlite', file_pattern=N
 		if overwrite:
 			os.remove(todo_file)
 		else:
-			raise ValueError()
+			raise ValueError("Todo-file already exists")
 
 	# Open the todo-file and create the records of the files in it:
+	logger.info("Building todo-file...")
 	try:
 		with closing(sqlite3.connect(todo_file)) as conn:
 			cursor = conn.cursor()
 
 			todolist_structure(conn)
 
-			for k, fpath in enumerate(files):
+			for k, fpath in enumerate(tqdm(files, **tqdm_settings)):
 
-				lightcurve = os.path.relpath(fpath, input_folder).replace('\\', '/')
+				lightcurve = os.path.relpath(fpath, input_folder)
 
 				lc = load_lightcurve(fpath)
 				starid = lc.targetid
@@ -63,6 +91,8 @@ def create_fake_todolist(input_folder, output_todo='todo.sqlite', file_pattern=N
 					starid=starid,
 					lightcurve=lightcurve)
 
+			conn.commit()
+			cursor.close()
 	except: # noqa: E722, pragma: no cover
 		if os.path.exists(todo_file):
 			os.remove(todo_file)
@@ -163,7 +193,7 @@ def todolist_insert(cursor, priority=None, lightcurve=None, starid=None,
 	))
 	cursor.execute("INSERT INTO diagnostics_corr (priority,lightcurve,elaptime,variance,rms_hour,ptp) VALUES (?,?,?,?,?,?);", (
 		priority,
-		lightcurve,
+		lightcurve.replace('\\', '/'),
 		elaptime,
 		variance,
 		rms_hour,

@@ -53,6 +53,9 @@ class BaseClassifier(object):
 		StellarClasses (:class:`enum.Enum`): Enum of all possible labels the classifier
 			should be able to classify stars into. This will depend on the ``level``
 			which the classifier is run on.
+		truncate_lightcurves (bool): Indicating if Kepler/K2 lightcurves will be trunctated
+			to 27.4 days when loaded. Default is to truncate lightcurves if running with short
+			training sets (27.4 days) and not truncate if running with long (90 day) training-sets.
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
@@ -87,9 +90,13 @@ class BaseClassifier(object):
 			logger.warning("BaseClassifier initialized without TrainingSet")
 			self.StellarClasses = StellarClassesLevel1
 			self.linfit = False
+			self.truncate_lightcurves = False
 		else:
 			self.StellarClasses = tset.StellarClasses
 			self.linfit = tset.linfit
+			self.truncate_lightcurves = (not tset.key.startswith('keplerq9v3-long'))
+
+		logger.debug("Enable truncate lightcurves = %s", self.truncate_lightcurves)
 
 		# Set the data directory, where results (trained models) will be saved:
 		if tset is not None:
@@ -309,7 +316,9 @@ class BaseClassifier(object):
 			if 'lightcurve' in features:
 				lightcurve = features['lightcurve']
 			else:
-				lightcurve = load_lightcurve(fname, starid=task['starid'])
+				lightcurve = load_lightcurve(fname,
+					starid=task['starid'],
+					truncate_lightcurve=self.truncate_lightcurves)
 
 			# No features found in cache, so calculate them:
 			if not features:

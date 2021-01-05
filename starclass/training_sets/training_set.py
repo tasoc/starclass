@@ -36,8 +36,8 @@ class TrainingSet(object):
 		train_idx (ndarray):
 		test_idx (ndarray):
 		crossval_folds (int): Number of cross-validation folds the training set has
-			been split into. If ´0´ the training set has not been split.
-		fold (int): The current cross-validation fold. This is ´0´ in the original training set.
+			been split into. If ``0`` the training set has not been split.
+		fold (int): The current cross-validation fold. This is ``0`` in the original training set.
 	"""
 
 	# Name of the TODO-file used by this training set:
@@ -45,8 +45,10 @@ class TrainingSet(object):
 
 	def __init__(self, level='L1', datalevel='corr', tf=0.0, linfit=False, random_seed=42):
 		"""
+		Initialize TrainingSet.
+
 		Parameters:
-			level (str): Level of the classification. Choises are `'L1'` and `'L2'`.
+			level (str): Level of the classification. Choises are ``'L1'`` and ``'L2'``.
 				Default is level 1.
 			tf (float): Test-fraction. Default=0.
 			linfit (bool): Should linfit be enabled for the trainingset?
@@ -55,6 +57,8 @@ class TrainingSet(object):
 				See :meth:`BaseClassifier.calc_features` for details.
 			random_seed (int): Random seed. Default=42.
 			datalevel (str): Deprecated.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
 		if not hasattr(self, 'key'):

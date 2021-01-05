@@ -91,7 +91,9 @@ def create_fake_todolist(input_folder, name='todo.sqlite', pattern=None,
 					starid=starid,
 					lightcurve=lightcurve)
 
+			# Commit changes, perform cleanup/optimization and close connection:
 			conn.commit()
+			todolist_cleanup(conn, cursor)
 			cursor.close()
 	except: # noqa: E722, pragma: no cover
 		if os.path.exists(todo_file):
@@ -113,8 +115,14 @@ def todolist_structure(conn):
 	"""
 
 	cursor = conn.cursor()
-	cursor.execute("PRAGMA foreign_keys=ON;")
 
+	# Change settings of SQLite file:
+	cursor.execute("PRAGMA page_size=4096;")
+	cursor.execute("PRAGMA foreign_keys=ON;")
+	cursor.execute("PRAGMA locking_mode=EXCLUSIVE;")
+	cursor.execute("PRAGMA journal_mode=TRUNCATE;")
+
+	# Create todo-list table:
 	cursor.execute("""CREATE TABLE todolist (
 		priority INTEGER PRIMARY KEY NOT NULL,
 		starid BIGINT NOT NULL,
@@ -131,6 +139,7 @@ def todolist_structure(conn):
 	cursor.execute("CREATE INDEX corr_status_idx ON todolist (corr_status);")
 	cursor.execute("CREATE INDEX starid_idx ON todolist (starid);")
 
+	# Create diagnostics_corr table:
 	cursor.execute("""CREATE TABLE diagnostics_corr (
 		priority INTEGER PRIMARY KEY NOT NULL,
 		lightcurve TEXT,
@@ -143,6 +152,7 @@ def todolist_structure(conn):
 		FOREIGN KEY (priority) REFERENCES todolist(priority) ON DELETE CASCADE ON UPDATE CASCADE
 	);""")
 
+	# Create datavalidation_corr table:
 	cursor.execute("""CREATE TABLE datavalidation_corr (
 		priority INTEGER PRIMARY KEY NOT NULL,
 		approved BOOLEAN NOT NULL,
@@ -151,6 +161,11 @@ def todolist_structure(conn):
 	);""")
 	cursor.execute("CREATE INDEX datavalidation_corr_approved_idx ON datavalidation_corr (approved);")
 
+	# Commit changes
+	conn.commit()
+
+	# Analyze the tables for better query planning:
+	cursor.execute("ANALYZE;")
 	conn.commit()
 
 #--------------------------------------------------------------------------------------------------
@@ -200,3 +215,27 @@ def todolist_insert(cursor, priority=None, lightcurve=None, starid=None,
 		ptp
 	))
 	cursor.execute("INSERT INTO datavalidation_corr (priority,approved,dataval) VALUES (?,1,0);", (priority,))
+
+#--------------------------------------------------------------------------------------------------
+def todolist_cleanup(conn, cursor):
+	"""
+	Perform a cleanup (ANALYZE and VACUUM) of the todolist.
+
+	Parameters:
+		conn (sqlite3.Connection): Connection to SQLite file.
+		cursor (sqlite3.Cursor): Cursor in SQLite file.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
+
+	# Analyze the tables for better query planning:
+	cursor.execute("ANALYZE;")
+	conn.commit()
+
+	# Run a VACUUM of the table which will force a recreation of the
+	# underlying "pages" of the file.
+	try:
+		conn.isolation_level = None
+		cursor.execute("VACUUM;")
+	finally:
+		conn.isolation_level = ''

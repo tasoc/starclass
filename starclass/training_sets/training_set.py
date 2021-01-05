@@ -20,7 +20,7 @@ from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from .. import BaseClassifier, TaskManager, utilities, io
 from ..StellarClasses import StellarClassesLevel1, StellarClassesLevel2
-from ..todolist import todolist_structure, todolist_insert
+from ..todolist import todolist_structure, todolist_insert, todolist_cleanup
 
 #--------------------------------------------------------------------------------------------------
 class TrainingSet(object):
@@ -337,6 +337,7 @@ class TrainingSet(object):
 						elaptime=elaptime)
 
 				conn.commit()
+				todolist_cleanup(conn, cursor)
 				cursor.close()
 
 		except: # noqa: E722, pragma: no cover

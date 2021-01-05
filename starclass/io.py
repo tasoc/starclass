@@ -1,18 +1,39 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
+Input/output functions.
 
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
 import numpy as np
+from bottleneck import nanmin
 from astropy.units import cds
 from astropy.io import fits
 import lightkurve as lk
 
 #--------------------------------------------------------------------------------------------------
-def load_lightcurve(fname, starid=None):
+def load_lightcurve(fname, starid=None, truncate_lightcurve=False):
+	"""
+	Load light curve from file.
+
+	Parameters:
+		fname (str): Path to file to be loaded.
+		starid (int): Star identifier (TIC/KIC/EPIC number) to be added to lightcurve object.
+			This is only used for file types where the number can not be determined from the
+			file itself.
+		truncate_lightcurve (bool): Truncate lightcurve to 27.4 days length, corresponding to
+			the nominal length of a TESS observing sector. This is only applied to Kepler/K2
+			data.
+
+	Returns:
+		:class:`lightkurve.LightCurve`: Lightcurve object.
+
+	Raises:
+		ValueError: On invalid file format.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
 
 	if fname.endswith(('.txt', '.noisy', '.sysnoise', '.clean')):
 		data = np.loadtxt(fname)
@@ -49,7 +70,7 @@ def load_lightcurve(fname, starid=None):
 					cadenceno=np.asarray(hdu['LIGHTCURVE'].data['CADENCENO'], dtype='int32'),
 					time_format='btjd',
 					time_scale='tdb',
-					targetid=hdu[0].header.get('TICID'),
+					targetid=hdu[0].header.get('TICID', starid),
 					label=hdu[0].header.get('OBJECT'),
 					camera=hdu[0].header.get('CAMERA'),
 					ccd=hdu[0].header.get('CCD'),
@@ -65,6 +86,9 @@ def load_lightcurve(fname, starid=None):
 				lightcurve.flux_unit = cds.ppm
 			elif telescope == 'Kepler':
 				lightcurve = lk.KeplerLightCurveFile(hdu).PDCSAP_FLUX
+				if truncate_lightcurve:
+					indx = (lightcurve.time - nanmin(lightcurve.time) <= 27.4)
+					lightcurve = lightcurve[indx]
 				lightcurve = 1e6 * (lightcurve.normalize() - 1)
 				lightcurve.flux_unit = cds.ppm
 			else:

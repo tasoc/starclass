@@ -60,7 +60,8 @@ class BaseClassifier(object):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	def __init__(self, tset=None, features_cache=None, plot=False, data_dir=None):
+	def __init__(self, tset=None, features_cache=None, plot=False, data_dir=None,
+		truncate_lightcurves=None):
 		"""
 		Initialize the classifier object.
 
@@ -72,6 +73,9 @@ class BaseClassifier(object):
 				saved/loaded as needed.
 			plot (bool, optional): Create plots as part of the output. Default is ``False``.
 			data_dir (str):
+			truncate_lightcurves (bool): Force truncation of lightcurves to 27.4 days.
+				If ``None``, the default will be decided based on the training-set
+				provided in ``tset``.
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
@@ -84,19 +88,24 @@ class BaseClassifier(object):
 		self.plot = plot
 		self.features_cache = features_cache
 		self._random_seed = 2187
+		self.truncate_lightcurves = truncate_lightcurves
 
 		# Inherit settings from the Training Set, just as a conveience:
 		if tset is None:
 			logger.warning("BaseClassifier initialized without TrainingSet")
 			self.StellarClasses = StellarClassesLevel1
 			self.linfit = False
-			self.truncate_lightcurves = False
 		else:
 			self.StellarClasses = tset.StellarClasses
 			self.linfit = tset.linfit
-			self.truncate_lightcurves = (not tset.key.startswith('keplerq9v3-long'))
 
-		logger.debug("Enable truncate lightcurves = %s", self.truncate_lightcurves)
+		# Decide if we should enable truncation of lightcurves upon loading:
+		if self.truncate_lightcurves is None:
+			if tset is None:
+				self.truncate_lightcurves = False
+			else:
+				self.truncate_lightcurves = (not tset.key.startswith('keplerq9v3-long'))
+		logger.debug("Truncate lightcurves = %s", self.truncate_lightcurves)
 
 		# Set the data directory, where results (trained models) will be saved:
 		if tset is not None:

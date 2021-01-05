@@ -26,6 +26,11 @@ def main():
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	#parser.add_argument('--starid', type=int, help='TIC identifier of target.', nargs='?', default=None)
+	# Lightcurve truncate override switch:
+	group = parser.add_mutually_exclusive_group(required=False)
+	group.add_argument('--truncate', dest='truncate', action='store_true', help='Force light curve truncation.')
+	group.add_argument('--no-truncate', dest='truncate', action='store_false', help='Force no light curve truncation.')
+	parser.set_defaults(truncate=None)
 	parser.add_argument('input_folder', type=str, help='Input directory to run classification on.', nargs='?', default=None)
 	args = parser.parse_args()
 
@@ -78,7 +83,7 @@ def main():
 				if stcl:
 					stcl.close()
 				stcl = starclass.get_classifier(current_classifier)
-				stcl = stcl(tset=tset, features_cache=None)
+				stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate)
 
 			# ----------------- This code would run on each worker ------------------------
 

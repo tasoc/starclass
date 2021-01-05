@@ -30,6 +30,9 @@ def test_todolist_insert(SHARED_INPUT_DIR):
 			with pytest.raises(ValueError):
 				todolist_insert(cursor, priority=1, lightcurve=None)
 
+			with pytest.raises(ValueError):
+				todolist_insert(cursor, priority=1, lightcurve='doesntmatter.fits', datasource='invalid')
+
 			lightcurve = 'tess00029281992-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz'
 			todolist_insert(cursor,
 				priority=2187,
@@ -102,6 +105,11 @@ def test_todolist_create(PRIVATE_INPUT_DIR):
 	expected_file = os.path.join(input_folder, 'todo.sqlite')
 	assert not os.path.exists(expected_file)
 
+	# Try calling with an non-existing folder should give an error:
+	with pytest.raises(NotADirectoryError):
+		create_fake_todolist(input_folder + '-does-not-exist')
+
+	# Now run it on the real folder containg files:
 	todo_file = create_fake_todolist(input_folder)
 
 	# todo-file should now exist:
@@ -138,6 +146,11 @@ def test_todolist_create(PRIVATE_INPUT_DIR):
 def test_todolist_create_pattern(PRIVATE_INPUT_DIR):
 
 	input_folder = os.path.join(PRIVATE_INPUT_DIR, 'create_todolist')
+
+	# Using a pattern which will not match any targets should give an error:
+	with pytest.raises(ValueError) as e:
+		create_fake_todolist(input_folder, name='')
+	assert str(e.value) == 'Invalid todo-file name'
 
 	# Using a pattern which will not match any targets should give an error:
 	with pytest.raises(ValueError) as e:

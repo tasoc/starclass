@@ -154,11 +154,13 @@ class BaseClassifier(object):
 	#----------------------------------------------------------------------------------------------
 	@property
 	def random_seed(self):
+		"""Random seed used in derived classifiers."""
 		return self._random_seed
 
 	#----------------------------------------------------------------------------------------------
 	@property
 	def random_state(self):
+		"""Random state (:class:`numpy.random.RandomState`) corresponding to ``random_seed``."""
 		return np.random.RandomState(self._random_seed)
 
 	#----------------------------------------------------------------------------------------------

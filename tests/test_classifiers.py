@@ -28,7 +28,18 @@ def test_classifiers_train_test(classifier):
 	with tempfile.TemporaryDirectory(dir=dd) as tmpdir:
 		with stcl(tset=tset, features_cache=None, data_dir=os.path.basename(tmpdir)) as cl:
 			print(cl.data_dir)
+
+			# Run training:
 			cl.train(tset)
+
+			# Check that the features_names list is populated:
+			# The classifier will have to provide a list (not the default None)
+			print(cl.features_names)
+			assert isinstance(cl.features_names, list)
+			if classifier != 'slosh': # SLOSH is allowed to not have any feature names
+				assert len(cl.features_names) > 0
+
+			# Run testing phase:
 			cl.test(tset)
 
 #--------------------------------------------------------------------------------------------------

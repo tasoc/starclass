@@ -14,8 +14,23 @@ from tqdm import tqdm
 from . import selfsom
 from ..utilities import get_periods
 
+NFREQUENCIES = 6
+
 #--------------------------------------------------------------------------------------------------
-def featcalc(features, som, providednfreqs=6, nfrequencies=6, cardinality=64,
+def feature_names(linfit):
+	"""
+	Returns a list with the feature names.
+	"""
+	names = []
+	for i in range(NFREQUENCIES):
+		names.append('p' + str(i+1))
+	names.extend(['amp21','amp31','phi21','phi31','SOM_map','SOM_range','p2p_98_phasefold','p2p_mean_phasefold','p2p_98_lc','p2p_mean_lc''psi','zc','Fp07','Fp7','Fp20','Fp50'])
+	if linfit:
+		names.append('detrend_coeff_norm')
+	return names
+
+#--------------------------------------------------------------------------------------------------
+def featcalc(features, som, nfrequencies=6, cardinality=64,
 	linflatten=False, savefeat=None, recalc=False):
 	"""
 	Calculates features for set of lightcurves

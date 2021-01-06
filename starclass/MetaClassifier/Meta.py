@@ -83,7 +83,15 @@ class MetaClassifier(BaseClassifier):
 		"""
 		Loads classifier object.
 		"""
+		# Start a logger that should be used to output e.g. debug information:
+		logger = logging.getLogger(__name__)
+
+		# Load the pickle file:
 		self.classifier, self.features_used = utilities.loadPickle(infile)
+
+		# Extract the features names based on the loaded classifier:
+		self.features_names = ['{0:s}_{1:s}'.format(classifier, stcl.name) for classifier, stcl in self.features_used]
+		logger.debug("Feature names: %s", self.features_names)
 
 	#----------------------------------------------------------------------------------------------
 	def build_features_table(self, features, total=None):
@@ -178,8 +186,7 @@ class MetaClassifier(BaseClassifier):
 		# Save this to object, we are using it to keep track of which features were used
 		# to train the classifier:
 		self.features_used = list(itertools.product(all_classifiers, self.StellarClasses))
-		#features_names = ['{0:s}_{1:s}'.format(classifier, stcl.name) for classifier, stcl in self.features_used]
-		#logger.debug("Feature names: %s", features_names)
+		self.features_names = ['{0:s}_{1:s}'.format(classifier, stcl.name) for classifier, stcl in self.features_used]
 
 		# Create table of features:
 		# Create as float32, since that is what RandomForestClassifier converts it to anyway.
@@ -192,6 +199,7 @@ class MetaClassifier(BaseClassifier):
 		keepcols = ~allnan(features, axis=0)
 		features = features[:, keepcols]
 		self.features_used = [x for i, x in enumerate(self.features_used) if keepcols[i]]
+		self.features_names = [x for i, x in enumerate(self.features_names) if keepcols[i]]
 
 		# Throw an error if a classifier is not run at all:
 		run_classifiers = set([fu[0] for fu in self.features_used])

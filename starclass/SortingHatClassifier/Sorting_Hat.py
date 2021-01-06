@@ -64,6 +64,8 @@ class SortingHatClassifier(BaseClassifier):
 				# load pre-trained classifier
 				self.load(self.clfile)
 
+		self.features_names = fc.feature_names()
+
 		if self.classifier is None:
 			# Create new untrained classifier
 			self.classifier = Classifier_obj(

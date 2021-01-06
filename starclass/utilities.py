@@ -53,6 +53,25 @@ def rms_timescale(lc, timescale=3600/86400):
 	return mad_to_sigma * nanmedian(np.abs(flux_bin - nanmedian(flux_bin)))
 
 #--------------------------------------------------------------------------------------------------
+def ptp(lc):
+	"""
+	Compute robust Point-To-Point scatter.
+
+	Parameters:
+		lc (``lightkurve.TessLightCurve`` object): Lightcurve to calculate PTP for.
+
+	Returns:
+		float: Robust PTP.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
+	if len(lc.flux) == 0 or allnan(lc.flux):
+		return np.nan
+	if len(lc.time) == 0 or allnan(lc.time):
+		raise ValueError("Invalid time-vector specified. No valid timestamps.")
+	return nanmedian(np.abs(np.diff(lc.flux)))
+
+#--------------------------------------------------------------------------------------------------
 def get_periods(featdict, nfreqs, time, in_days=True, ignore_harmonics=False):
 	"""
 	Cuts frequency data down to desired number of frequencies (in uHz) and optionally

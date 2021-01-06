@@ -14,12 +14,12 @@ from tqdm import tqdm
 import enum
 import warnings
 from sklearn.metrics import accuracy_score, confusion_matrix
-from bottleneck import nanmedian, nanvar
+from bottleneck import nanvar
 from .io import load_lightcurve, savePickle, loadPickle
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
-from .utilities import rms_timescale
+from .utilities import rms_timescale, ptp
 from .plots import plotConfMatrix, plt
 from .StellarClasses import StellarClassesLevel1
 
@@ -355,7 +355,7 @@ class BaseClassifier(object):
 		if features['rms_hour'] is None or not np.isfinite(features['rms_hour']):
 			features['rms_hour'] = rms_timescale(lightcurve)
 		if features['ptp'] is None or not np.isfinite(features['ptp']):
-			features['ptp'] = nanmedian(np.abs(np.diff(lightcurve.flux)))
+			features['ptp'] = ptp(lightcurve)
 
 		# Save features in cache file for later use:
 		if save_to_cache and self.features_cache:

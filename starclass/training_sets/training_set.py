@@ -7,7 +7,7 @@ Training Sets.
 """
 
 import numpy as np
-from bottleneck import nanmedian, nanvar
+from bottleneck import nanvar
 import os
 import requests
 import zipfile
@@ -315,7 +315,7 @@ class TrainingSet(object):
 
 						variance = nanvar(lc.flux, ddof=1)
 						rms_hour = utilities.rms_timescale(lc)
-						ptp = nanmedian(np.abs(np.diff(lc.flux)))
+						ptp = utilities.ptp(lc)
 
 						#if datasource is None:
 						#	if (lc.time[1] - lc.time[0])*86400 > 1000:

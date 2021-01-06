@@ -12,7 +12,7 @@ import os
 import copy
 from sklearn.ensemble import RandomForestClassifier
 from . import RF_GC_featcalc as fc
-from .. import BaseClassifier, utilities
+from .. import BaseClassifier, io
 
 #--------------------------------------------------------------------------------------------------
 class Classifier_obj(RandomForestClassifier):
@@ -99,7 +99,7 @@ class RFGCClassifier(BaseClassifier):
 		fc.kohonenSave(self.classifier.som.K,os.path.join(self.data_dir, somoutfile)) # overwrites
 		tempsom = copy.deepcopy(self.classifier.som)
 		self.classifier.som = None
-		utilities.savePickle(outfile, self.classifier)
+		io.savePickle(outfile, self.classifier)
 		self.classifier.som = tempsom
 
 	#----------------------------------------------------------------------------------------------
@@ -109,7 +109,7 @@ class RFGCClassifier(BaseClassifier):
 
 		somfile MUST match the som used to train the classifier.
 		"""
-		self.classifier = utilities.loadPickle(infile)
+		self.classifier = io.loadPickle(infile)
 
 		if somfile is not None:
 			if os.path.exists(somfile):

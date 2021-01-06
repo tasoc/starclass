@@ -15,11 +15,11 @@ import enum
 import warnings
 from sklearn.metrics import accuracy_score, confusion_matrix
 from bottleneck import nanmedian, nanvar
-from .io import load_lightcurve
+from .io import load_lightcurve, savePickle, loadPickle
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
-from .utilities import savePickle, loadPickle, rms_timescale
+from .utilities import rms_timescale
 from .plots import plotConfMatrix, plt
 from .StellarClasses import StellarClassesLevel1
 

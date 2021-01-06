@@ -6,11 +6,15 @@ Input/output functions.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
+import pickle
+import gzip
 import numpy as np
 from bottleneck import nanmin
 from astropy.units import cds
 from astropy.io import fits
 import lightkurve as lk
+
+PICKLE_DEFAULT_PROTOCOL = 4 #: Default protocol to use for saving pickle files.
 
 #--------------------------------------------------------------------------------------------------
 def load_lightcurve(fname, starid=None, truncate_lightcurve=False):
@@ -97,3 +101,44 @@ def load_lightcurve(fname, starid=None, truncate_lightcurve=False):
 		raise ValueError("Invalid file format")
 
 	return lightcurve
+
+#--------------------------------------------------------------------------------------------------
+def savePickle(fname, obj):
+	"""
+	Save an object to file using pickle.
+
+	Parameters:
+		fname (string): File name to save to. If the name ends in '.gz' the file
+			will be automatically gzipped.
+		obj (object): Any pickalble object to be saved to file.
+	"""
+
+	if fname.endswith('.gz'):
+		o = gzip.open
+	else:
+		o = open
+
+	with o(fname, 'wb') as fid:
+		pickle.dump(obj, fid, protocol=PICKLE_DEFAULT_PROTOCOL)
+
+#--------------------------------------------------------------------------------------------------
+def loadPickle(fname):
+	"""
+	Load an object from file using pickle.
+
+	Parameters:
+		fname (string): File name to save to. If the name ends in '.gz' the file
+			will be automatically unzipped.
+		obj (object): Any pickalble object to be saved to file.
+
+	Returns:
+		object: The unpickled object from the file.
+	"""
+
+	if fname.endswith('.gz'):
+		o = gzip.open
+	else:
+		o = open
+
+	with o(fname, 'rb') as fid:
+		return pickle.load(fid)

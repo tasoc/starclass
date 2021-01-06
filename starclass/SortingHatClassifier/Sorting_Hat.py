@@ -11,7 +11,7 @@ import os.path
 import os
 from sklearn.ensemble import RandomForestClassifier
 from . import Sorting_Hat_featcalc as fc
-from .. import BaseClassifier, utilities
+from .. import BaseClassifier, io
 
 #--------------------------------------------------------------------------------------------------
 class Classifier_obj(RandomForestClassifier):
@@ -79,14 +79,14 @@ class SortingHatClassifier(BaseClassifier):
 		"""
 		Save the classifier object with pickle.
 		"""
-		utilities.savePickle(outfile, self.classifier)
+		io.savePickle(outfile, self.classifier)
 
 	#----------------------------------------------------------------------------------------------
 	def load(self, infile):
 		"""
 		Load classifier object.
 		"""
-		self.classifier = utilities.loadPickle(infile)
+		self.classifier = io.loadPickle(infile)
 
 	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features, recalc=False):

@@ -11,7 +11,7 @@ import copy
 import json
 from xgboost import XGBClassifier as xgb
 from . import xgb_feature_calc as xgb_features
-from .. import BaseClassifier, utilities
+from .. import BaseClassifier, io
 
 #--------------------------------------------------------------------------------------------------
 class XGBClassifier(BaseClassifier):
@@ -100,7 +100,7 @@ class XGBClassifier(BaseClassifier):
 
 		#self.classifier = None
 		temp_classifier = copy.deepcopy(self.classifier)
-		utilities.savePickle(outfile, self.classifier)
+		io.savePickle(outfile, self.classifier)
 		self.classifier = temp_classifier
 
 	#----------------------------------------------------------------------------------------------
@@ -109,7 +109,7 @@ class XGBClassifier(BaseClassifier):
 		Loading the xgb clasifier
 		"""
 
-		self.classifier = utilities.loadPickle(infile)
+		self.classifier = io.loadPickle(infile)
 
 	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features):

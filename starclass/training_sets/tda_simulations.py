@@ -13,6 +13,7 @@ import logging
 from tqdm import tqdm
 from ..StellarClasses import StellarClassesLevel1, StellarClassesLevel2
 from . import TrainingSet
+from ..todolist import todolist_structure, todolist_insert
 
 #--------------------------------------------------------------------------------------------------
 def _generate_todolist(self):
@@ -25,7 +26,7 @@ def _generate_todolist(self):
 		cursor = conn.cursor()
 
 		# Create the basic file structure of a TODO-list:
-		self.generate_todolist_structure(conn)
+		todolist_structure(conn)
 
 		logger.info("Step 3: Reading file and extracting information...")
 		starlist = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),
@@ -56,7 +57,7 @@ def _generate_todolist(self):
 			variance, rms_hour, ptp = diagnostics[k]
 
 			pri += 1
-			self.generate_todolist_insert(cursor,
+			todolist_insert(cursor,
 				priority=pri,
 				starid=starid,
 				lightcurve=lightcurve,

@@ -11,8 +11,6 @@ import os
 import shutil
 import tempfile
 import types
-import sqlite3
-from contextlib import closing
 import conftest # noqa: F401
 import starclass.training_sets as tsets
 from starclass import trainingset_available, get_trainingset
@@ -122,91 +120,6 @@ def test_trainingset_generate_todolist(monkeypatch, tsetkey):
 
 		assert tset.input_folder == tsetdir
 		assert os.path.isfile(os.path.join(tsetdir, tset._todo_name + '.sqlite'))
-
-#--------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
-def test_trainingset_generate_todolist_insert(SHARED_INPUT_DIR, tsetkey):
-
-	# Get training set class using conv. function:
-	tsetclass = get_trainingset(tsetkey)
-	tset = tsetclass()
-
-	with tempfile.TemporaryDirectory(prefix='pytest-private-tsets-') as tmpdir:
-		with closing(sqlite3.connect(os.path.join(tmpdir, 'todo.sqlite'))) as conn:
-			conn.row_factory = sqlite3.Row
-			cursor = conn.cursor()
-
-			tset.generate_todolist_structure(conn)
-
-			with pytest.raises(ValueError):
-				tset.generate_todolist_insert(cursor, priority=None)
-
-			with pytest.raises(ValueError):
-				tset.generate_todolist_insert(cursor, priority=1, lightcurve=None)
-
-			lightcurve = os.path.join(SHARED_INPUT_DIR, 'tess00029281992-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz')
-			tset.generate_todolist_insert(cursor,
-				priority=2187,
-				starid=12345678,
-				tmag=15.6,
-				lightcurve=lightcurve,
-				datasource='tpf',
-				variance=3.14,
-				rms_hour=2.71,
-				ptp=42.0)
-
-			# TODOLIST table:
-			cursor.execute("SELECT * FROM todolist WHERE priority=2187;")
-			row = cursor.fetchone()
-			assert row['priority'] == 2187
-			assert row['starid'] == 12345678
-			assert row['tmag'] == 15.6
-			assert row['datasource'] == 'tpf'
-			assert row['camera'] == 1 # These are constant!
-			assert row['ccd'] == 1 # These are constant!
-			assert row['cbv_area'] == 111 # These are constant!
-			assert row['status'] == 1 # These are constant!
-			assert row['corr_status'] == 1 # These are constant!
-
-			# DIAGNOSTICS_CORR table:
-			cursor.execute("SELECT * FROM diagnostics_corr WHERE priority=2187;")
-			row = cursor.fetchone()
-			assert row['lightcurve'] == lightcurve
-			assert row['variance'] == 3.14
-			assert row['rms_hour'] == 2.71
-			assert row['ptp'] == 42.0
-
-			# DATAVALIDATION_CORR table:
-			cursor.execute("SELECT * FROM datavalidation_corr WHERE priority=2187;")
-			row = cursor.fetchone()
-			assert row['approved'] == 1 # These are constant!
-			assert row['dataval'] == 0 # These are constant!
-
-			tset.generate_todolist_insert(cursor,
-				priority=2188,
-				lightcurve=lightcurve)
-
-			# TODOLIST table:
-			cursor.execute("SELECT * FROM todolist WHERE priority=2188;")
-			row = cursor.fetchone()
-			assert row['priority'] == 2188
-			assert row['starid'] == 2188 # When not provided, will used priority
-			assert row['tmag'] == -99
-			assert row['datasource'] == 'ffi'
-
-			# DIAGNOSTICS_CORR table:
-			cursor.execute("SELECT * FROM diagnostics_corr WHERE priority=2188;")
-			row = cursor.fetchone()
-			assert row['lightcurve'] == lightcurve
-			assert row['variance'] > 0
-			assert row['rms_hour'] > 0
-			assert row['ptp'] > 0
-
-			# DATAVALIDATION_CORR table:
-			cursor.execute("SELECT * FROM datavalidation_corr WHERE priority=2188;")
-			row = cursor.fetchone()
-			assert row['approved'] == 1 # These are constant!
-			assert row['dataval'] == 0 # These are constant!
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)

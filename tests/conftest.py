@@ -11,10 +11,33 @@ import os.path
 import tempfile
 import shutil
 import sys
+import subprocess
 
 # Insert starclass package as the first on path:
 if sys.path[0] != os.path.abspath(os.path.join(os.path.dirname(__file__), '..')):
 	sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+#--------------------------------------------------------------------------------------------------
+def capture_run_cli(cli, params):
+
+	if isinstance(params, str):
+		params = params.split()
+
+	cmd = [sys.executable, cli] + params
+	proc = subprocess.Popen(cmd,
+		cwd=os.path.join(os.path.dirname(__file__), '..'),
+		stdout=subprocess.PIPE,
+		stderr=subprocess.PIPE,
+		universal_newlines=True
+	)
+	out, err = proc.communicate()
+	exitcode = proc.returncode
+	proc.kill()
+
+	print("ExitCode: %d" % exitcode)
+	print("StdOut:\n%s" % out)
+	print("StdErr:\n%s" % err)
+	return out, err, exitcode
 
 #--------------------------------------------------------------------------------------------------
 @pytest.fixture(scope='session')

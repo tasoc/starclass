@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 The basic stellar classifier class for the TASOC pipeline.
@@ -10,17 +10,16 @@ All other specific stellar classification algorithms will inherit from BaseClass
 import numpy as np
 import os.path
 import logging
-from astropy.units import cds
-import lightkurve as lk
-from astropy.io import fits
 from tqdm import tqdm
 import enum
 import warnings
 from sklearn.metrics import accuracy_score, confusion_matrix
+from bottleneck import nanmedian, nanvar
+from .io import load_lightcurve
 from .features.freqextr import freqextr
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
-from .utilities import savePickle, loadPickle
+from .utilities import savePickle, loadPickle, rms_timescale
 from .plots import plotConfMatrix, plt
 from .StellarClasses import StellarClassesLevel1
 
@@ -54,11 +53,15 @@ class BaseClassifier(object):
 		StellarClasses (:class:`enum.Enum`): Enum of all possible labels the classifier
 			should be able to classify stars into. This will depend on the ``level``
 			which the classifier is run on.
+		truncate_lightcurves (bool): Indicating if Kepler/K2 lightcurves will be trunctated
+			to 27.4 days when loaded. Default is to truncate lightcurves if running with short
+			training sets (27.4 days) and not truncate if running with long (90 day) training-sets.
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	def __init__(self, tset=None, features_cache=None, plot=False, data_dir=None):
+	def __init__(self, tset=None, features_cache=None, plot=False, data_dir=None,
+		truncate_lightcurves=None):
 		"""
 		Initialize the classifier object.
 
@@ -70,6 +73,9 @@ class BaseClassifier(object):
 				saved/loaded as needed.
 			plot (bool, optional): Create plots as part of the output. Default is ``False``.
 			data_dir (str):
+			truncate_lightcurves (bool): Force truncation of lightcurves to 27.4 days.
+				If ``None``, the default will be decided based on the training-set
+				provided in ``tset``.
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
@@ -82,6 +88,7 @@ class BaseClassifier(object):
 		self.plot = plot
 		self.features_cache = features_cache
 		self._random_seed = 2187
+		self.truncate_lightcurves = truncate_lightcurves
 
 		# Inherit settings from the Training Set, just as a conveience:
 		if tset is None:
@@ -91,6 +98,14 @@ class BaseClassifier(object):
 		else:
 			self.StellarClasses = tset.StellarClasses
 			self.linfit = tset.linfit
+
+		# Decide if we should enable truncation of lightcurves upon loading:
+		if self.truncate_lightcurves is None:
+			if tset is None:
+				self.truncate_lightcurves = False
+			else:
+				self.truncate_lightcurves = (not tset.key.startswith('keplerq9v3-long'))
+		logger.debug("Truncate lightcurves = %s", self.truncate_lightcurves)
 
 		# Set the data directory, where results (trained models) will be saved:
 		if tset is not None:
@@ -309,69 +324,32 @@ class BaseClassifier(object):
 			# Load lightcurve file and create a TessLightCurve object:
 			if 'lightcurve' in features:
 				lightcurve = features['lightcurve']
-
-			elif fname.endswith(('.txt', '.noisy', '.sysnoise', '.clean')):
-				data = np.loadtxt(fname)
-				if data.shape[1] == 4:
-					quality = np.asarray(data[:,3], dtype='int32')
-				else:
-					quality = np.zeros(data.shape[0], dtype='int32')
-
-				lightcurve = lk.TessLightCurve(
-					time=data[:,0],
-					flux=data[:,1],
-					flux_err=data[:,2],
-					flux_unit=cds.ppm,
-					quality=quality,
-					time_format='jd',
-					time_scale='tdb',
-					targetid=task['starid'],
-					quality_bitmask=2+8+256, # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK,
-					meta={}
-				)
-
-			elif fname.endswith(('.fits.gz', '.fits')):
-				with fits.open(fname, mode='readonly', memmap=True) as hdu:
-					telescope = hdu[0].header.get('TELESCOP')
-					if telescope == 'TESS' and hdu[0].header.get('ORIGIN') == 'TASOC/Aarhus':
-						lightcurve = lk.TessLightCurve(
-							time=hdu['LIGHTCURVE'].data['TIME'],
-							flux=hdu['LIGHTCURVE'].data['FLUX_CORR'],
-							flux_err=hdu['LIGHTCURVE'].data['FLUX_CORR_ERR'],
-							flux_unit=cds.ppm,
-							centroid_col=hdu['LIGHTCURVE'].data['MOM_CENTR1'],
-							centroid_row=hdu['LIGHTCURVE'].data['MOM_CENTR2'],
-							quality=np.asarray(hdu['LIGHTCURVE'].data['QUALITY'], dtype='int32'),
-							cadenceno=np.asarray(hdu['LIGHTCURVE'].data['CADENCENO'], dtype='int32'),
-							time_format='btjd',
-							time_scale='tdb',
-							targetid=hdu[0].header.get('TICID'),
-							label=hdu[0].header.get('OBJECT'),
-							camera=hdu[0].header.get('CAMERA'),
-							ccd=hdu[0].header.get('CCD'),
-							sector=hdu[0].header.get('SECTOR'),
-							ra=hdu[0].header.get('RA_OBJ'),
-							dec=hdu[0].header.get('DEC_OBJ'),
-							quality_bitmask=1+2+256, # CorrectorQualityFlags.DEFAULT_BITMASK
-							meta={}
-						)
-					elif telescope == 'TESS':
-						lightcurve = lk.TESSLightCurveFile(hdu).PDCSAP_FLUX
-						lightcurve = 1e6 * (lightcurve.normalize() - 1)
-						lightcurve.flux_unit = cds.ppm
-					elif telescope == 'Kepler':
-						lightcurve = lk.KeplerLightCurveFile(hdu).PDCSAP_FLUX
-						lightcurve = 1e6 * (lightcurve.normalize() - 1)
-						lightcurve.flux_unit = cds.ppm
-					else:
-						raise ValueError("Could not determine FITS lightcurve type")
 			else:
-				raise ValueError("Invalid file format")
+				lightcurve = load_lightcurve(fname,
+					starid=task['starid'],
+					truncate_lightcurve=self.truncate_lightcurves)
 
 			# No features found in cache, so calculate them:
 			if not features:
 				save_to_cache = True
 				features = self.calc_features(lightcurve)
+
+		# Add the fields from the task to the list of features:
+		for key in ('tmag', 'variance', 'rms_hour', 'ptp', 'other_classifiers'):
+			if key in task.keys():
+				features[key] = task[key]
+			else:
+				logger.warning("Key '%s' not found in task.", key)
+				features[key] = np.NaN
+
+		# If these features were not provided with the task, i.e. they
+		# have not been pre-computed, we should compute them now:
+		if features['variance'] is None or not np.isfinite(features['variance']):
+			features['variance'] = nanvar(lightcurve.flux, ddof=1)
+		if features['rms_hour'] is None or not np.isfinite(features['rms_hour']):
+			features['rms_hour'] = rms_timescale(lightcurve)
+		if features['ptp'] is None or not np.isfinite(features['ptp']):
+			features['ptp'] = nanmedian(np.abs(np.diff(lightcurve.flux)))
 
 		# Save features in cache file for later use:
 		if save_to_cache and self.features_cache:
@@ -380,12 +358,6 @@ class BaseClassifier(object):
 		# Add the fields from the task to the list of features:
 		features['priority'] = task['priority']
 		features['starid'] = task['starid']
-		for key in ('tmag', 'variance', 'rms_hour', 'ptp', 'other_classifiers'):
-			if key in task.keys():
-				features[key] = task[key]
-			else:
-				logger.warning("Key '%s' not found in task.", key)
-				features[key] = np.NaN
 
 		logger.debug(features)
 		return features

@@ -71,7 +71,8 @@ class XGBClassifier(BaseClassifier):
 				objective='multi:softmax',
 				random_state=self.random_seed, # XGBoost uses misleading names
 				reg_alpha=1e-5,
-				subsample=0.8
+				subsample=0.8,
+				use_label_encoder=False
 			)
 			self.trained = False
 			self.features_names = xgb_features.feature_names()
@@ -123,12 +124,11 @@ class XGBClassifier(BaseClassifier):
 		#logger.info("We are staring the magic...")
 		xgb_classprobs = self.classifier.predict_proba(feature_results)[0]
 		logger.debug("Classification complete")
-		class_results = {}
 
-		for c, cla in enumerate(self.classifier.classes_):
-			key = self.StellarClasses(cla)
+		class_results = {}
+		for k, stcl in enumerate(self.StellarClasses):
 			# Cast to float for prediction
-			class_results[key] = float(xgb_classprobs[c])
+			class_results[stcl] = float(xgb_classprobs[k])
 
 		return class_results
 
@@ -159,7 +159,9 @@ class XGBClassifier(BaseClassifier):
 		#		feature_results = pd.read_csv(self.features_file)
 		#		precalc = True
 
-		fit_labels = self.parse_labels(tset.labels())
+		# Convert classification labels to integers:
+		intlookup = {key.value: value for value, key in enumerate(self.StellarClasses)}
+		fit_labels = [intlookup[lbl] for lbl in self.parse_labels(tset.labels())]
 
 		#if not precalc:
 		#	logger.info('Extracting Features ...')

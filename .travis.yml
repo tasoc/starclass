@@ -27,7 +27,7 @@ jobs:
       osx_image: xcode11.2 # Python 3.7.4 running on macOS 10.14.4
       language: shell
       before_install:
-        - brew install git-lfs
+        - brew install git-lfs libomp
         - python3 --version
         - git lfs install
         - git lfs pull

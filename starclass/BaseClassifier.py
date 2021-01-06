@@ -49,6 +49,8 @@ class BaseClassifier(object):
 		plot (bool): Indicates wheter plotting is enabled.
 		data_dir (str): Path to directory where classifiers store auxiliary data.
 			Different directories will be used for each classification level.
+		features_cache (str): Path to directory where calculated features will be
+			saved/loaded as needed.
 		classifier_key (str): Keyword/name of the current classifier.
 		StellarClasses (:class:`enum.Enum`): Enum of all possible labels the classifier
 			should be able to classify stars into. This will depend on the ``level``

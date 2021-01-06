@@ -15,14 +15,6 @@ from ..RFGCClassifier import RF_GC_featcalc
 from ..utilities import get_periods
 
 #--------------------------------------------------------------------------------------------------
-def feature_names():
-	"""
-	Returns a list with the feature names.
-	"""
-	names = ['skewness','kurtosis','shapiro_wilk','eta','PeriodLS','Freq_amp_0','Freq_ampratio_21','Freq_ampratio_31','Freq_phasediff_21','Freq_phasediff_31','Rcs','psi_Rcs']
-	return names
-
-#--------------------------------------------------------------------------------------------------
 def feature_extract(features, savefeat=None, linflatten=False, recalc=False):
 	featout = pd.DataFrame()
 	if not isinstance(features, types.GeneratorType):

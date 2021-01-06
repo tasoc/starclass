@@ -15,6 +15,7 @@ import pyentrp.entropy as ent
 from . import npeet_entropy_estimators as npeet
 from ..utilities import get_periods
 
+# Number of frequencies used as features:
 NFREQUENCIES = 3
 
 #--------------------------------------------------------------------------------------------------
@@ -22,22 +23,31 @@ def feature_names():
 	"""
 	Returns a list with the feature names.
 	"""
-	names = []
-	for i in range(NFREQUENCIES):
-		names.append('f' + str(i+1))
-	names.extend(['varrat', 'number_significantharmonic','skewness', 'flux_ratio', 'diff_entropy_lc', 'diff_entropy_as', 'mse_mean', 'mse_max', 'mse_std', 'mse_power'])
+	names = ['f' + str(i+1) for i in range(NFREQUENCIES)]
+	names += [
+		'varrat',
+		'number_significantharmonic',
+		'skewness',
+		'flux_ratio',
+		'diff_entropy_lc',
+		'diff_entropy_as',
+		'mse_mean',
+		'mse_max',
+		'mse_std',
+		'mse_power'
+	]
 	return names
 
 #--------------------------------------------------------------------------------------------------
-def featcalc(features, nfrequencies=3, linflatten=False, savefeat=None, recalc=False):
+def featcalc(features, linflatten=False, savefeat=None, recalc=False):
 	"""
 	Calculates features for set of lightcurves
 	"""
 
-	featout = np.zeros([1,nfrequencies+10])
 	if isinstance(features, dict): # trick for single features
 		features = [features]
 
+	featout = np.zeros([1, NFREQUENCIES+10], dtype='float32')
 	for obj in features:
 		precalc = False
 		if savefeat is not None:
@@ -48,23 +58,23 @@ def featcalc(features, nfrequencies=3, linflatten=False, savefeat=None, recalc=F
 				precalc = True
 
 		if not precalc:
-			objfeatures = np.zeros(nfrequencies+10)
-			lc = prepLCs(obj['lightcurve'],linflatten)
+			objfeatures = np.zeros(NFREQUENCIES+10, dtype='float32')
+			lc = prepLCs(obj['lightcurve'], linflatten)
 
-			periods, _, _ = get_periods(obj, nfrequencies, lc.time, in_days=False)
-			objfeatures[:nfrequencies] = periods
+			periods, _, _ = get_periods(obj, NFREQUENCIES, lc.time, in_days=False)
+			objfeatures[:NFREQUENCIES] = periods
 
 			#EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)
 			#objfeatures[0] = EBper # overwrites top period
 
-			objfeatures[nfrequencies:nfrequencies+2] = compute_varrat(obj)
-			#objfeatures[nfrequencies+1:nfrequencies+2] = compute_lpf1pa11(obj)
-			objfeatures[nfrequencies+2:nfrequencies+3] = stat.skew(lc.flux)
-			objfeatures[nfrequencies+3:nfrequencies+4] = compute_flux_ratio(lc.flux)
-			objfeatures[nfrequencies+4:nfrequencies+5] = compute_differential_entropy(lc.flux)
-			objfeatures[nfrequencies+5:nfrequencies+6] = compute_differential_entropy(obj['powerspectrum'].standard[1])
-			objfeatures[nfrequencies+6:nfrequencies+10] = compute_multiscale_entropy(lc.flux)
-			#objfeatures[nfrequencies+10:nfrequencies+11] = compute_max_lyapunov_exponent(lc.flux)
+			objfeatures[NFREQUENCIES:NFREQUENCIES+2] = compute_varrat(obj)
+			#objfeatures[NFREQUENCIES+1:NFREQUENCIES+2] = compute_lpf1pa11(obj)
+			objfeatures[NFREQUENCIES+2:NFREQUENCIES+3] = stat.skew(lc.flux)
+			objfeatures[NFREQUENCIES+3:NFREQUENCIES+4] = compute_flux_ratio(lc.flux)
+			objfeatures[NFREQUENCIES+4:NFREQUENCIES+5] = compute_differential_entropy(lc.flux)
+			objfeatures[NFREQUENCIES+5:NFREQUENCIES+6] = compute_differential_entropy(obj['powerspectrum'].standard[1])
+			objfeatures[NFREQUENCIES+6:NFREQUENCIES+10] = compute_multiscale_entropy(lc.flux)
+			#objfeatures[NFREQUENCIES+10:NFREQUENCIES+11] = compute_max_lyapunov_exponent(lc.flux)
 
 			if savefeat is not None:
 				np.savetxt(featfile,objfeatures, delimiter=',')

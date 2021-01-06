@@ -45,6 +45,7 @@ class SLOSHClassifier(BaseClassifier):
 		#self.classifier = None
 		self.mc_iterations = mc_iterations
 		self.num_labels = len(self.StellarClasses)
+		self.features_names = [] # SLOSH have no features as such
 
 		# Set the global random seeds:
 		np.random.seed(self.random_seed)

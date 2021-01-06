@@ -75,7 +75,22 @@ class XGBClassifier(BaseClassifier):
 				use_label_encoder=False
 			)
 			self.trained = False
-			self.features_names = xgb_features.feature_names()
+
+		# List of feature names used by the classifier:
+		self.features_names = [
+			'skewness',
+			'kurtosis',
+			'shapiro_wilk',
+			'eta',
+			'PeriodLS',
+			'Freq_amp_0',
+			'Freq_ampratio_21',
+			'Freq_ampratio_31',
+			'Freq_phasediff_21',
+			'Freq_phasediff_31',
+			'Rcs',
+			'psi_Rcs'
+		]
 
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):

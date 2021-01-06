@@ -53,6 +53,7 @@ class BaseClassifier(object):
 		StellarClasses (:class:`enum.Enum`): Enum of all possible labels the classifier
 			should be able to classify stars into. This will depend on the ``level``
 			which the classifier is run on.
+		features_names (list): List of names of features used by the classifier.
 		truncate_lightcurves (bool): Indicating if Kepler/K2 lightcurves will be trunctated
 			to 27.4 days when loaded. Default is to truncate lightcurves if running with short
 			training sets (27.4 days) and not truncate if running with long (90 day) training-sets.
@@ -89,6 +90,7 @@ class BaseClassifier(object):
 		self.features_cache = features_cache
 		self._random_seed = 2187
 		self.truncate_lightcurves = truncate_lightcurves
+		self.features_names = None
 
 		# Inherit settings from the Training Set, just as a conveience:
 		if tset is None:

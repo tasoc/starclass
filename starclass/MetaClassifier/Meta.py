@@ -13,7 +13,7 @@ import numpy as np
 import itertools
 from bottleneck import allnan, anynan
 from sklearn.ensemble import RandomForestClassifier
-from .. import BaseClassifier, utilities
+from .. import BaseClassifier, io
 from ..constants import classifier_list
 
 #--------------------------------------------------------------------------------------------------
@@ -76,7 +76,7 @@ class MetaClassifier(BaseClassifier):
 		"""
 		Saves the classifier object with pickle.
 		"""
-		utilities.savePickle(outfile, [self.classifier, self.features_used])
+		io.savePickle(outfile, [self.classifier, self.features_used])
 
 	#----------------------------------------------------------------------------------------------
 	def load(self, infile):
@@ -87,7 +87,7 @@ class MetaClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		# Load the pickle file:
-		self.classifier, self.features_used = utilities.loadPickle(infile)
+		self.classifier, self.features_used = io.loadPickle(infile)
 
 		# Extract the features names based on the loaded classifier:
 		self.features_names = ['{0:s}_{1:s}'.format(classifier, stcl.name) for classifier, stcl in self.features_used]

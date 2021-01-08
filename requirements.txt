@@ -1,3 +1,17 @@
-numpy
-astropy
-lightkurve
+pytest
+flake8
+flake8-tabs
+flake8-builtins
+flake8-logging-format
+numpy == 1.19.4
+matplotlib == 3.3.2
+scipy == 1.5.4
+astropy == 4.1
+lightkurve >= 1.7.0
+scikit-learn == 0.23.2
+Bottleneck == 1.3.2
+requests
+tensorflow == 2.4.0
+xgboost == 1.3.1
+tqdm
+pyentrp == 0.6.0

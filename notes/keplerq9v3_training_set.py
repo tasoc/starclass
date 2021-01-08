@@ -17,7 +17,7 @@ from astropy.io import fits
 from lightkurve import LightCurve
 if sys.path[0] != os.path.abspath('..'):
 	sys.path.insert(0, os.path.abspath('..'))
-from starclass.utilities import rms_timescale
+import starclass.utilities as util
 #from starclass.plots import plt
 
 #--------------------------------------------------------------------------------------------------
@@ -58,7 +58,7 @@ if __name__ == '__main__':
 
 	# Make sure directories exists:
 	os.makedirs(output_dir, exist_ok=True)
-	shutil.copy('keplerq9v2_targets.txt', os.path.join(output_dir, 'targets.txt'))
+	shutil.copy('keplerq9v3_targets.txt', os.path.join(output_dir, 'targets.txt'))
 
 	# Load the list of KIC numbers and stellar classes:
 	starlist = np.genfromtxt(os.path.join(output_dir, 'targets.txt'),
@@ -177,8 +177,8 @@ if __name__ == '__main__':
 			# Calculate diagnostics:
 			lc = LightCurve(time=time, flux=flux, flux_err=flux_err)
 			variance = nanvar(flux, ddof=1)
-			rms_hour = rms_timescale(lc, timescale=3600/86400)
-			ptp = nanmedian(np.abs(np.diff(flux)))
+			rms_hour = util.rms_timescale(lc, timescale=3600/86400)
+			ptp = util.ptp(lc)
 
 			# Add target to TODO-list:
 			diag.write("{variance:.16e},{rms_hour:.16e},{ptp:.16e}\n".format(

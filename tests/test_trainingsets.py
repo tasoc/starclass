@@ -18,6 +18,8 @@ from starclass import trainingset_available, get_trainingset
 AVAILABLE_TSETS = [
 	'keplerq9v3',
 	'keplerq9v3-instr',
+	pytest.param('keplerq9v3-long', marks=pytest.mark.skipif(not trainingset_available('keplerq9v3-long'), reason='TrainingSet not available')),
+	pytest.param('keplerq9v3-long-instr', marks=pytest.mark.skipif(not trainingset_available('keplerq9v3-long-instr'), reason='TrainingSet not available')),
 	pytest.param('keplerq9v2', marks=pytest.mark.skipif(not trainingset_available('keplerq9v2'), reason='TrainingSet not available')),
 	pytest.param('keplerq9', marks=pytest.mark.skipif(not trainingset_available('keplerq9'), reason='TrainingSet not available')),
 	pytest.param('tdasim', marks=pytest.mark.skip),

@@ -43,4 +43,5 @@ Helper classes and utilities
 	starclass.io
 	starclass.plots
 	starclass.taskmanager
+	starclass.todolist
 	starclass.utilities

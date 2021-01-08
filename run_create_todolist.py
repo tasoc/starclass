@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Command-line interface for creating todo-file by scanning directory for light curve files..
+
+.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+"""
 
 import argparse
 import logging
 import starclass
 
 #--------------------------------------------------------------------------------------------------
-if __name__ == '__main__':
-
+def main():
 	# Parse command line arguments:
 	parser = argparse.ArgumentParser(description='')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
@@ -41,3 +45,7 @@ if __name__ == '__main__':
 		name=args.name,
 		pattern=args.pattern,
 		overwrite=args.overwrite)
+
+#--------------------------------------------------------------------------------------------------
+if __name__ == '__main__':
+	main()

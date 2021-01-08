@@ -22,3 +22,4 @@ Command-line Utilities
 	run_training
 	run_starclass
 	run_starclass_mpi
+	run_create_todolist

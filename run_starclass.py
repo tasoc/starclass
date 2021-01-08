@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Utility function for running classifiers.
+Command-line interface for running classifications.
 
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """

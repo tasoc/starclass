@@ -59,6 +59,13 @@ def main():
 		input_folder = os.environ.get('STARCLASS_INPUT')
 	if not input_folder:
 		parser.error("Please specify an INPUT_FOLDER.")
+	if not os.path.exists(input_folder):
+		parser.error("INPUT_FOLDER does not exist")
+	if os.path.isdir(input_folder):
+		todo_file = os.path.join(input_folder, 'todo.sqlite')
+	else:
+		todo_file = os.path.abspath(input_folder)
+		input_folder = os.path.dirname(input_folder)
 
 	# Initialize the training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
@@ -75,7 +82,7 @@ def main():
 
 	if rank == 0:
 		try:
-			with starclass.TaskManager(input_folder, cleanup=True, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
+			with starclass.TaskManager(todo_file, cleanup=True, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 				# Get list of tasks:
 				#numtasks = tm.get_number_tasks()
 				#tm.logger.info("%d tasks to be run", numtasks)

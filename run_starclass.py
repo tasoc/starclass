@@ -56,9 +56,15 @@ def main():
 	input_folder = args.input_folder
 	if input_folder is None:
 		input_folder = os.environ.get('STARCLASS_INPUT')
-
 	if input_folder is None:
 		parser.error("No input folder specified")
+	if not os.path.exists(input_folder):
+		parser.error("INPUT_FOLDER does not exist")
+	if os.path.isdir(input_folder):
+		todo_file = os.path.join(input_folder, 'todo.sqlite')
+	else:
+		todo_file = os.path.abspath(input_folder)
+		input_folder = os.path.dirname(input_folder)
 
 	# Choose which classifier to use
 	# For now, there is only one...
@@ -71,7 +77,7 @@ def main():
 	# Running:
 	# When simply running the classifier on new stars:
 	stcl = None
-	with starclass.TaskManager(input_folder, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
+	with starclass.TaskManager(todo_file, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 		while True:
 			task = tm.get_task(classifier=current_classifier)
 			if task is None:

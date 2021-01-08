@@ -62,7 +62,7 @@ def main():
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in parallel?
 		# TODO: Check if results are already present
-		with starclass.TaskManager(tset.input_folder, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
+		with starclass.TaskManager(tset.todo_file, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 			for cla_key in tm.all_classifiers:
 				# Split the tset object into cross-validation folds.
 				# These are objects with exactly the same properties as the original one,
@@ -86,7 +86,7 @@ def main():
 
 	# Initialize the classifier:
 	classifier = starclass.get_classifier(current_classifier)
-	with starclass.TaskManager(tset.input_folder, overwrite=False, classes=tset.StellarClasses) as tm:
+	with starclass.TaskManager(tset.todo_file, overwrite=False, classes=tset.StellarClasses) as tm:
 		with classifier(tset=tset, features_cache=tset.features_cache) as stcl:
 			# Run the training of the classifier:
 			logger.info("Training %s on full training-set...", current_classifier)

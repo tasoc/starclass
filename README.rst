@@ -14,13 +14,16 @@ The TASOC Stellar Classification module
 
 This module provides the stellar classification setup for the TESS Asteroseismic Science Operations Center (TASOC).
 
+The code is available through our GitHub organisation (https://github.com/tasoc/starclass) and full documentation for this code can be found on https://tasoc.dk/code/.
+
+.. note::
+    Even though the full code and documentation are freely available, we highly encourage users to not attempt to use the code to generate their own photometry or classifications from TESS. Instead we encourage you to use the fully processed data products from the full TASOC pipeline, which are available from `TASOC <https://tasoc.dk>`_ and `MAST <https://archive.stsci.edu/hlsp/tasoc>`_. If you are interested in working on details in the processing, we welcome you to join the T'DA working group.
+
 The overall strategy of the classification pipeline is to have different classifiers are run on the same data, and all the results from the individual classifiers are passed into an overall "meta-classifier" which will assign the final classifications based on the inputs from all classifiers.
 
 Classification is done in two levels (1 and 2), where the first level separates stars into overall classes of stars that exhibit similar lightcurves. In level 2, these classes are further separated into the individual pulsation classes.
 
 .. image:: docs/burger_diagram.png
-
-The code is available through our GitHub organization (https://github.com/tasoc/starclass) and full documentation for this code can be found on https://tasoc.dk/code/.
 
 Installation instructions
 =========================

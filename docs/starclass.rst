@@ -40,6 +40,8 @@ Helper classes and utilities
 
 .. toctree::
 
+	starclass.convenience
+	starclass.constants
 	starclass.io
 	starclass.plots
 	starclass.taskmanager

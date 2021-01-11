@@ -168,7 +168,12 @@ class TrainingSet(object):
 
 			# Set tf to be zero here so the training set isn't further split
 			# as want to run all the data through CV
-			newtset = self.__class__(level=self.level, datalevel=self.datalevel, tf=0.0)
+			newtset = self.__class__(
+				level=self.level,
+				datalevel=self.datalevel,
+				linfit=self.linfit,
+				random_seed=self.random_seed,
+				tf=0.0)
 
 			# Set testfraction to value from CV i.e. 1/n_splits
 			newtset.testfraction = tf

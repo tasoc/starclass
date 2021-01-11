@@ -153,18 +153,21 @@ def test_trainingset_features(tsetkey, linfit):
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
-def test_trainingset_folds(tsetkey):
+@pytest.mark.parametrize('linfit', [False, True])
+def test_trainingset_folds(tsetkey, linfit):
 
 	# Get training set class using conv. function:
 	tsetclass = get_trainingset(tsetkey)
-	tset = tsetclass()
+	tset = tsetclass(linfit=linfit)
 
 	for k, fold in enumerate(tset.folds(n_splits=5, tf=0.2)):
 		assert isinstance(fold, tsetclass)
+		assert fold.key == tset.key
 		assert fold.crossval_folds == 5
 		assert fold.fold == k + 1
 		assert fold.testfraction == 0.2
 		assert fold.level == tset.level
+		assert fold.random_seed == tset.random_seed
 		assert len(fold.train_idx) > 0
 		assert len(fold.test_idx) > 0
 		assert len(fold.train_idx) > len(fold.test_idx)

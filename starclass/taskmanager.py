@@ -13,6 +13,7 @@ import logging
 from astropy.table import Table
 from . import STATUS
 from .constants import classifier_list
+from .version import get_version
 
 #--------------------------------------------------------------------------------------------------
 class TaskManager(object):
@@ -85,7 +86,8 @@ class TaskManager(object):
 
 		# Create table for settings if it doesn't already exits:
 		self.cursor.execute("""CREATE TABLE IF NOT EXISTS starclass_settings (
-			tset TEXT NOT NULL
+			tset TEXT NOT NULL,
+			version TEXT NOT NULL
 		);""")
 		self.conn.commit()
 
@@ -316,7 +318,10 @@ class TaskManager(object):
 		"""
 		try:
 			self.cursor.execute("DELETE FROM starclass_settings;")
-			self.cursor.execute("INSERT INTO starclass_settings (tset) VALUES (?);", [self.tset])
+			self.cursor.execute("INSERT INTO starclass_settings (tset,version) VALUES (?,?);", [
+				self.tset,
+				get_version()
+			])
 			self.conn.commit()
 		except: # noqa: E722, pragma: no cover
 			self.conn.rollback()

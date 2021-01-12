@@ -83,7 +83,7 @@ class XGBClassifier(BaseClassifier):
 			'shapiro_wilk',
 			'eta',
 			'PeriodLS',
-			'Freq_amp_0',
+			'amp1', # Freq_amp_0
 			'Freq_ampratio_21',
 			'Freq_ampratio_31',
 			'Freq_phasediff_21',
@@ -145,7 +145,7 @@ class XGBClassifier(BaseClassifier):
 			# Cast to float for prediction
 			class_results[stcl] = float(xgb_classprobs[k])
 
-		return class_results
+		return class_results, feature_results.values
 
 	#----------------------------------------------------------------------------------------------
 	def train(self, tset, savecl=True, recalc=False, overwrite=False, feat_import=True):

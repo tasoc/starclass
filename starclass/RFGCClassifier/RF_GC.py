@@ -157,7 +157,7 @@ class RFGCClassifier(BaseClassifier):
 		for c, cla in enumerate(self.classifier.classes_):
 			key = self.StellarClasses(cla)
 			result[key] = classprobs[c]
-		return result
+		return result, featarray
 
 	#----------------------------------------------------------------------------------------------
 	def train(self, tset, savecl=True, recalc=False, overwrite=False):

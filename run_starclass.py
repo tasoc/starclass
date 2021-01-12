@@ -6,11 +6,9 @@ Command-line interface for running classifications.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-import matplotlib.pyplot as plt
 import os.path
 import argparse
 import logging
-from timeit import default_timer
 import starclass
 
 #--------------------------------------------------------------------------------------------------
@@ -93,30 +91,11 @@ def main():
 
 			# ----------------- This code would run on each worker ------------------------
 
-			fname = os.path.join(input_folder, task['lightcurve'])
-			features = stcl.load_star(task, fname)
-
-			print(features)
-			lc = features['lightcurve']
-			lc.show_properties()
-
-			plt.close('all')
-			lc.plot()
-
-			res = task.copy()
-
-			tic_predict = default_timer()
-			res['starclass_results'] = stcl.classify(features)
-			toc_predict = default_timer()
+			res = stcl.classify(task)
 
 			# ----------------- This code would run on each worker ------------------------
 
-			# Pad results with metadata and return to TaskManager to be saved:
-			res.update({
-				'tset': tset.key,
-				'status': starclass.STATUS.OK,
-				'elaptime': toc_predict - tic_predict
-			})
+			# Return to TaskManager to be saved:
 			tm.save_results(res)
 
 #--------------------------------------------------------------------------------------------------

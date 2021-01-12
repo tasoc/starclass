@@ -17,6 +17,8 @@ from starclass.StellarClasses import StellarClassesLevel1
 def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
 	"""Test of TaskManager"""
 
+	input_dir = os.path.dirname(PRIVATE_TODO_FILE)
+
 	with TaskManager(PRIVATE_TODO_FILE, overwrite=True) as tm:
 		# Get the number of tasks:
 		with pytest.raises(NotImplementedError):
@@ -36,7 +38,7 @@ def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
 		# The first priority in the TODO file is the following:
 		assert task1['priority'] == 17
 		assert task1['starid'] == 29281992
-		assert task1['lightcurve'] == 'ffi/00029/tess00029281992-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz'
+		assert task1['lightcurve'] == os.path.join(input_dir, 'tess00029281992-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz')
 		assert task1['classifier'] == 'slosh'
 
 		# Start task with priority=1:
@@ -48,7 +50,7 @@ def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
 
 		assert task2['priority'] == 26
 		assert task2['starid'] == 29859905
-		assert task2['lightcurve'] == 'ffi/00029/tess00029859905-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz'
+		assert task2['lightcurve'] == os.path.join(input_dir, 'ffi/00029/tess00029859905-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz')
 		assert task2['classifier'] == 'slosh'
 
 		# Check that the status did actually change in the todolist:
@@ -199,7 +201,72 @@ def test_taskmanager_save_and_settings(PRIVATE_TODO_FILE):
 		result['tset'] = 'another'
 		with pytest.raises(ValueError) as e:
 			tm.save_results(result)
-		assert str(e.value) == "Attempting to mix results from multiple training sets"
+		assert str(e.value) == "Attempting to mix results from multiple training sets. Previous='keplerq9v3', New='another'."
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('classifier', ['rfgc', 'xgb', 'sortinghat', 'slosh'])
+def test_taskmanager_moat(PRIVATE_TODO_FILE, classifier):
+
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
+		# Start a random task:
+		task = tm.get_task(classifier=classifier)
+		print(task)
+
+		#
+		features_common = {'freq1': 42, 'amp1': 43, 'phase1': 4}
+		features = {'unique_feature': 2187, 'special_feature': 1234}
+
+		# Make a fake result we can save;
+		result = task.copy()
+		result['tset'] = 'keplerq9v3'
+		result['classifier'] = classifier
+		result['status'] = STATUS.OK
+		result['elaptime'] = 3.14
+		result['starclass_results'] = {
+			StellarClassesLevel1.SOLARLIKE: 0.8,
+			StellarClassesLevel1.APERIODIC: 0.2
+		}
+		# This is the important part in this test:
+		result['features'] = features
+		result['features_common'] = features_common
+
+		# Save the result:
+		tm.save_results(result)
+
+		# Check common features were stored in the table:
+		tm.cursor.execute("SELECT * FROM starclass_features_common WHERE priority=?;", [task['priority']])
+		row1 = dict(tm.cursor.fetchone())
+		del row1['priority']
+		assert row1 == features_common
+
+		tm.cursor.execute("SELECT * FROM starclass_features_%s WHERE priority=?;" % classifier, [task['priority']])
+		row2 = dict(tm.cursor.fetchone())
+		del row2['priority']
+		assert row2 == features
+
+		# Try to extract the features again, they should be identical to the ones we put in:
+		extracted_features = tm.moat_query('common', task['priority'])
+		assert extracted_features == features_common
+		extracted_features = tm.moat_query(classifier, task['priority'])
+		assert extracted_features == features
+
+		# If we ask for the exact same target, we should get another classifier,
+		# but the common features should now be provided to us:
+		task2 = tm.get_task(priority=task['priority'], classifier=classifier)
+		print(task2)
+		assert task2['classifier'] != classifier
+		assert task2['features_common'] == features_common
+
+		# Clear the moat, which should delete all MOAT tables:
+		tm.moat_clear()
+
+		# Check that there are no more MOAT tables in the todo-file:
+		tm.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'starclass_features_%';")
+		assert tm.cursor.fetchone()[0] == 0
+
+		# Using the query should now return nothing:
+		assert tm.moat_query('common', task['priority']) is None
+		assert tm.moat_query(classifier, task['priority']) is None
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

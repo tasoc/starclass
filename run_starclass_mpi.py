@@ -168,39 +168,18 @@ def main():
 				toc_wait = default_timer()
 
 				if tag == tags.START:
-					result = task.copy()
-
 					# Run the classification prediction:
-					try:
-						if task['classifier'] != current_classifier or stcl is None:
-							current_classifier = task['classifier']
-							if stcl:
-								stcl.close()
-							stcl = starclass.get_classifier(current_classifier)
-							stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate)
+					if task['classifier'] != current_classifier or stcl is None:
+						current_classifier = task['classifier']
+						if stcl:
+							stcl.close()
+						stcl = starclass.get_classifier(current_classifier)
+						stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate)
 
-						fname = os.path.join(input_folder, task['lightcurve'])
-						features = stcl.load_star(task, fname)
-
-						tic_predict = default_timer()
-						result['starclass_results'] = stcl.classify(features)
-						toc_predict = default_timer()
-
-						result['elaptime'] = toc_predict - tic_predict
-						result['status'] = starclass.STATUS.OK
-					except: # noqa: E722, pragma: no cover
-						# Something went wrong
-						error_msg = traceback.format_exc().strip()
-						result.update({
-							'status': starclass.STATUS.ERROR,
-							'details': {'errors': [error_msg]},
-						})
+					result = stcl.classify(task)
 
 					# Pad results with metadata and return to TaskManager to be saved:
-					result.update({
-						'tset': tset.key,
-						'worker_wait_time': toc_wait - tic_wait
-					})
+					result['worker_wait_time'] = toc_wait - tic_wait
 
 					# Send the result back to the master:
 					comm.send(result, dest=0, tag=tags.DONE)

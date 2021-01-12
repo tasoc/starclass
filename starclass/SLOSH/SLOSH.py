@@ -102,7 +102,7 @@ class SLOSHClassifier(BaseClassifier):
 		for k, stcl in enumerate(self.StellarClasses):
 			result[stcl] = pred[k]
 
-		return result
+		return result, []
 
 	#----------------------------------------------------------------------------------------------
 	def train(self, tset):

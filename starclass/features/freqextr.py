@@ -9,6 +9,7 @@ Extract frequencies from timeseries.
 
 import numpy as np
 import logging
+import itertools
 from bottleneck import median
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
@@ -419,3 +420,72 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 	tab.meta['conseclim'] = conseclim
 
 	return tab
+
+#--------------------------------------------------------------------------------------------------
+def table_from_dict(feat, n_peaks=6, n_harmonics=0, flux_unit=None):
+
+	rows = []
+	for num, harmonic in itertools.product(range(1, n_peaks+1), range(n_harmonics+1)):
+		if harmonic == 0:
+			key = '{0:d}'.format(num)
+		else:
+			key = '{0:d}_harmonic{1:d}'.format(num, harmonic)
+
+		amp = feat['amp' + key]
+		phase = feat['phase' + key]
+
+		rows.append([
+			num,
+			harmonic,
+			feat['freq' + key],
+			amp,
+			phase,
+			amp*np.cos(phase),
+			amp*np.sin(phase)
+		])
+
+	tab = Table(
+		rows=rows,
+		names=['num', 'harmonic', 'frequency', 'amplitude', 'phase', 'alpha', 'beta'],
+		dtype=['int32', 'int32', 'float64', 'float64', 'float64', 'float64', 'float64'])
+
+	# Add units to columns:
+	tab['frequency'].unit = u.uHz
+	tab['amplitude'].unit = flux_unit
+	tab['phase'].unit = u.rad
+	tab['alpha'].unit = flux_unit
+	tab['beta'].unit = flux_unit
+
+	# Add index to peak number and harmonic for easy lookup:
+	# TODO: Use table indicies - Problem with Pickle
+	#tab.add_index('num')
+
+	# Add meta data to table on how the list was created:
+	tab.meta['n_peaks'] = n_peaks
+	tab.meta['n_harmonics'] = n_harmonics
+	#tab.meta['harmonics_list'] = harmonics_list
+	#tab.meta['hifac'] = hifac
+	#tab.meta['ofac'] = ofac
+	#tab.meta['snrlim'] = snrlim
+	#tab.meta['snr_width'] = snr_width * u.uHz
+	#tab.meta['faplim'] = faplim
+	#tab.meta['devlim'] = devlim
+	#tab.meta['conseclim'] = conseclim
+
+	return tab
+
+#--------------------------------------------------------------------------------------------------
+def table_to_dict(tab):
+
+	features = {}
+	for row in tab:
+		if row['harmonic'] == 0:
+			key = '{0:d}'.format(row['num'])
+		else:
+			key = '{0:d}_harmonic{1:d}'.format(row['num'], row['harmonic'])
+
+		features['freq' + key] = row['frequency']
+		features['amp' + key] = row['amplitude']
+		features['phase' + key] = row['phase']
+
+	return features

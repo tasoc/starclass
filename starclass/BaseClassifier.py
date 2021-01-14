@@ -185,7 +185,7 @@ class BaseClassifier(object):
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-
+		logger = logging.getLogger(__name__)
 		result = task.copy()
 		result.update({
 			'tset': self.tset.key,
@@ -239,6 +239,8 @@ class BaseClassifier(object):
 				'status': STATUS.ERROR,
 				'details': {'errors': [error_msg]},
 			})
+			logger.exception("Classify failed: Priority '%s', Classifier '%s'.",
+				task.get('priority'), self.classifier_key)
 
 		return result
 

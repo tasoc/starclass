@@ -42,6 +42,19 @@ def test_classifiers_train_test(classifier):
 			# Run testing phase:
 			cl.test(tset)
 
+		# Close the classifier and start it again, it should now load the pre-trained classifier
+		# and be able to run tests without training first:
+		with stcl(tset=tset, features_cache=None, data_dir=os.path.basename(tmpdir)) as cl:
+			# Check that the features_names list is populated after reloading classifier:
+			# The classifier will have to provide a list (not the default None)
+			print(cl.features_names)
+			assert isinstance(cl.features_names, list)
+			if classifier != 'slosh': # SLOSH is allowed to not have any feature names
+				assert len(cl.features_names) > 0
+
+			# Run testing phase:
+			cl.test(tset)
+
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	pytest.main([__file__])

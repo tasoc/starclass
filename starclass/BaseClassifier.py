@@ -232,6 +232,10 @@ class BaseClassifier(object):
 				'status': STATUS.OK,
 				'elaptime': toc_predict - tic_predict
 			})
+		except (KeyboardInterrupt, SystemExit):
+			result.update({
+				'status': STATUS.ABORT
+			})
 		except: # noqa: E722, pragma: no cover
 			# Something went wrong
 			error_msg = traceback.format_exc().strip()

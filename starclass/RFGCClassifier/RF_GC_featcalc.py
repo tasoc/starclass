@@ -128,7 +128,7 @@ def makeSOM(features, outfile, overwrite=False, cardinality=64, dimx=1, dimy=400
 	logger.info('Preparing lightcurves for SOM')
 	SOMarray = SOM_alldataprep(features, cardinality=cardinality)
 	logger.info('%d lightcurves prepared. Training SOM', SOMarray.shape[0])
-	som = SOM_train(SOMarray, outfile, overwrite, cardinality, dimx, dimy, nsteps, learningrate, random_seed)
+	som = SOM_train(SOMarray, outfile, overwrite, cardinality, dimx, dimy, nsteps, learningrate, random_seed=random_seed)
 	logger.info('SOM trained.')
 	return som
 

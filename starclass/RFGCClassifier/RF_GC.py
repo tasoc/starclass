@@ -87,7 +87,7 @@ class RFGCClassifier(BaseClassifier):
 			if self.classifier.som is None and self.somfile is not None:
 				# load som
 				if os.path.exists(self.somfile):
-					self.classifier.som = fc.loadSOM(self.somfile, self.random_seed)
+					self.classifier.som = fc.loadSOM(self.somfile, random_seed=self.random_seed)
 
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile, somoutfile='som.txt'):

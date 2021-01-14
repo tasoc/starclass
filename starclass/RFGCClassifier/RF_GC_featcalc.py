@@ -21,16 +21,32 @@ def feature_names(linfit):
 	"""
 	Returns a list with the feature names.
 	"""
-	names = []
-	for i in range(NFREQUENCIES):
-		names.append('p' + str(i+1))
-	names.extend(['amp21','amp31','phi21','phi31','SOM_map','SOM_range','p2p_98_phasefold','p2p_mean_phasefold','p2p_98_lc','p2p_mean_lc''psi','zc','Fp07','Fp7','Fp20','Fp50'])
+	names = ['EBperiod']
+	names += ['p' + str(i+1) for i in range(1, NFREQUENCIES)]
+	names += [
+		'amp21',
+		'amp31',
+		'phi21',
+		'phi31',
+		'SOM_map',
+		'SOM_range',
+		'p2p_98_phasefold',
+		'p2p_mean_phasefold',
+		'p2p_98_lc',
+		'p2p_mean_lc',
+		'psi',
+		'zc',
+		'Fp07',
+		'Fp7',
+		'Fp20',
+		'Fp50'
+	]
 	if linfit:
 		names.append('detrend_coeff_norm')
 	return names
 
 #--------------------------------------------------------------------------------------------------
-def featcalc(features, som, nfrequencies=6, cardinality=64,
+def featcalc(features, som, cardinality=64,
 	linflatten=False, savefeat=None, recalc=False):
 	"""
 	Calculates features for set of lightcurves
@@ -49,7 +65,7 @@ def featcalc(features, som, nfrequencies=6, cardinality=64,
 			linfit = ('detrend_coeff' in obj)
 
 			# Find the number of featues to use:
-			Nfeat = nfrequencies + 16
+			Nfeat = NFREQUENCIES + 16
 			if linfit:
 				Nfeat += 1
 
@@ -67,26 +83,26 @@ def featcalc(features, som, nfrequencies=6, cardinality=64,
 				precalc = True
 
 		if not precalc:
-			objfeatures = np.zeros(nfrequencies+16, dtype='float32')
+			objfeatures = np.zeros(Nfeat, dtype='float32')
 			lc = prepLCs(obj['lightcurve'], linflatten=linflatten)
 
-			periods, n_usedfreqs, usedfreqs = get_periods(obj, nfrequencies, lc.time, ignore_harmonics=True)
+			periods, n_usedfreqs, usedfreqs = get_periods(obj, NFREQUENCIES, lc.time, ignore_harmonics=True)
 
-			objfeatures[:nfrequencies] = periods
-			objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj, n_usedfreqs, usedfreqs)
-			objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj, n_usedfreqs, usedfreqs)
+			objfeatures[:NFREQUENCIES] = periods
+			objfeatures[NFREQUENCIES:NFREQUENCIES+2] = freq_ampratios(obj, n_usedfreqs, usedfreqs)
+			objfeatures[NFREQUENCIES+2:NFREQUENCIES+4] = freq_phasediffs(obj, n_usedfreqs, usedfreqs)
 
 			EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=True)
 			objfeatures[0] = EBper # overwrites top period
 
-			objfeatures[nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, cardinality)
-			objfeatures[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux, EBper)
-			objfeatures[nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
+			objfeatures[NFREQUENCIES+4:NFREQUENCIES+6] = SOMloc(som, lc.time, lc.flux, EBper, cardinality)
+			objfeatures[NFREQUENCIES+6:NFREQUENCIES+8] = phase_features(lc.time, lc.flux, EBper)
+			objfeatures[NFREQUENCIES+8:NFREQUENCIES+10] = p2p_features(lc.flux)
 
 			psi, zc = compute_hocs(lc.time, lc.flux, 5)
-			objfeatures[nfrequencies+10] = psi
-			objfeatures[nfrequencies+11] = zc[0]
-			objfeatures[nfrequencies+12:nfrequencies+16] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
+			objfeatures[NFREQUENCIES+10] = psi
+			objfeatures[NFREQUENCIES+11] = zc[0]
+			objfeatures[NFREQUENCIES+12:NFREQUENCIES+16] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
 
 			if savefeat is not None:
 				np.savetxt(featfile, objfeatures, delimiter=',')
@@ -96,7 +112,7 @@ def featcalc(features, som, nfrequencies=6, cardinality=64,
 		# with the point-to-point scatter:
 		if linfit:
 			slope_feature = np.abs(obj['detrend_coeff'][0]) / obj['ptp']
-			objfeatures = np.append(objfeatures, slope_feature)
+			objfeatures[NFREQUENCIES+16] = slope_feature
 
 		featout = np.vstack((featout, objfeatures))
 

@@ -83,11 +83,14 @@ class RFGCClassifier(BaseClassifier):
 				max_features=max_features,
 				min_samples_split=min_samples_split,
 				random_state=self.random_state)
-			self.features_names = fc.feature_names(self.linfit)
+
 			if self.classifier.som is None and self.somfile is not None:
 				# load som
 				if os.path.exists(self.somfile):
 					self.classifier.som = fc.loadSOM(self.somfile, random_seed=self.random_seed)
+
+		# List of feature names used by the classifier:
+		self.features_names = fc.feature_names(self.linfit)
 
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile, somoutfile='som.txt'):

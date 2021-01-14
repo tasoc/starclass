@@ -87,7 +87,7 @@ class RFGCClassifier(BaseClassifier):
 			if self.classifier.som is None and self.somfile is not None:
 				# load som
 				if os.path.exists(self.somfile):
-					self.classifier.som = fc.loadSOM(self.somfile)
+					self.classifier.som = fc.loadSOM(self.somfile, random_seed=self.random_seed)
 
 		# List of feature names used by the classifier:
 		self.features_names = fc.feature_names(self.linfit)
@@ -196,7 +196,7 @@ class RFGCClassifier(BaseClassifier):
 		# Check for pre-calculated som
 		if self.classifier.som is None:
 			logger.info("No SOM loaded. Creating new SOM, saving to '%s'.", self.somfile)
-			self.classifier.som = fc.makeSOM(tset.features(), outfile=self.somfile, overwrite=overwrite)
+			self.classifier.som = fc.makeSOM(tset.features(), outfile=self.somfile, overwrite=overwrite, random_seed=self.random_seed)
 			logger.info('SOM created and saved.')
 			logger.info('Calculating/Loading Features.')
 			featarray = fc.featcalc(tset.features(), self.classifier.som, savefeat=self.featdir, recalc=recalc)

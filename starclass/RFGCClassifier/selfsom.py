@@ -46,7 +46,7 @@ class SimpleSOMMapper(object):
 	kernel.
 	"""
 	def __init__(self, kshape, niter, learning_rate=0.005,
-		iradius=None, distance_metric=None, initialization_func=None):
+		iradius=None, distance_metric=None, initialization_func=None, random_seed=None):
 		"""
 		Parameters
 		----------
@@ -75,6 +75,8 @@ class SimpleSOMMapper(object):
 			then values in the returned array are taken from a standard normal
 			distribution.
 		"""
+
+		np.random.seed(random_seed)
 
 		self.kshape = np.array(kshape, dtype='int')
 

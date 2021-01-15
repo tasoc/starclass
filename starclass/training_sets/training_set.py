@@ -479,9 +479,18 @@ class TrainingSet(object):
 
 	#----------------------------------------------------------------------------------------------
 	def clear_cache(self):
+		"""
+		Clear features cache.
 
+		This will delete the features cache directory in the training-set data directory,
+		and delete all MOAT cache tables in the training-set.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		# Delete the features cache directory:
 		if os.path.exists(self.features_cache):
 			shutil.rmtree(self.features_cache)
 
+		# Delete the MOAT tables from the training-set todo-file:
 		with TaskManager(self.todo_file, overwrite=False, classes=self.StellarClasses) as tm:
 			tm.moat_clear()

@@ -39,10 +39,22 @@ def main():
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
-	parser.add_argument('-c', '--classifier', help='Classifier to use.', default=None, choices=starclass.classifier_list)
-	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9v3', choices=starclass.trainingset_list)
-	parser.add_argument('--linfit', help='Enable linfit in training set.', action='store_true')
+	parser.add_argument('--clear-cache', help='Clear existing features cache tables before running. Can only be used together with --overwrite.', action='store_true')
+	#
+	parser.add_argument('-c', '--classifier',
+		default='rfgc',
+		choices=starclass.classifier_list,
+		metavar='{CLASSIFIER}',
+		help='Classifier to use. Choises are ' + ", ".join(starclass.classifier_list) + '.')
+
+	parser.add_argument('-t', '--trainingset',
+		default='keplerq9v3',
+		choices=starclass.trainingset_list,
+		metavar='{TSET}',
+		help='Train classifier using this training-set. Choises are ' + ", ".join(starclass.trainingset_list) + '.')
+
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
+	parser.add_argument('--linfit', help='Enable linfit in training set.', action='store_true')
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	# Lightcurve truncate override switch:
 	group = parser.add_mutually_exclusive_group(required=False)
@@ -52,6 +64,11 @@ def main():
 	# Input folder:
 	parser.add_argument('input_folder', type=str, help='Input directory. This directory should contain a TODO-file and corresponding lightcurves.', nargs='?', default=None)
 	args = parser.parse_args()
+
+	# Cache tables (MOAT) should not be cleared unless results tables are also cleared.
+	# Otherwise we could end up with non-complete MOAT tables.
+	if args.clear_cache and not args.overwrite:
+		parser.error("--clear-cache can not be used without --overwrite")
 
 	# Get input and output folder from environment variables:
 	input_folder = args.input_folder
@@ -83,6 +100,10 @@ def main():
 	if rank == 0:
 		try:
 			with starclass.TaskManager(todo_file, cleanup=True, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
+				# If we were asked to do so, start by clearing the existing MOAT tables:
+				if args.overwrite and args.clear_cache:
+					tm.moat_clear()
+
 				# Get list of tasks:
 				#numtasks = tm.get_number_tasks()
 				#tm.logger.info("%d tasks to be run", numtasks)

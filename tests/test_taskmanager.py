@@ -269,5 +269,17 @@ def test_taskmanager_moat(PRIVATE_TODO_FILE, classifier):
 		assert tm.moat_query(classifier, task['priority']) is None
 
 #--------------------------------------------------------------------------------------------------
+def test_taskmanager_moat_create(PRIVATE_TODO_FILE):
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
+
+		# Test with wrong classifier input:
+		with pytest.raises(ValueError) as e:
+			tm.moat_create('nonsense', ['freq1', 'freq2'])
+		assert str(e.value) == 'Invalid classifier: nonsense'
+
+		# Create table with common features:
+		tm.moat_create('common', ['freq1', 'freq2'])
+
+#--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	pytest.main([__file__])

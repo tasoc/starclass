@@ -144,7 +144,7 @@ class TaskManager(object):
 
 		# Run a cleanup/optimization of the database before we get started:
 		if cleanup:
-			self.logger.info("Cleaning TODOLIST before run...")
+			self.logger.debug("Cleaning TODOLIST before run...")
 			try:
 				self.conn.isolation_level = None
 				self.cursor.execute("VACUUM;")
@@ -460,6 +460,14 @@ class TaskManager(object):
 			))
 		self.conn.commit()
 		self._moat_tables.clear()
+
+		# Run a VACUUM of todo-file after potentially deleting many tables:
+		self.logger.debug("Cleaning TODOLIST after moat_clear...")
+		try:
+			self.conn.isolation_level = None
+			self.cursor.execute("VACUUM;")
+		finally:
+			self.conn.isolation_level = ''
 
 	#----------------------------------------------------------------------------------------------
 	def save_results(self, result):

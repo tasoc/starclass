@@ -355,6 +355,8 @@ class TaskManager(object):
 		# Just some checks of the input:
 		if classifier != 'common' and classifier not in self.all_classifiers:
 			raise ValueError("Invalid classifier: %s" % classifier)
+		if not columns:
+			raise ValueError("Invalid column names provided")
 
 		#db_name = 'db_' + classifier
 		table_name = "starclass_features_" + classifier

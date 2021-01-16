@@ -136,7 +136,7 @@ def prepLCs(lc, linflatten=False):
 
 #--------------------------------------------------------------------------------------------------
 def makeSOM(features, outfile, overwrite=False, cardinality=64, dimx=1, dimy=400,
-	nsteps=300, learningrate=0.1):
+	nsteps=300, learningrate=0.1, random_seed=None):
 	"""
 	Top level function for training a SOM.
 	"""
@@ -144,12 +144,12 @@ def makeSOM(features, outfile, overwrite=False, cardinality=64, dimx=1, dimy=400
 	logger.info('Preparing lightcurves for SOM')
 	SOMarray = SOM_alldataprep(features, cardinality=cardinality)
 	logger.info('%d lightcurves prepared. Training SOM', SOMarray.shape[0])
-	som = SOM_train(SOMarray, outfile, overwrite, cardinality, dimx, dimy, nsteps, learningrate)
+	som = SOM_train(SOMarray, outfile, overwrite, cardinality, dimx, dimy, nsteps, learningrate, random_seed=random_seed)
 	logger.info('SOM trained.')
 	return som
 
 #--------------------------------------------------------------------------------------------------
-def loadSOM(somfile):
+def loadSOM(somfile, random_seed=None):
 	"""
 	Loads a previously trained SOM.
 
@@ -163,6 +163,8 @@ def loadSOM(somfile):
 	som:	 object
 		Trained som object
 	"""
+	np.random.seed(random_seed)
+
 	with open(somfile,'r') as f:
 		lines = f.readlines()
 	newshape = lines[0].strip('\n').split(',')
@@ -174,7 +176,7 @@ def loadSOM(somfile):
 		'''
 		return np.random.uniform(0,1,size=(dimx,dimy,cardinality))
 
-	som = selfsom.SimpleSOMMapper((dimx,dimy),1,initialization_func=Init,learning_rate=0.1)
+	som = selfsom.SimpleSOMMapper((dimx,dimy),1,initialization_func=Init,learning_rate=0.1, random_seed=random_seed)
 	loadk = kohonenLoad(somfile)
 	som.train(loadk) # purposeless but tricks the SOM into thinking it's been trained. Don't ask.
 	som._K = loadk
@@ -281,7 +283,7 @@ def SOM_alldataprep(features, outfile=None, cardinality=64):
 
 #--------------------------------------------------------------------------------------------------
 def SOM_train(SOMarray, outfile=None, overwrite=False, cardinality=64, dimx=1, dimy=400,
-	nsteps=300, learningrate=0.1):
+	nsteps=300, learningrate=0.1, random_seed=None):
 	''' Function to train a SOM
 
 	Parameters
@@ -305,6 +307,7 @@ def SOM_train(SOMarray, outfile=None, overwrite=False, cardinality=64, dimx=1, d
 	som object:		object
 		Trained som
 	'''
+	np.random.seed(random_seed)
 
 	cardinality = SOMarray.shape[1]
 
@@ -312,7 +315,7 @@ def SOM_train(SOMarray, outfile=None, overwrite=False, cardinality=64, dimx=1, d
 		return np.random.uniform(0,1,size=(dimx,dimy,cardinality))
 
 	som = selfsom.SimpleSOMMapper((dimx,dimy),nsteps,initialization_func=Init,
-									learning_rate=learningrate)
+									learning_rate=learningrate, random_seed=random_seed)
 	som.train(SOMarray)
 	if outfile:
 		if not os.path.exists(outfile) or overwrite:

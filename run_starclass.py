@@ -19,13 +19,13 @@ def main():
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
 	parser.add_argument('--clear-cache', help='Clear existing features cache tables before running. Can only be used together with --overwrite.', action='store_true')
-	#
+	# Option to select which classifier to run:
 	parser.add_argument('-c', '--classifier',
-		default='rfgc',
+		default=None,
 		choices=starclass.classifier_list,
 		metavar='{CLASSIFIER}',
-		help='Classifier to use. Choises are ' + ", ".join(starclass.classifier_list) + '.')
-
+		help='Classifier to run. Default is to run all classifiers. Choises are ' + ", ".join(starclass.classifier_list) + '.')
+	# Option to select training set:
 	parser.add_argument('-t', '--trainingset',
 		default='keplerq9v3',
 		choices=starclass.trainingset_list,
@@ -82,9 +82,14 @@ def main():
 		todo_file = os.path.abspath(input_folder)
 		input_folder = os.path.dirname(input_folder)
 
-	# Choose which classifier to use
-	# For now, there is only one...
-	current_classifier = args.classifier
+	# Choose which classifier to use:
+	# If nothing was specified, run all classifiers, and automatically switch between them:
+	if args.classifier is None:
+		current_classifier = starclass.classifier_list[0]
+		change_classifier = True
+	else:
+		current_classifier = args.classifier
+		change_classifier = False
 
 	# Initialize training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
@@ -99,7 +104,7 @@ def main():
 			tm.moat_clear()
 
 		while True:
-			task = tm.get_task(classifier=current_classifier)
+			task = tm.get_task(classifier=current_classifier, change_classifier=change_classifier)
 			if task is None:
 				break
 			tm.start_task(task)

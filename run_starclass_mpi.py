@@ -40,13 +40,13 @@ def main():
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
 	parser.add_argument('--clear-cache', help='Clear existing features cache tables before running. Can only be used together with --overwrite.', action='store_true')
-	#
+	# Option to select which classifier to run:
 	parser.add_argument('-c', '--classifier',
-		default='rfgc',
+		default=None,
 		choices=starclass.classifier_list,
 		metavar='{CLASSIFIER}',
-		help='Classifier to use. Choises are ' + ", ".join(starclass.classifier_list) + '.')
-
+		help='Classifier to run. Default is to run all classifiers. Choises are ' + ", ".join(starclass.classifier_list) + '.')
+	# Option to select training set:
 	parser.add_argument('-t', '--trainingset',
 		default='keplerq9v3',
 		choices=starclass.trainingset_list,
@@ -112,10 +112,16 @@ def main():
 				num_workers = size - 1
 
 				# Create a set of initial classifiers to initialize the workers as:
-				initial_classifiers = []
-				for k, c in enumerate(itertools.cycle(tm.all_classifiers)):
-					if k >= num_workers: break
-					initial_classifiers.append(c)
+				# If nothing was specified run all classifiers, and automatically switch between them:
+				if args.classifier is None:
+					change_classifier = True
+					initial_classifiers = []
+					for k, c in enumerate(itertools.cycle(tm.all_classifiers)):
+						if k >= num_workers: break
+						initial_classifiers.append(c)
+				else:
+					initial_classifiers = [args.classifier]*num_workers
+					change_classifier = False
 
 				tm.logger.info("Initial classifiers: %s", initial_classifiers)
 
@@ -131,18 +137,18 @@ def main():
 
 					if tag == tags.DONE:
 						# The worker is done with a task
-						tm.logger.info("Got data from worker %d: %s", source, data)
+						tm.logger.debug("Got data from worker %d: %s", source, data)
 						tm.save_results(data)
 
 					if tag in (tags.DONE, tags.READY):
 						# Worker is ready, so send it a task
 						# If provided, try to find a task that is with the same classifier
 						cl = initial_classifiers[source-1] if data is None else data.get('classifier')
-						task = tm.get_task(classifier=cl, change_classifier=True)
+						task = tm.get_task(classifier=cl, change_classifier=change_classifier)
 						if task:
 							tm.start_task(task)
 							comm.send(task, dest=source, tag=tags.START)
-							tm.logger.info("Sending task %d to worker %d", task['priority'], source)
+							tm.logger.debug("Sending task %d to worker %d", task['priority'], source)
 						else:
 							comm.send(None, dest=source, tag=tags.EXIT)
 

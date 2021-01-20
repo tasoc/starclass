@@ -18,7 +18,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 from bottleneck import nanvar
 from timeit import default_timer
 from .io import load_lightcurve, savePickle, loadPickle
-from .features.freqextr import freqextr, table_from_dict, table_to_dict
+from .features.freqextr import freqextr, freqextr_table_from_dict, freqextr_table_to_dict
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import rms_timescale, ptp
@@ -438,7 +438,7 @@ class BaseClassifier(object):
 				if 'freq1' in features:
 					# There is no frequency table, but individual keys,
 					# so reconstruct the frequencies table from the features dict:
-					features['frequencies'] = table_from_dict(features, n_peaks=6, n_harmonics=5,
+					features['frequencies'] = freqextr_table_from_dict(features, n_peaks=6, n_harmonics=5,
 						flux_unit=lc.flux_unit)
 				else:
 					# Extract primary frequencies from lightcurve and add to features:
@@ -446,7 +446,7 @@ class BaseClassifier(object):
 						Noptimize=5, devlim=None, initps=psd)
 
 					# Add these for backward compatibility:
-					features.update(table_to_dict(features['frequencies']))
+					features.update(freqextr_table_to_dict(features['frequencies']))
 
 			# Calculate FliPer features:
 			# TODO: Should these be done before or after linfit?

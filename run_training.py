@@ -20,13 +20,13 @@ def main():
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
 	parser.add_argument('--clear-cache', help='Clear existing features cache before running.', action='store_true')
-	#
+	# Option to select which classifier to train:
 	parser.add_argument('-c', '--classifier',
-		default='rfgc',
+		default='meta',
 		choices=starclass.classifier_list,
 		metavar='{CLASSIFIER}',
-		help='Classifier to use. Choises are ' + ", ".join(starclass.classifier_list) + '.')
-
+		help='Classifier to train. Choises are ' + ", ".join(starclass.classifier_list) + '.')
+	# Option to select training set:
 	parser.add_argument('-t', '--trainingset',
 		default='keplerq9v3',
 		choices=starclass.trainingset_list,

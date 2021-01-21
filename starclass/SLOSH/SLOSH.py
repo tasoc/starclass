@@ -157,7 +157,7 @@ class SLOSHClassifier(BaseClassifier):
 		datasets = []
 		with h5py.File(hdf5_file, 'a') as hdf:
 			images = hdf.require_group('images')
-			for feat in tqdm(tset.features(), total=len(tset.train_idx), **tqdm_settings):
+			for feat in tqdm(tset.features(), total=len(tset), **tqdm_settings):
 				dset_name = str(feat['priority'])
 				datasets.append(dset_name)
 				if dset_name not in images:

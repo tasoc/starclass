@@ -232,7 +232,7 @@ class BaseClassifier(object):
 				'status': STATUS.OK,
 				'elaptime': toc_predict - tic_predict
 			})
-		except (KeyboardInterrupt, SystemExit):
+		except (KeyboardInterrupt, SystemExit): # pragma: no cover
 			result.update({
 				'status': STATUS.ABORT
 			})

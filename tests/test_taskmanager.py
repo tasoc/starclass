@@ -10,8 +10,12 @@ import pytest
 import os.path
 from astropy.table import Table
 import conftest # noqa: F401
+import starclass
 from starclass import TaskManager, STATUS
 from starclass.StellarClasses import StellarClassesLevel1
+
+AVALIABLE_CLASSIFIERS = list(starclass.classifier_list)
+AVALIABLE_CLASSIFIERS.remove('meta')
 
 #--------------------------------------------------------------------------------------------------
 def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
@@ -109,7 +113,7 @@ def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE):
 
 		# We should now get the highest priority target, but not with SLOSH:
 		assert task2['priority'] == 17
-		assert task2['classifier'] and task2['classifier'] != 'slosh'
+		assert task2['classifier'] is not None and task2['classifier'] != 'slosh'
 
 #--------------------------------------------------------------------------------------------------
 def test_taskmanager_meta_classifier(PRIVATE_TODO_FILE):
@@ -204,7 +208,7 @@ def test_taskmanager_save_and_settings(PRIVATE_TODO_FILE):
 		assert str(e.value) == "Attempting to mix results from multiple training sets. Previous='keplerq9v3', New='another'."
 
 #--------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize('classifier', ['rfgc', 'xgb', 'sortinghat', 'slosh'])
+@pytest.mark.parametrize('classifier', AVALIABLE_CLASSIFIERS)
 def test_taskmanager_moat(PRIVATE_TODO_FILE, classifier):
 
 	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
@@ -212,9 +216,9 @@ def test_taskmanager_moat(PRIVATE_TODO_FILE, classifier):
 		task = tm.get_task(classifier=classifier)
 		print(task)
 
-		#
-		features_common = {'freq1': 42, 'amp1': 43, 'phase1': 4}
-		features = {'unique_feature': 2187, 'special_feature': 1234}
+		# Create dummy features which we will save and restore:
+		features_common = {'freq1': 42.0, 'amp1': 43.0, 'phase1': 4.0}
+		features = {'unique_feature': 2187.0, 'special_feature': 1234.0}
 
 		# Make a fake result we can save;
 		result = task.copy()
@@ -253,9 +257,21 @@ def test_taskmanager_moat(PRIVATE_TODO_FILE, classifier):
 		# If we ask for the exact same target, we should get another classifier,
 		# but the common features should now be provided to us:
 		task2 = tm.get_task(priority=task['priority'], classifier=classifier)
-		print(task2)
+		print('TASK2: %s' % task2)
 		assert task2['classifier'] != classifier
 		assert task2['features_common'] == features_common
+
+	# Reload the TaskManager, with overwrite, which should remove all previous results,
+	# but the MOAT should still exist:
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
+
+		# If we ask for the exact same target, we should get THE SAME classifier,
+		# but the common features should now be provided to us:
+		task3 = tm.get_task(priority=task['priority'], classifier=classifier)
+		print('TASK3: %s' % task3)
+		assert task3['classifier'] == classifier
+		assert task3['features_common'] == features_common
+		assert task3['features'] == features
 
 		# Clear the moat, which should delete all MOAT tables:
 		tm.moat_clear()

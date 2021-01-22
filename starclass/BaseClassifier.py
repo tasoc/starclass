@@ -378,12 +378,10 @@ class BaseClassifier(object):
 					save_to_cache = True
 
 			# Transfer cache of common features from task (MOAT):
-			if 'features_common' in task:
-				features.update(task['features_common'])
+			features.update(task.get('features_common', {}))
 
 			# Transfer cache of features specific to this classifier from task (MOAT):
-			if 'features' in task:
-				features.update(task['features'])
+			features.update(task.get('features', {}))
 
 			# Add the fields from the task to the list of features:
 			for key in ('tmag', 'variance', 'rms_hour', 'ptp'):

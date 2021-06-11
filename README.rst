@@ -1,8 +1,8 @@
 =======================================
 The TASOC Stellar Classification module
 =======================================
-.. image:: https://github.com/tasoc/photometry/actions/workflows/tests.yml/badge.svg?branch=devel
-    :target: https://github.com/tasoc/photometry/actions/workflows/tests.yml
+.. image:: https://github.com/tasoc/starclass/actions/workflows/tests.yml/badge.svg?branch=devel
+    :target: https://github.com/tasoc/starclass/actions/workflows/tests.yml
 .. image:: https://img.shields.io/codecov/c/github/tasoc/starclass
     :target: https://codecov.io/github/tasoc/starclass
 .. image:: https://hitsofcode.com/github/tasoc/starclass?branch=devel

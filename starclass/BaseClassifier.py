@@ -468,8 +468,11 @@ class BaseClassifier(object):
 			if save_to_cache:
 				savePickle(features_file, features)
 
-		else:
-			features['other_classifiers'] = task['other_classifiers']
+		# Add the results from other classifiers to the features:
+		# TODO: Only add this for the MetaClassifier. This can not be done now because
+		#       BaseClassifier is used directly in TrainingSet, which means it doesn't know
+		#       which classifier is being used.
+		features['other_classifiers'] = task['other_classifiers']
 
 		# Add the fields from the task to the list of features:
 		features['priority'] = task['priority']

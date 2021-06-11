@@ -10,12 +10,18 @@ import pytest
 import os.path
 from astropy.table import Table
 import conftest # noqa: F401
+import starclass
 from starclass import TaskManager, STATUS
 from starclass.StellarClasses import StellarClassesLevel1
+
+AVALIABLE_CLASSIFIERS = list(starclass.classifier_list)
+AVALIABLE_CLASSIFIERS.remove('meta')
 
 #--------------------------------------------------------------------------------------------------
 def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
 	"""Test of TaskManager"""
+
+	input_dir = os.path.dirname(PRIVATE_TODO_FILE)
 
 	with TaskManager(PRIVATE_TODO_FILE, overwrite=True) as tm:
 		# Get the number of tasks:
@@ -36,7 +42,7 @@ def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
 		# The first priority in the TODO file is the following:
 		assert task1['priority'] == 17
 		assert task1['starid'] == 29281992
-		assert task1['lightcurve'] == 'ffi/00029/tess00029281992-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz'
+		assert task1['lightcurve'] == os.path.join(input_dir, 'tess00029281992-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz')
 		assert task1['classifier'] == 'slosh'
 
 		# Start task with priority=1:
@@ -48,7 +54,7 @@ def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
 
 		assert task2['priority'] == 26
 		assert task2['starid'] == 29859905
-		assert task2['lightcurve'] == 'ffi/00029/tess00029859905-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz'
+		assert task2['lightcurve'] == os.path.join(input_dir, 'ffi/00029/tess00029859905-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz')
 		assert task2['classifier'] == 'slosh'
 
 		# Check that the status did actually change in the todolist:
@@ -107,7 +113,7 @@ def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE):
 
 		# We should now get the highest priority target, but not with SLOSH:
 		assert task2['priority'] == 17
-		assert task2['classifier'] and task2['classifier'] != 'slosh'
+		assert task2['classifier'] is not None and task2['classifier'] != 'slosh'
 
 #--------------------------------------------------------------------------------------------------
 def test_taskmanager_meta_classifier(PRIVATE_TODO_FILE):
@@ -199,7 +205,96 @@ def test_taskmanager_save_and_settings(PRIVATE_TODO_FILE):
 		result['tset'] = 'another'
 		with pytest.raises(ValueError) as e:
 			tm.save_results(result)
-		assert str(e.value) == "Attempting to mix results from multiple training sets"
+		assert str(e.value) == "Attempting to mix results from multiple training sets. Previous='keplerq9v3', New='another'."
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('classifier', AVALIABLE_CLASSIFIERS)
+def test_taskmanager_moat(PRIVATE_TODO_FILE, classifier):
+
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
+		# Start a random task:
+		task = tm.get_task(classifier=classifier)
+		print(task)
+
+		# Create dummy features which we will save and restore:
+		features_common = {'freq1': 42.0, 'amp1': 43.0, 'phase1': 4.0}
+		features = {'unique_feature': 2187.0, 'special_feature': 1234.0}
+
+		# Make a fake result we can save;
+		result = task.copy()
+		result['tset'] = 'keplerq9v3'
+		result['classifier'] = classifier
+		result['status'] = STATUS.OK
+		result['elaptime'] = 3.14
+		result['starclass_results'] = {
+			StellarClassesLevel1.SOLARLIKE: 0.8,
+			StellarClassesLevel1.APERIODIC: 0.2
+		}
+		# This is the important part in this test:
+		result['features'] = features
+		result['features_common'] = features_common
+
+		# Save the result:
+		tm.save_results(result)
+
+		# Check common features were stored in the table:
+		tm.cursor.execute("SELECT * FROM starclass_features_common WHERE priority=?;", [task['priority']])
+		row1 = dict(tm.cursor.fetchone())
+		del row1['priority']
+		assert row1 == features_common
+
+		tm.cursor.execute("SELECT * FROM starclass_features_%s WHERE priority=?;" % classifier, [task['priority']])
+		row2 = dict(tm.cursor.fetchone())
+		del row2['priority']
+		assert row2 == features
+
+		# Try to extract the features again, they should be identical to the ones we put in:
+		extracted_features = tm.moat_query('common', task['priority'])
+		assert extracted_features == features_common
+		extracted_features = tm.moat_query(classifier, task['priority'])
+		assert extracted_features == features
+
+		# If we ask for the exact same target, we should get another classifier,
+		# but the common features should now be provided to us:
+		task2 = tm.get_task(priority=task['priority'], classifier=classifier)
+		print('TASK2: %s' % task2)
+		assert task2['classifier'] != classifier
+		assert task2['features_common'] == features_common
+
+	# Reload the TaskManager, with overwrite, which should remove all previous results,
+	# but the MOAT should still exist:
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
+
+		# If we ask for the exact same target, we should get THE SAME classifier,
+		# but the common features should now be provided to us:
+		task3 = tm.get_task(priority=task['priority'], classifier=classifier)
+		print('TASK3: %s' % task3)
+		assert task3['classifier'] == classifier
+		assert task3['features_common'] == features_common
+		assert task3['features'] == features
+
+		# Clear the moat, which should delete all MOAT tables:
+		tm.moat_clear()
+
+		# Check that there are no more MOAT tables in the todo-file:
+		tm.cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'starclass_features_%';")
+		assert tm.cursor.fetchone()[0] == 0
+
+		# Using the query should now return nothing:
+		assert tm.moat_query('common', task['priority']) is None
+		assert tm.moat_query(classifier, task['priority']) is None
+
+#--------------------------------------------------------------------------------------------------
+def test_taskmanager_moat_create_wrong(PRIVATE_TODO_FILE):
+	"""Test moat-create with wrong input"""
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
+		# Wrong classifier:
+		with pytest.raises(ValueError) as e:
+			tm.moat_create('nonsense', ['freq1', 'freq2'])
+		assert str(e.value) == 'Invalid classifier: nonsense'
+
+		with pytest.raises(ValueError) as e:
+			tm.moat_create('common', [])
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

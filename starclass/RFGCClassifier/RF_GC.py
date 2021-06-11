@@ -6,6 +6,8 @@ The RF-GC classifier (general random forest).
 .. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 """
 
+import numpy as np
+from bottleneck import anynan
 import logging
 import os.path
 import os
@@ -13,6 +15,10 @@ import copy
 from sklearn.ensemble import RandomForestClassifier
 from . import RF_GC_featcalc as fc
 from .. import BaseClassifier, io
+from ..utilities import get_periods
+
+# Number of frequencies used as features:
+NFREQUENCIES = 6
 
 #--------------------------------------------------------------------------------------------------
 class Classifier_obj(RandomForestClassifier):
@@ -67,12 +73,6 @@ class RFGCClassifier(BaseClassifier):
 		else:
 			self.clfile = None
 
-		if self.features_cache is not None:
-			self.featdir = os.path.join(self.features_cache, 'rfgc_features')
-			os.makedirs(self.featdir, exist_ok=True)
-		else:
-			self.featdir = None
-
 		if self.clfile is not None:
 			if os.path.exists(self.clfile):
 				# load pre-trained classifier
@@ -90,7 +90,28 @@ class RFGCClassifier(BaseClassifier):
 					self.classifier.som = fc.loadSOM(self.somfile, random_seed=self.random_seed)
 
 		# List of feature names used by the classifier:
-		self.features_names = fc.feature_names(self.linfit)
+		self.features_names = ['EBperiod']
+		self.features_names += ['p' + str(i+1) for i in range(1, NFREQUENCIES)]
+		self.features_names += [
+			'ampratio21',
+			'ampratio31',
+			'phasediff21',
+			'phasediff31',
+			'SOM_map',
+			'SOM_range',
+			'p2p_98_phasefold',
+			'p2p_mean_phasefold',
+			'p2p_98_lc',
+			'p2p_mean_lc',
+			'psi',
+			'zc',
+			'Fp07',
+			'Fp7',
+			'Fp20',
+			'Fp50'
+		]
+		if self.linfit:
+			self.features_names.append('detrend_coeff_norm')
 
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile, somoutfile='som.txt'):
@@ -99,7 +120,7 @@ class RFGCClassifier(BaseClassifier):
 
 		som object saved as this MUST be the one used to train the classifier.
 		"""
-		fc.kohonenSave(self.classifier.som.K,os.path.join(self.data_dir, somoutfile)) # overwrites
+		fc.kohonenSave(self.classifier.som.K, os.path.join(self.data_dir, somoutfile)) # overwrites
 		tempsom = copy.deepcopy(self.classifier.som)
 		self.classifier.som = None
 		io.savePickle(outfile, self.classifier)
@@ -114,28 +135,77 @@ class RFGCClassifier(BaseClassifier):
 		"""
 		self.classifier = io.loadPickle(infile)
 
-		if somfile is not None:
-			if os.path.exists(somfile):
-				self.classifier.som = fc.loadSOM(somfile)
+		if somfile is not None and os.path.exists(somfile):
+			self.classifier.som = fc.loadSOM(somfile)
 
 		if self.classifier.som is None:
 			self.classifier.trained = False
+
+	#--------------------------------------------------------------------------------------------------
+	def featcalc(self, features, total=None, cardinality=64, linflatten=False, recalc=False):
+		"""
+		Calculates features for set features.
+		"""
+
+		if isinstance(features, dict): # trick for single features
+			features = [features]
+		if total is None:
+			total = len(features)
+
+		# Loop through the provided features and build feature table:
+		featout = np.empty([total, len(self.features_names)], dtype='float32')
+		for k, obj in enumerate(features):
+			# Load features from the provided (cached) features if they exist:
+			featout[k, :] = [obj.get(key, np.NaN) for key in self.features_names]
+
+			# If not all features are already populated, we are going to recalculate them all:
+			if recalc or anynan(featout[k, :]):
+
+				lc = fc.prepLCs(obj['lightcurve'], linflatten=linflatten)
+
+				periods, n_usedfreqs, usedfreqs = get_periods(obj, NFREQUENCIES, lc.time, ignore_harmonics=True)
+				featout[k, :NFREQUENCIES] = periods
+
+				EBper = fc.EBperiod(lc.time, lc.flux, periods[0], linflatten=True)
+				featout[k, 0] = EBper # overwrites top period
+
+				featout[k, NFREQUENCIES:NFREQUENCIES+2] = fc.freq_ampratios(obj, n_usedfreqs, usedfreqs)
+
+				featout[k, NFREQUENCIES+2:NFREQUENCIES+4] = fc.freq_phasediffs(obj, n_usedfreqs, usedfreqs)
+
+				# Self Organising Map
+				featout[k, NFREQUENCIES+4:NFREQUENCIES+6] = fc.SOMloc(self.classifier.som, lc.time, lc.flux, EBper, cardinality)
+
+				featout[k, NFREQUENCIES+6:NFREQUENCIES+8] = fc.phase_features(lc.time, lc.flux, EBper)
+
+				featout[k, NFREQUENCIES+8:NFREQUENCIES+10] = fc.p2p_features(lc.flux)
+
+				# Higher Order Crossings:
+				psi, zc = fc.compute_hocs(lc.time, lc.flux, 5)
+				featout[k, NFREQUENCIES+10:NFREQUENCIES+12] = psi, zc[0]
+
+				# FliPer:
+				featout[k, NFREQUENCIES+12:NFREQUENCIES+16] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
+
+				# If we are running with linfit enabled, add an extra feature
+				# which is the absoulte value of the fitted linear trend, divided
+				# with the point-to-point scatter:
+				if self.linfit:
+					slope_feature = np.abs(obj['detrend_coeff'][0]) / obj['ptp']
+					featout[k, NFREQUENCIES+16] = slope_feature
+
+		return featout
 
 	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features, recalc=False):
 		"""
 		Classify a single lightcurve.
 
-		* Assumes lightcurve time is in days
-		* Assumes featdict contains ['freq1'],['freq2']...['freq6'] in units of muHz
-		* Assumes featdict contains ['amp1'],['amp2'],['amp3'] (amplitudes not amplitude ratios)
-		* Assumes featdict contains ['phase1'],['phase2'],['phase3'] (phases not phase differences)
-
 		Parameters:
 			features (dict): Dictionary of features.
 
 		Returns:
-			dict: Dictionary of stellar classifications. -10 for NA results.
+			dict: Dictionary of stellar classifications.
 		"""
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
@@ -148,7 +218,7 @@ class RFGCClassifier(BaseClassifier):
 		# ...then self.classifier.som is not None
 
 		logger.debug("Calculating features...")
-		featarray = fc.featcalc(features, self.classifier.som, savefeat=self.featdir, recalc=recalc)
+		featarray = self.featcalc(features, total=1, recalc=recalc)
 		#logger.info("Features calculated.")
 
 		# Do the magic:
@@ -160,25 +230,20 @@ class RFGCClassifier(BaseClassifier):
 		for c, cla in enumerate(self.classifier.classes_):
 			key = self.StellarClasses(cla)
 			result[key] = classprobs[c]
-		return result
+		return result, featarray
 
 	#----------------------------------------------------------------------------------------------
 	def train(self, tset, savecl=True, recalc=False, overwrite=False):
 		"""
 		Train the classifier.
 
-		* Assumes lightcurve time is in days
-		* Assumes featdict contains ['freq1'],['freq2']...['freq6'] in units of muHz
-		* Assumes featdict contains ['amp1'],['amp2'],['amp3'] (amplitudes not amplitude ratios)
-		* Assumes featdict contains ['phase1'],['phase2'],['phase3'] (phases not phase differences)
-
 		Parameters:
-			labels (ndarray, [n_objects]): labels for training set lightcurves.
-			features (iterable of dict): features, inc lightcurves
+			tset (``TrainingSet``): labels for training set lightcurves.
+			features (iterable of dict): features, inc lightcurves.
 			savecl (bool, optional): Save classifier?
-				(``overwrite`` or ``recalc`` must be true for an old classifier to be overwritten)
-			overwrite (bool, optional): Reruns SOM
-			recalc (bool, optional): Recalculates features
+				(``overwrite`` or ``recalc`` must be true for an old classifier to be overwritten).
+			overwrite (bool, optional): Reruns SOM.
+			recalc (bool, optional): Recalculates features.
 
 		"""
 		# Start a logger that should be used to output e.g. debug information:
@@ -198,11 +263,9 @@ class RFGCClassifier(BaseClassifier):
 			logger.info("No SOM loaded. Creating new SOM, saving to '%s'.", self.somfile)
 			self.classifier.som = fc.makeSOM(tset.features(), outfile=self.somfile, overwrite=overwrite, random_seed=self.random_seed)
 			logger.info('SOM created and saved.')
-			logger.info('Calculating/Loading Features.')
-			featarray = fc.featcalc(tset.features(), self.classifier.som, savefeat=self.featdir, recalc=recalc)
-		else:
-			logger.info('Calculating/Loading Features.')
-			featarray = fc.featcalc(tset.features(), self.classifier.som, savefeat=self.featdir, recalc=recalc)
+
+		logger.info('Calculating/Loading Features.')
+		featarray = self.featcalc(tset.features(), total=len(tset), recalc=recalc)
 		logger.info('Features calculated/loaded.')
 
 		self.classifier.oob_score = True
@@ -219,8 +282,8 @@ class RFGCClassifier(BaseClassifier):
 				self.save(self.clfile, self.somfile)
 
 	#----------------------------------------------------------------------------------------------
-	def loadsom(self, somfile, dimx=1, dimy=400, cardinality=64):
+	def loadsom(self, somfile):
 		"""
 		Loads a SOM, if not done at init.
 		"""
-		self.classifier.som = fc.loadSOM(somfile, dimx, dimy, cardinality)
+		self.classifier.som = fc.loadSOM(somfile)

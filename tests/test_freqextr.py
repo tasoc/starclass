@@ -10,8 +10,9 @@ import numpy as np
 from bottleneck import allnan
 import lightkurve as lk
 from astropy.units import cds
+from astropy.table import Table
 import conftest # noqa: F401
-from starclass.features.freqextr import freqextr
+from starclass.features.freqextr import freqextr, freqextr_table_from_dict, freqextr_table_to_dict
 from starclass.features.powerspectrum import powerspectrum
 from starclass.plots import plt, plots_interactive
 
@@ -63,7 +64,7 @@ def test_freqextr_simple():
 	flux += 2*np.sin(100*omega)
 	flux += np.random.normal(0, 2, size=len(time))
 
-	lc = lk.LightCurve(time=time, flux=flux)
+	lc = lk.LightCurve(time=time, flux=flux, flux_unit=cds.ppm)
 
 	tab = freqextr(lc, n_peaks=5, n_harmonics=0)
 	_summary(lc, tab)
@@ -98,6 +99,41 @@ def test_freqextr_simple():
 		assert np.isnan(peakn['alpha'])
 		assert np.isnan(peakn['beta'])
 		assert np.isnan(peakn['deviation'])
+
+	# Convert from table to features dict:
+	feat = freqextr_table_to_dict(tab)
+	assert isinstance(feat, dict)
+	for k in range(1, tab.meta['n_peaks']+1):
+		assert 'freq{0:d}'.format(k) in feat
+		assert 'amp{0:d}'.format(k) in feat
+		assert 'phase{0:d}'.format(k) in feat
+	assert 'freq6' not in feat
+	assert 'amp6' not in feat
+	assert 'phase6' not in feat
+
+	# Convert the dict back to table:
+	tab2 = freqextr_table_from_dict(feat, flux_unit=cds.ppm)
+	assert isinstance(tab2, Table)
+
+	# Check that nothing was changed in the conversion:
+	assert len(tab2) == len(tab)
+	assert tab2.colnames == tab.colnames
+	assert tab2.dtype == tab.dtype
+	# Table values should not change:
+	np.testing.assert_allclose(tab2['amplitude'], tab['amplitude'])
+	np.testing.assert_allclose(tab2['frequency'], tab['frequency'])
+	np.testing.assert_allclose(tab2['phase'], tab['phase'])
+	np.testing.assert_allclose(tab2['alpha'], tab['alpha'])
+	np.testing.assert_allclose(tab2['beta'], tab['beta'])
+	# Meta information - only some fields are preserved:
+	assert tab2.meta['n_peaks'] == tab.meta['n_peaks']
+	assert tab2.meta['n_harmonics'] == tab.meta['n_harmonics']
+	# Check units:
+	assert tab2['amplitude'].unit == tab['amplitude'].unit
+	assert tab2['frequency'].unit == tab['frequency'].unit
+	assert tab2['phase'].unit == tab['phase'].unit
+	assert tab2['alpha'].unit == tab['alpha'].unit
+	assert tab2['beta'].unit == tab['beta'].unit
 
 #--------------------------------------------------------------------------------------------------
 def test_freqextr_onlynoise():

@@ -19,11 +19,23 @@ def main():
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
-	parser.add_argument('-c', '--classifier', help='Classifier to train.', default='meta', choices=starclass.classifier_list)
+	parser.add_argument('--clear-cache', help='Clear existing features cache before running.', action='store_true')
+	# Option to select which classifier to train:
+	parser.add_argument('-c', '--classifier',
+		default='meta',
+		choices=starclass.classifier_list,
+		metavar='{CLASSIFIER}',
+		help='Classifier to train. Choises are ' + ", ".join(starclass.classifier_list) + '.')
+	# Option to select training set:
+	parser.add_argument('-t', '--trainingset',
+		default='keplerq9v3',
+		choices=starclass.trainingset_list,
+		metavar='{TSET}',
+		help='Train classifier using this training-set. Choises are ' + ", ".join(starclass.trainingset_list) + '.')
+
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
-	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
-	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9v3', choices=starclass.trainingset_list)
 	parser.add_argument('--linfit', help='Enable linfit in training set.', action='store_true')
+	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-tf', '--testfraction', help='Holdout/test-set fraction', type=float, default=0.0)
 	args = parser.parse_args()
 
@@ -55,6 +67,10 @@ def main():
 	# Pick the training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
 	tset = tsetclass(level=args.level, tf=args.testfraction, linfit=args.linfit)
+
+	# If we were asked to do so, clear the cache before proceding:
+	if args.clear_cache:
+		tset.clear_cache()
 
 	# The Meta-classifier requires us to first train all of the other classifiers
 	# using cross-validation

@@ -10,13 +10,15 @@ All other specific stellar classification algorithms will inherit from BaseClass
 import numpy as np
 import os.path
 import logging
+import traceback
 from tqdm import tqdm
 import enum
 import warnings
 from sklearn.metrics import accuracy_score, confusion_matrix
 from bottleneck import nanvar
+from timeit import default_timer
 from .io import load_lightcurve, savePickle, loadPickle
-from .features.freqextr import freqextr
+from .features.freqextr import freqextr, freqextr_table_from_dict, freqextr_table_to_dict
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import rms_timescale, ptp
@@ -164,7 +166,7 @@ class BaseClassifier(object):
 		return np.random.RandomState(self._random_seed)
 
 	#----------------------------------------------------------------------------------------------
-	def classify(self, features):
+	def classify(self, task):
 		"""
 		Classify a star from the lightcurve and other features.
 
@@ -179,19 +181,72 @@ class BaseClassifier(object):
 			dict: Dictionary of classifications
 
 		See Also:
-			:py:func:`do_classify`
+			:py:func:`do_classify`, :py:func:`load_star`
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-		res = self.do_classify(features)
-		# Check results
-		for key, value in res.items():
-			if key not in self.StellarClasses:
-				raise ValueError("Classifier returned unknown stellar class: '%s'" % key)
-			if value < 0 or value > 1:
-				raise ValueError("Classifier should return probability between 0 and 1.")
+		logger = logging.getLogger(__name__)
+		result = task.copy()
+		result.update({
+			'tset': self.tset.key,
+			'classifier': self.classifier_key
+		})
+		try:
+			# Load the common features from the task information
+			# and run the prediction/classification on the features:
+			tic_predict = default_timer()
+			features_common = self.load_star(task)
+			res, features = self.do_classify(features_common)
+			toc_predict = default_timer()
 
-		return res
+			# Basic checks of results:
+			for key, value in res.items():
+				if key not in self.StellarClasses:
+					raise ValueError("Classifier returned unknown stellar class: '%s'" % key)
+				if value < 0 or value > 1:
+					raise ValueError("Classifier should return probability between 0 and 1.")
+
+			# Remove complex or redundant features from common features:
+			for rm in ('lightcurve', 'powerspectrum', 'frequencies', 'priority', 'starid', 'tmag', 'other_classifiers'):
+				if rm in features_common:
+					del features_common[rm]
+
+			if self.features_names and self.classifier_key != 'meta':
+				# If needed, convert features to dictionary:
+				if not isinstance(features, dict):
+					if isinstance(features, np.ndarray):
+						features = features.flatten()
+
+					features = dict(zip(self.features_names, [float(feat) for feat in features]))
+
+				# Remove features which are already in the common:
+				features = {k: features[k] for k in set(features) - set(features_common)}
+			else:
+				features = None
+
+			# Pad results with metadata:
+			result.update({
+				'starclass_results': res,
+				'features_common': features_common,
+				'features': features,
+				'status': STATUS.OK,
+				'elaptime': toc_predict - tic_predict
+			})
+		except (KeyboardInterrupt, SystemExit): # pragma: no cover
+			result.update({
+				'status': STATUS.ABORT
+			})
+		except: # noqa: E722, pragma: no cover
+			# Something went wrong
+			error_msg = traceback.format_exc().strip()
+			result.update({
+				'status': STATUS.ERROR,
+				'details': {'errors': [error_msg]},
+			})
+			logger.exception("Classify failed: Priority '%s', Classifier '%s'.",
+				task.get('priority'), self.classifier_key)
+
+		return result
 
 	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features):
@@ -204,7 +259,7 @@ class BaseClassifier(object):
 			features (dict): Dictionary of features of star, including the lightcurve itself.
 
 		Returns:
-			dict: Dictionary where the keys should be from :class:`StellarClasses` and the
+			dict: Dictionary where the keys should be from ``StellarClasses`` and the
 			corresponding values indicate the probability of the star belonging to
 			that class.
 
@@ -252,26 +307,20 @@ class BaseClassifier(object):
 
 		# Classify test set (has to be one by one unless we change classifiers)
 		y_pred = []
-		for features in tqdm(tset.features_test(), total=len(tset.test_idx)):
-			# Create result-dict that is understood by the TaskManager:
-			res = {
-				'priority': features['priority'],
-				'classifier': self.classifier_key,
-				'tset': tset.key,
-				'status': STATUS.OK
-			}
+		for task in tqdm(tset.features_test(), total=len(tset.test_idx)):
 
 			# Classify this star from the test-set:
-			res['starclass_results'] = self.classify(features)
+			result = self.classify(task)
+			#features = {'freq1': 32432, 'amp1': 4, 'unique_feature': 42} # FIXME: This should be returned by do_classify!
 
 			# FIXME: Only keeping the first label
-			prediction = max(res['starclass_results'], key=lambda key: res['starclass_results'][key]).value
+			prediction = max(result['starclass_results'], key=lambda key: result['starclass_results'][key]).value
 			y_pred.append(prediction)
 
 			# Save results for this classifier/trainingset in database:
 			if save is not None:
-				logger.debug(res)
-				save(res)
+				logger.debug(result)
+				save(result)
 
 		# Convert labels to ndarray:
 		# FIXME: Only comparing to the first label
@@ -293,13 +342,12 @@ class BaseClassifier(object):
 		plt.close(fig)
 
 	#----------------------------------------------------------------------------------------------
-	def load_star(self, task, fname):
+	def load_star(self, task):
 		"""
 		Receive a task from the TaskManager, loads the lightcurve and returns derived features.
 
 		Parameters:
 			task (dict): Task dictionary as returned by :func:`TaskManager.get_task`.
-			fname (str): Path to lightcurve file associated with task.
 
 		Returns:
 			dict: Dictionary with features.
@@ -314,7 +362,6 @@ class BaseClassifier(object):
 
 		# Define variables used below:
 		features = {}
-		save_to_cache = False
 
 		# The Meta-classifier is only using features from the other classifiers,
 		# so there is no reason to load lightcurves and calculate/load any other classifiers:
@@ -322,120 +369,116 @@ class BaseClassifier(object):
 			# Load features from cache file, or calculate them
 			# and put them into cache file for other classifiers
 			# to use later on:
+			save_to_cache = False
 			if self.features_cache:
 				features_file = os.path.join(self.features_cache, 'features-' + str(task['priority']) + '.pickle')
 				if os.path.exists(features_file):
 					features = loadPickle(features_file)
+				else:
+					save_to_cache = True
+
+			# Transfer cache of common features from task (MOAT):
+			features.update(task.get('features_common', {}))
+
+			# Transfer cache of features specific to this classifier from task (MOAT):
+			features.update(task.get('features', {}))
+
+			# Add the fields from the task to the list of features:
+			for key in ('tmag', 'variance', 'rms_hour', 'ptp'):
+				if key in task.keys():
+					features[key] = task[key]
+				else:
+					logger.warning("Key '%s' not found in task.", key)
+					features[key] = np.NaN
 
 			# Load lightcurve file and create a TessLightCurve object:
 			if 'lightcurve' in features:
 				lightcurve = features['lightcurve']
 			else:
-				lightcurve = load_lightcurve(fname,
+				lightcurve = load_lightcurve(task['lightcurve'],
 					starid=task['starid'],
 					truncate_lightcurve=self.truncate_lightcurves)
 
-			# No features found in cache, so calculate them:
-			if not features:
-				save_to_cache = True
-				features = self.calc_features(lightcurve)
+				# Add the lightcurve as a seperate feature:
+				features['lightcurve'] = lightcurve
 
-		# Add the fields from the task to the list of features:
-		for key in ('tmag', 'variance', 'rms_hour', 'ptp', 'other_classifiers'):
-			if key in task.keys():
-				features[key] = task[key]
-			else:
-				logger.warning("Key '%s' not found in task.", key)
-				features[key] = np.NaN
+			# Prepare lightcurve for power spectrum calculation:
+			# NOTE: Lightcurves are now in relative flux (ppm) with zero mean!
+			lc = lightcurve.remove_nans()
 
-		# If these features were not provided with the task, i.e. they
-		# have not been pre-computed, we should compute them now:
-		if features['variance'] is None or not np.isfinite(features['variance']):
-			features['variance'] = nanvar(lightcurve.flux, ddof=1)
-		if features['rms_hour'] is None or not np.isfinite(features['rms_hour']):
-			features['rms_hour'] = rms_timescale(lightcurve)
-		if features['ptp'] is None or not np.isfinite(features['ptp']):
-			features['ptp'] = ptp(lightcurve)
+			if self.linfit:
+				# Do a robust fitting with a first-order polynomial,
+				# where we are catching cases where the fitting goes bad.
+				indx = np.isfinite(lc.time) & np.isfinite(lc.flux) & np.isfinite(lc.flux_err)
+				mintime = np.nanmin(lc.time[indx])
+				with warnings.catch_warnings():
+					warnings.filterwarnings('error', category=np.RankWarning)
+					try:
+						p = np.polyfit(lc.time[indx] - mintime, lc.flux[indx], 1, w=1/lc.flux_err[indx])
+						lc -= np.polyval(p, lc.time - mintime)
+					except np.RankWarning: # pragma: no cover
+						logger.warning("Could not detrend light curve")
+						p = np.array([0, 0])
 
-		# Save features in cache file for later use:
-		if save_to_cache and self.features_cache:
-			savePickle(features_file, features)
+				# Store the coefficients of the above detrending as a seperate feature:
+				features['detrend_coeff'] = p
+
+			# Calculate power spectrum:
+			psd = features.get('powerspectrum')
+			if psd is None:
+				psd = powerspectrum(lc)
+
+				# Save the entire power spectrum object in the features:
+				features['powerspectrum'] = psd
+
+			# Individual frequencies:
+			if 'frequencies' not in features:
+				if 'freq1' in features:
+					# There is no frequency table, but individual keys,
+					# so reconstruct the frequencies table from the features dict:
+					features['frequencies'] = freqextr_table_from_dict(features, n_peaks=6, n_harmonics=5,
+						flux_unit=lc.flux_unit)
+				else:
+					# Extract primary frequencies from lightcurve and add to features:
+					features['frequencies'] = freqextr(lc, n_peaks=6, n_harmonics=5,
+						Noptimize=5, devlim=None, initps=psd)
+
+					# Add these for backward compatibility:
+					features.update(freqextr_table_to_dict(features['frequencies']))
+
+			# Calculate FliPer features:
+			# TODO: Should these be done before or after linfit?
+			#       Hopefully after, since otherwise we have to calculate another powerspectrum
+			if 'Fp07' not in features:
+				features.update(FliPer(psd))
+
+			# If these features were not provided with the task, i.e. they
+			# have not been pre-computed, we should compute them now:
+			# Note we are using the un-corrected lightcurve here
+			# since this will otherwise change from the values originally calculated from
+			# the corrections pipeline, where the lightcurve was not detrended first.
+			if features['variance'] is None or not np.isfinite(features['variance']):
+				features['variance'] = nanvar(lightcurve.flux, ddof=1)
+			if features['rms_hour'] is None or not np.isfinite(features['rms_hour']):
+				features['rms_hour'] = rms_timescale(lightcurve)
+			if features['ptp'] is None or not np.isfinite(features['ptp']):
+				features['ptp'] = ptp(lightcurve)
+
+			# Save features in cache file for later use:
+			if save_to_cache:
+				savePickle(features_file, features)
+
+		# Add the results from other classifiers to the features:
+		# TODO: Only add this for the MetaClassifier. This can not be done now because
+		#       BaseClassifier is used directly in TrainingSet, which means it doesn't know
+		#       which classifier is being used.
+		features['other_classifiers'] = task['other_classifiers']
 
 		# Add the fields from the task to the list of features:
 		features['priority'] = task['priority']
 		features['starid'] = task['starid']
 
 		logger.debug(features)
-		return features
-
-	#----------------------------------------------------------------------------------------------
-	def calc_features(self, lightcurve):
-		"""
-		Calculate common derived features from the lightcurve.
-
-		Parameters:
-			lightcurve (:class:`TessLightCurve`): Lightcurve object to claculate features from.
-
-		Returns:
-			dict: Dictionary of features.
-
-		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
-		"""
-
-		logger = logging.getLogger(__name__)
-
-		# We start out with an empty list of features:
-		features = {}
-
-		# Add the lightcurve as a seperate feature:
-		features['lightcurve'] = lightcurve
-
-		# Prepare lightcurve for power spectrum calculation:
-		# NOTE: Lightcurves are now in relative flux (ppm) with zero mean!
-		lc = lightcurve.remove_nans()
-		#lc = lc.remove_outliers(5.0, stdfunc=mad_std) # Sigma clipping
-
-		if self.linfit:
-			# Do a robust fitting with a first-order polynomial,
-			# where we are catching cases where the fitting goes bad.
-			indx = np.isfinite(lc.time) & np.isfinite(lc.flux) & np.isfinite(lc.flux_err)
-			mintime = np.nanmin(lc.time[indx])
-			with warnings.catch_warnings():
-				warnings.filterwarnings('error', category=np.RankWarning)
-				try:
-					p = np.polyfit(lc.time[indx] - mintime, lc.flux[indx], 1, w=1/lc.flux_err[indx])
-					lc -= np.polyval(p, lc.time - mintime)
-				except np.RankWarning: # pragma: no cover
-					logger.warning("Could not detrend light curve")
-					p = np.array([0, 0])
-
-			# Store the coefficients of the above detrending as a seperate feature:
-			features['detrend_coeff'] = p
-
-		# Calculate power spectrum:
-		psd = powerspectrum(lc)
-
-		# Save the entire power spectrum object in the features:
-		features['powerspectrum'] = psd
-
-		# Extract primary frequencies from lightcurve and add to features:
-		features['frequencies'] = freqextr(lc, n_peaks=6, n_harmonics=5,
-			Noptimize=5, devlim=None, initps=psd)
-
-		# Add these for backward compatibility:
-		for row in features['frequencies']:
-			if row['harmonic'] == 0:
-				key = '{0:d}'.format(row['num'])
-			else:
-				key = '{0:d}_harmonic{1:d}'.format(row['num'], row['harmonic'])
-
-			features['freq' + key] = row['frequency']
-			features['amp' + key] = row['amplitude']
-			features['phase' + key] = row['phase']
-
-		# Calculate FliPer features:
-		features.update(FliPer(psd))
-
 		return features
 
 	#----------------------------------------------------------------------------------------------

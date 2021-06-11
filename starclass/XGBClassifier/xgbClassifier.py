@@ -8,7 +8,6 @@ General XGB Classification
 import logging
 import os
 import copy
-import json
 from xgboost import XGBClassifier as xgb
 from . import xgb_feature_calc as xgb_features
 from .. import BaseClassifier, io
@@ -44,19 +43,13 @@ class XGBClassifier(BaseClassifier):
 		# Attributes of this classifier:
 		self.classifier = None
 		self.classifier_file = None
-		self.featdir = None
 
 		if clfile is not None:
 			self.classifier_file = os.path.join(self.data_dir, clfile)
 
-		if self.features_cache is not None:
-			self.featdir = os.path.join(self.features_cache, 'xgb_features')
-			os.makedirs(self.featdir, exist_ok=True)
-
 		if self.classifier_file is not None and os.path.exists(self.classifier_file):
 			# Load pre-trained classifier
 			self.load(self.classifier_file)
-			self.trained = True # Assume any classifier loaded is already trained
 		else:
 			# Create new untrained classifier:
 			self.classifier = xgb(
@@ -72,7 +65,8 @@ class XGBClassifier(BaseClassifier):
 				random_state=self.random_seed, # XGBoost uses misleading names
 				reg_alpha=1e-5,
 				subsample=0.8,
-				use_label_encoder=False
+				use_label_encoder=False,
+				n_jobs=1
 			)
 			self.trained = False
 
@@ -83,11 +77,11 @@ class XGBClassifier(BaseClassifier):
 			'shapiro_wilk',
 			'eta',
 			'PeriodLS',
-			'Freq_amp_0',
-			'Freq_ampratio_21',
-			'Freq_ampratio_31',
-			'Freq_phasediff_21',
-			'Freq_phasediff_31',
+			'amp1', # Freq_amp_0
+			'ampratio21', # Freq_ampratio_21
+			'ampratio31', # Freq_ampratio_31
+			'phasediff21', # Freq_phasediff_21
+			'phasediff31', # Freq_phasediff_31
 			'Rcs',
 			'psi_Rcs'
 		]
@@ -97,7 +91,6 @@ class XGBClassifier(BaseClassifier):
 		"""
 		Save xgb classifier object with pickle
 		"""
-
 		#self.classifier = None
 		temp_classifier = copy.deepcopy(self.classifier)
 		io.savePickle(outfile, self.classifier)
@@ -108,8 +101,8 @@ class XGBClassifier(BaseClassifier):
 		"""
 		Loading the xgb clasifier
 		"""
-
 		self.classifier = io.loadPickle(infile)
+		self.trained = True # Assume any classifier loaded is already trained
 
 	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features):
@@ -132,11 +125,10 @@ class XGBClassifier(BaseClassifier):
 
 		# If classifer has been trained, calculate features
 		logger.debug("Calculating features...")
-		feature_results = xgb_features.feature_extract(features) # TODO: Come back to this
+		feature_results = xgb_features.feature_extract(features, self.features_names, total=1)
 		#logger.info('Feature Extraction done')
 
 		# Do the magic:
-		#logger.info("We are staring the magic...")
 		xgb_classprobs = self.classifier.predict_proba(feature_results)[0]
 		logger.debug("Classification complete")
 
@@ -145,10 +137,10 @@ class XGBClassifier(BaseClassifier):
 			# Cast to float for prediction
 			class_results[stcl] = float(xgb_classprobs[k])
 
-		return class_results
+		return class_results, feature_results
 
 	#----------------------------------------------------------------------------------------------
-	def train(self, tset, savecl=True, recalc=False, overwrite=False, feat_import=True):
+	def train(self, tset, savecl=True, recalc=False, overwrite=False, save_feature_importances=True):
 		"""
 		Training classifier using the ...
 		"""
@@ -160,44 +152,22 @@ class XGBClassifier(BaseClassifier):
 			return
 
 		logger.info('Calculating/Loading Features.')
-		featarray = xgb_features.feature_extract(tset.features(), savefeat=self.featdir, recalc=recalc)
+		featarray = xgb_features.feature_extract(tset.features(), self.features_names, total=len(tset), recalc=recalc)
 		logger.info('Features calculated/loaded.')
-
-		#print(list(featarray))
-		#featarray = featarray.drop(['LinearTrend', 'PairSlopeTrend'], axis=1)
-		#print(list(featarray))
-		#featarray.to_csv(self.data_dir+'/features.csv', index=False)
-
-		#if self.feature is not None:
-		#	if os.path.exists(self.features_file):
-		#		logger.info('Loading features from precalculated file.')
-		#		feature_results = pd.read_csv(self.features_file)
-		#		precalc = True
 
 		# Convert classification labels to integers:
 		intlookup = {key.value: value for value, key in enumerate(self.StellarClasses)}
 		fit_labels = [intlookup[lbl] for lbl in self.parse_labels(tset.labels())]
 
-		#if not precalc:
-		#	logger.info('Extracting Features ...')
-		#	# Calculate features
-		#	feature_results = xgb_features.feature_extract(features) ## absolute_import ##
-		#	# Save calcualted features
-		#	if savefeat:
-		#		if self.features_file is not None:
-		#			if not os.path.exists(self.features_file) or overwrite:
-		#				logger.info('Saving extracted features to feets_features.txt')
-		#				feature_results.to_csv(self.features_file, index=False)
-
 		logger.info('Training ...')
 		#logger.info('SHAPES ', str(np.shape(featarray)))
 		#logger.info('SHAPES ', str(np.shape(fit_labels)))
 		self.classifier.fit(featarray, fit_labels)
-		if feat_import:
+
+		if save_feature_importances:
 			importances = self.classifier.feature_importances_.astype(float)
-			feature_importances = zip(list(featarray), importances)
-			with open(os.path.join(self.data_dir, 'xgbClassifier_feat_import.json'), 'w') as outfile:
-				json.dump(list(feature_importances), outfile)
+			feature_importances = dict(zip(self.features_names, importances))
+			io.saveJSON(os.path.join(self.data_dir, 'xgbClassifier_feature_importances.json'), feature_importances)
 
 		self.trained = True
 
@@ -205,4 +175,3 @@ class XGBClassifier(BaseClassifier):
 			if not os.path.exists(self.classifier_file) or overwrite:
 				logger.info('Saving pickled xgb classifier to %s', self.classifier_file)
 				self.save(self.classifier_file)
-				#self.save_model(self.classifier_file)

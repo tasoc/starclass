@@ -103,7 +103,7 @@ def test_todolist_create(PRIVATE_INPUT_DIR):
 	#
 	input_folder = os.path.join(PRIVATE_INPUT_DIR, 'create_todolist')
 	expected_file = os.path.join(input_folder, 'todo.sqlite')
-	assert not os.path.exists(expected_file)
+	assert not os.path.exists(expected_file), "Todo-file already exists"
 
 	# Try calling with an non-existing folder should give an error:
 	with pytest.raises(NotADirectoryError):
@@ -174,7 +174,7 @@ def test_todolist_run_create(PRIVATE_INPUT_DIR):
 
 	# Run CLI version of create todolist program:
 	out, err, exitcode = conftest.capture_run_cli('run_create_todolist.py', input_folder)
-	assert exitcode == 0
+	assert exitcode == 0, "run_create_todolist failed"
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

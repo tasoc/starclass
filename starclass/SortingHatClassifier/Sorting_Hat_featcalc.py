@@ -7,79 +7,10 @@ Utilities for the SORTING-HAT classifier.
 """
 
 import numpy as np
-import os
 from bottleneck import nansum
-import scipy.stats as stat
 import astropy.units as u
 import pyentrp.entropy as ent
 from . import npeet_entropy_estimators as npeet
-from ..utilities import get_periods
-
-# Number of frequencies used as features:
-NFREQUENCIES = 3
-
-#--------------------------------------------------------------------------------------------------
-def feature_names():
-	"""
-	Returns a list with the feature names.
-	"""
-	names = ['f' + str(i+1) for i in range(NFREQUENCIES)]
-	names += [
-		'varrat',
-		'number_significantharmonic',
-		'skewness',
-		'flux_ratio',
-		'diff_entropy_lc',
-		'diff_entropy_as',
-		'mse_mean',
-		'mse_max',
-		'mse_std',
-		'mse_power'
-	]
-	return names
-
-#--------------------------------------------------------------------------------------------------
-def featcalc(features, linflatten=False, savefeat=None, recalc=False):
-	"""
-	Calculates features for set of lightcurves
-	"""
-
-	if isinstance(features, dict): # trick for single features
-		features = [features]
-
-	featout = np.zeros([1, NFREQUENCIES+10], dtype='float32')
-	for obj in features:
-		precalc = False
-		if savefeat is not None:
-			featfile = os.path.join(savefeat, str(obj['priority'])+'.txt')
-			if os.path.exists(featfile) and not recalc:
-				#logger.info(str(obj['priority'])+": Loading precalculated features...")
-				objfeatures = np.loadtxt(featfile, delimiter=',')
-				precalc = True
-
-		if not precalc:
-			objfeatures = np.zeros(NFREQUENCIES+10, dtype='float32')
-			lc = prepLCs(obj['lightcurve'], linflatten)
-
-			periods, _, _ = get_periods(obj, NFREQUENCIES, lc.time, in_days=False)
-			objfeatures[:NFREQUENCIES] = periods
-
-			#EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)
-			#objfeatures[0] = EBper # overwrites top period
-
-			objfeatures[NFREQUENCIES:NFREQUENCIES+2] = compute_varrat(obj)
-			#objfeatures[NFREQUENCIES+1:NFREQUENCIES+2] = compute_lpf1pa11(obj)
-			objfeatures[NFREQUENCIES+2:NFREQUENCIES+3] = stat.skew(lc.flux)
-			objfeatures[NFREQUENCIES+3:NFREQUENCIES+4] = compute_flux_ratio(lc.flux)
-			objfeatures[NFREQUENCIES+4:NFREQUENCIES+5] = compute_differential_entropy(lc.flux)
-			objfeatures[NFREQUENCIES+5:NFREQUENCIES+6] = compute_differential_entropy(obj['powerspectrum'].standard[1])
-			objfeatures[NFREQUENCIES+6:NFREQUENCIES+10] = compute_multiscale_entropy(lc.flux)
-			#objfeatures[NFREQUENCIES+10:NFREQUENCIES+11] = compute_max_lyapunov_exponent(lc.flux)
-
-			if savefeat is not None:
-				np.savetxt(featfile,objfeatures, delimiter=',')
-		featout = np.vstack((featout,objfeatures))
-	return featout[1:,:]
 
 #--------------------------------------------------------------------------------------------------
 def prepLCs(lc, linflatten=False, detrending_coeff=1):

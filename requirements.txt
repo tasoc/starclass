@@ -1,6 +1,6 @@
 pytest
 flake8
-flake8-tabs
+flake8-tabs >= 2.3.2
 flake8-builtins
 flake8-logging-format
 numpy == 1.19.4

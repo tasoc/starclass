@@ -52,7 +52,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        [ ${{ runner.os }} == "macOS" ] && brew install libomp
+        [ "${{ runner.os }}" = "macOS" ] && brew install libomp
         python -m pip install --upgrade pip wheel
         grep "numpy" requirements.txt | xargs -I {} pip install "{}"
         pip install -r requirements.txt

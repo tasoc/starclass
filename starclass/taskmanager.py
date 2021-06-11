@@ -13,6 +13,7 @@ import logging
 from astropy.table import Table
 from . import STATUS
 from .constants import classifier_list
+from .version import get_version
 
 #--------------------------------------------------------------------------------------------------
 class TaskManager(object):
@@ -45,6 +46,8 @@ class TaskManager(object):
 		self.StellarClasses = classes
 		self.readonly = readonly
 		self.tset = None
+		self.input_folder = os.path.abspath(os.path.dirname(todo_file))
+		self._moat_tables = {}
 
 		# Keep a list of all the possible classifiers here:
 		self.all_classifiers = list(classifier_list)
@@ -75,6 +78,15 @@ class TaskManager(object):
 		if self.cursor.fetchone() is None:
 			raise ValueError("The TODO-file does not contain diagnostics_corr. Are you sure corrections have been run?")
 
+		# Find existing MOAT tables in the todo-file:
+		self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'starclass_features_%';")
+		for row in self.cursor.fetchall():
+			classifier = row['name'].replace('starclass_features_', '')
+			self.cursor.execute("PRAGMA table_info(" + row['name'] + ");")
+			columns = [col['name'] for col in self.cursor.fetchall()]
+			columns.remove('priority')
+			self.moat_create(classifier, columns)
+
 		# Reset the status of everything for a new run:
 		if overwrite:
 			self.cursor.execute("DROP TABLE IF EXISTS starclass_settings;")
@@ -85,7 +97,8 @@ class TaskManager(object):
 
 		# Create table for settings if it doesn't already exits:
 		self.cursor.execute("""CREATE TABLE IF NOT EXISTS starclass_settings (
-			tset TEXT NOT NULL
+			tset TEXT NOT NULL,
+			version TEXT NOT NULL
 		);""")
 		self.conn.commit()
 
@@ -131,7 +144,7 @@ class TaskManager(object):
 
 		# Run a cleanup/optimization of the database before we get started:
 		if cleanup:
-			self.logger.info("Cleaning TODOLIST before run...")
+			self.logger.debug("Cleaning TODOLIST before run...")
 			try:
 				self.conn.isolation_level = None
 				self.cursor.execute("VACUUM;")
@@ -234,11 +247,23 @@ class TaskManager(object):
 		if task:
 			task = dict(task)
 			task['classifier'] = classifier
+			task['lightcurve'] = os.path.join(self.input_folder, task['lightcurve'])
 
 			# Add things from the catalog file:
 			#catalog_file = os.path.join(????, 'catalog_sector{sector:03d}_camera{camera:d}_ccd{ccd:d}.sqlite')
 			# cursor.execute("SELECT ra,decl as dec,teff FROM catalog WHERE starid=?;", (task['starid'], ))
 			#task.update()
+
+			# Add common features already calculated by some other classifier:
+			# This is not needed for the meta-classifier
+			if classifier != 'meta':
+				features_common = self.moat_query('common', task['priority'])
+				if features_common is not None:
+					task['features_common'] = features_common
+				if classifier is not None:
+					features_specific = self.moat_query(classifier, task['priority'])
+					if features_specific is not None:
+						task['features'] = features_specific
 
 			# If the classifier that is running is the meta-classifier,
 			# add the results from all other classifiers to the task dict:
@@ -316,11 +341,135 @@ class TaskManager(object):
 		"""
 		try:
 			self.cursor.execute("DELETE FROM starclass_settings;")
-			self.cursor.execute("INSERT INTO starclass_settings (tset) VALUES (?);", [self.tset])
+			self.cursor.execute("INSERT INTO starclass_settings (tset,version) VALUES (?,?);", [
+				self.tset,
+				get_version()
+			])
 			self.conn.commit()
 		except: # noqa: E722, pragma: no cover
 			self.conn.rollback()
 			raise
+
+	#----------------------------------------------------------------------------------------------
+	def moat_create(self, classifier, columns):
+		# Just some checks of the input:
+		if classifier != 'common' and classifier not in self.all_classifiers:
+			raise ValueError("Invalid classifier: %s" % classifier)
+		if not columns:
+			raise ValueError("Invalid column names provided")
+
+		#db_name = 'db_' + classifier
+		table_name = "starclass_features_" + classifier
+
+		columns = sorted(columns)
+		columns_insert = ",".join(columns)
+		columns_create = ",\n".join(['"' + key + '" REAL' for key in columns])
+		placeholders = ",".join([':' + key for key in columns])
+
+		# Create table:
+		#print("ATTACH DATABASE '' AS {db_name:s};".format(
+		#	db_name=db_name
+		#))
+		query_create = """
+		CREATE TABLE IF NOT EXISTS {table_name:s} (
+			priority INTEGER NOT NULL PRIMARY KEY,
+			{columns:s},
+			FOREIGN KEY (priority) REFERENCES diagnostics_corr(priority) ON DELETE CASCADE ON UPDATE CASCADE
+		);""".format(
+			table_name=table_name,
+			columns=columns_create
+		)
+		self.cursor.execute(query_create)
+		self.cursor.execute("ANALYZE;")
+
+		# Generate SQL statement which will be used to insert extracted features
+		# into this table:
+		query_insert = "INSERT OR REPLACE INTO {table_name:s} (priority,{columns:s}) VALUES (:priority,{placeholders:s});".format(
+			table_name=table_name,
+			columns=columns_insert,
+			placeholders=placeholders
+		)
+
+		# Generate SQL statement which will be used to select extracted features
+		# from this table:
+		query_select = "SELECT {columns:s} FROM {table_name:s} WHERE priority=?;".format(
+			table_name=table_name,
+			columns=columns_insert
+		)
+
+		# Gather into dict and save to memory for later reuse:
+		query = {
+			'table_name': table_name,
+			'insert': query_insert,
+			'select': query_select,
+		}
+		self._moat_tables[classifier] = query
+		return query
+
+	#----------------------------------------------------------------------------------------------
+	def _moat_insert(self, classifier, priority, features):
+		"""
+		Insert extracted features into Mother Of All Tables (MOAT).
+
+		Parameters:
+			classifier (str):
+			priority (int):
+			features (dict):
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+
+		query = self._moat_tables.get(classifier)
+		if query is None:
+			query = self.moat_create(classifier, features.keys())
+
+		# Insert into MOAT table using pre-compiled SQL query:
+		priority_dict = {'priority': priority}
+		self.cursor.execute(query['insert'], {**features, **priority_dict})
+
+	#----------------------------------------------------------------------------------------------
+	def moat_query(self, classifier, priority):
+		"""
+		Query Mother Of All Tables (MOAT) for cached features.
+
+		Parameters:
+			classifier (str):
+			priority (int):
+
+		Returns:
+			dict: Dictionary with features stores in MOAT.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		query = self._moat_tables.get(classifier)
+		if query is not None:
+			self.cursor.execute(query['select'], [priority])
+			row = self.cursor.fetchone()
+			if row:
+				return {key: (np.NaN if val is None else val) for key, val in dict(row).items()}
+		return None
+
+	#----------------------------------------------------------------------------------------------
+	def moat_clear(self):
+		"""
+		Clear Mother Of All Tables (MOAT).
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		for query in self._moat_tables.values():
+			self.cursor.execute("DROP TABLE {table_name:s};".format(
+				table_name=query['table_name']
+			))
+		self.conn.commit()
+		self._moat_tables.clear()
+
+		# Run a VACUUM of todo-file after potentially deleting many tables:
+		self.logger.debug("Cleaning TODOLIST after moat_clear...")
+		try:
+			self.conn.isolation_level = None
+			self.cursor.execute("VACUUM;")
+		finally:
+			self.conn.isolation_level = ''
 
 	#----------------------------------------------------------------------------------------------
 	def save_results(self, result):
@@ -329,22 +478,30 @@ class TaskManager(object):
 
 		Parameters:
 			results (dict): Dictionary of results and diagnostics.
+
+		Raises:
+			ValueError: If attempting to save results from multiple different training sets.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
 		# If the training set has not already been set for this TODO-file,
 		# update the settings, and if it has check that we are not
 		# mixing results from different correctors in one TODO-file.
-		if self.tset is None and result.get('tset'):
-			self.tset = result.get('tset')
+		tset = result.get('tset')
+		if self.tset is None and tset:
+			self.tset = tset
 			self.save_settings()
-		elif result.get('tset') != self.tset:
-			raise ValueError("Attempting to mix results from multiple training sets")
+		elif tset != self.tset:
+			raise ValueError("Attempting to mix results from multiple training sets. Previous='%s', New='%s'." % (self.tset, tset))
 
 		priority = result.get('priority')
 		classifier = result.get('classifier')
 		status = result.get('status')
 		details = result.get('details', {})
 		starclass_results = result.get('starclass_results', {})
+		common = result.get('features_common')
+		features = result.get('features')
 
 		# Save additional diagnostics:
 		error_msg = details.get('errors', None)
@@ -372,6 +529,14 @@ class TaskManager(object):
 					'class': key.name,
 					'prob': value
 				})
+
+			# Save common features if they are provided:
+			if common:
+				self._moat_insert('common', priority, common)
+
+			# Save classifier-specific features if they are provided:
+			if features:
+				self._moat_insert(classifier, priority, features)
 
 			self.conn.commit()
 		except: # noqa: E722, pragma: no cover

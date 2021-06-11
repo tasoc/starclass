@@ -6,12 +6,19 @@ The Sorting-Hat Classifier (Supervised randOm foRest variabiliTy classIfier usin
 .. codeauthor:: Jeroen Audenaert <jeroen.audenaert@kuleuven.be>
 """
 
+import numpy as np
+from bottleneck import anynan
+import scipy.stats as stat
 import logging
 import os.path
 import os
 from sklearn.ensemble import RandomForestClassifier
 from . import Sorting_Hat_featcalc as fc
 from .. import BaseClassifier, io
+from ..utilities import get_periods
+
+# Number of frequencies used as features:
+NFREQUENCIES = 3
 
 #--------------------------------------------------------------------------------------------------
 class Classifier_obj(RandomForestClassifier):
@@ -53,18 +60,23 @@ class SortingHatClassifier(BaseClassifier):
 		else:
 			self.clfile = None
 
-		if self.features_cache is not None:
-			self.featdir = os.path.join(self.features_cache, 'sortinghat_features')
-			os.makedirs(self.featdir, exist_ok=True)
-		else:
-			self.featdir = None
+		if self.clfile is not None and os.path.exists(self.clfile):
+			# load pre-trained classifier
+			self.load(self.clfile)
 
-		if self.clfile is not None:
-			if os.path.exists(self.clfile):
-				# load pre-trained classifier
-				self.load(self.clfile)
-
-		self.features_names = fc.feature_names()
+		self.features_names = ['f' + str(i+1) for i in range(NFREQUENCIES)]
+		self.features_names += [
+			'varrat',
+			'number_significantharmonic',
+			'skewness',
+			'flux_ratio',
+			'diff_entropy_lc',
+			'diff_entropy_as',
+			'mse_mean',
+			'mse_max',
+			'mse_std',
+			'mse_power'
+		]
 
 		if self.classifier is None:
 			# Create new untrained classifier
@@ -89,22 +101,52 @@ class SortingHatClassifier(BaseClassifier):
 		self.classifier = io.loadPickle(infile)
 
 	#----------------------------------------------------------------------------------------------
+	def featcalc(self, features, total=None, recalc=False):
+		"""
+		Calculates features for set of lightcurves
+		"""
+
+		if isinstance(features, dict): # trick for single features
+			features = [features]
+		if total is None:
+			total = len(features)
+
+		featout = np.empty([total, len(self.features_names)], dtype='float32')
+		for k, obj in enumerate(features):
+			# Load features from the provided (cached) features if they exist:
+			featout[k, :] = [obj.get(key, np.NaN) for key in self.features_names]
+
+			# If not all features are already populated, we are going to recalculate them all:
+			if recalc or anynan(featout[k, :]):
+				lc = fc.prepLCs(obj['lightcurve'], linflatten=False)
+
+				periods, _, _ = get_periods(obj, NFREQUENCIES, lc.time, in_days=False)
+				featout[k, :NFREQUENCIES] = periods
+
+				#EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=linflatten-1)
+				#featout[k, 0] = EBper # overwrites top period
+
+				featout[k, NFREQUENCIES:NFREQUENCIES+2] = fc.compute_varrat(obj)
+				#featout[k, NFREQUENCIES+1:NFREQUENCIES+2] = fc.compute_lpf1pa11(obj)
+				featout[k, NFREQUENCIES+2:NFREQUENCIES+3] = stat.skew(lc.flux)
+				featout[k, NFREQUENCIES+3:NFREQUENCIES+4] = fc.compute_flux_ratio(lc.flux)
+				featout[k, NFREQUENCIES+4:NFREQUENCIES+5] = fc.compute_differential_entropy(lc.flux)
+				featout[k, NFREQUENCIES+5:NFREQUENCIES+6] = fc.compute_differential_entropy(obj['powerspectrum'].standard[1])
+				featout[k, NFREQUENCIES+6:NFREQUENCIES+10] = fc.compute_multiscale_entropy(lc.flux)
+				#featout[k, NFREQUENCIES+10:NFREQUENCIES+11] = fc.compute_max_lyapunov_exponent(lc.flux)
+
+		return featout
+
+	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features, recalc=False):
 		"""
 		Classify a single lightcurve.
-		Assumes lightcurve time is in days
-		Assumes featdict contains ['logf1'],['logf2'],['logf3'], in units of muHz
-		Assumes featdict contains ['varrat'],['number_significantharmonic']
-		Assumes featdict contains ['skewness'],['flux_ratio']
-		Assumes featdict contains ['mse_mean'],['mse_max'],['mse_std'],['mse_power']
-		Assumes featdict contains ['diff_entropy_lc'],['diff_entropy_as']
 
 		Parameters:
-			lightcurve (``lightkurve.TessLightCurve`` object): Lightcurve.
-			featdict (dict): Dictionary of other features.
+			features (dict): Dictionary of features.
 
 		Returns:
-			dict: Dictionary of stellar classifications. -10 for NA results.
+			dict: Dictionary of stellar classifications.
 		"""
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
@@ -116,7 +158,7 @@ class SortingHatClassifier(BaseClassifier):
 		# If self.classifier.trained=True, calculate additional features
 
 		logger.debug("Calculating features...")
-		featarray = fc.featcalc(features, savefeat=self.featdir, recalc=recalc)
+		featarray = self.featcalc(features, total=1, recalc=recalc)
 		#logger.info("Features calculated.")
 
 		# Do the magic:
@@ -128,25 +170,19 @@ class SortingHatClassifier(BaseClassifier):
 		for c, cla in enumerate(self.classifier.classes_):
 			key = self.StellarClasses(cla)
 			result[key] = classprobs[c]
-		return result
+		return result, featarray
 
 	#----------------------------------------------------------------------------------------------
 	def train(self, tset, savecl=True, recalc=False, overwrite=False):
 		"""
 		Train the classifier.
-		Assumes lightcurve time is in days
-		Assumes featdict contains ['logf1'],['logf2'],['logf3'], in units of muHz
-		Assumes featdict contains ['varrat'],['number_significantharmonic']
-		Assumes featdict contains ['skewness'],['flux_ratio']
-		Assumes featdict contains ['mse_mean'],['mse_max'],['mse_std'],['mse_power']
-		Assumes featdict contains ['diff_entropy_lc'],['diff_entropy_as']
 
 		Parameters:
 			labels (ndarray, [n_objects]): labels for training set lightcurves.
-			features (iterable of dict): features, inc lightcurves
-			savecl - save classifier? (overwrite or recalc must be true for an old classifier to be overwritten)
-			overwrite reruns SOM
-			recalc recalculates features
+			features (iterable of dict): features, inc lightcurves.
+			savecl: save classifier? (overwrite or recalc must be true for an old classifier to be overwritten)
+			overwrite: reruns SOM
+			recalc: recalculates features
 
 		"""
 		# Start a logger that should be used to output e.g. debug information:
@@ -160,7 +196,7 @@ class SortingHatClassifier(BaseClassifier):
 		fitlabels = self.parse_labels(tset.labels())
 
 		logger.info('Calculating/Loading Features.')
-		featarray = fc.featcalc(tset.features(), savefeat=self.featdir, recalc=recalc)
+		featarray = self.featcalc(tset.features(), total=len(tset), recalc=recalc)
 		logger.info('Features calculated/loaded.')
 
 		self.classifier.oob_score = True
@@ -170,8 +206,7 @@ class SortingHatClassifier(BaseClassifier):
 		self.classifier.oob_score = False
 		self.classifier.trained = True
 
-		if savecl and self.classifier.trained:
-			if self.clfile is not None:
-				if not os.path.exists(self.clfile) or overwrite or recalc:
-					logger.info("Saving pickled classifier instance to '%s'", self.clfile)
-					self.save(self.clfile)
+		if savecl and self.clfile is not None:
+			if not os.path.exists(self.clfile) or overwrite or recalc:
+				logger.info("Saving pickled classifier instance to '%s'", self.clfile)
+				self.save(self.clfile)

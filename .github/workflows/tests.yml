@@ -50,7 +50,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install OS specific requirements
+    - name: Install MacOS specific requirements
       if: runner.os == 'macOS'
       run: brew install libomp
 
@@ -62,7 +62,7 @@ jobs:
         pip install codecov pytest-cov
 
     #- name: Setup MPI
-    #  if: matrix.os == 'ubuntu-latest'
+    #  if: runner.os == 'Linux'
     #  run: |
     #    sudo apt-get install -y openmpi-bin libopenmpi-dev
     #    pip install mpi4py

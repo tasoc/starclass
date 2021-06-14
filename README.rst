@@ -23,7 +23,7 @@ The overall strategy of the classification pipeline is to have different classif
 
 Classification is done in two levels (1 and 2), where the first level separates stars into overall classes of stars that exhibit similar lightcurves. In level 2, these classes are further separated into the individual pulsation classes.
 
-.. image:: docs/burger_diagram.png
+.. image:: docs/_static/burger_diagram.png
 
 Installation instructions
 =========================

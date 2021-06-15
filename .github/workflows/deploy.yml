@@ -46,6 +46,12 @@ jobs:
     - name: Update VERSION file
       run: python -c "from starclass import version; version.update_release_version();"
 
+    - name: Generate changelog
+      id: changelog
+      uses: metcalfc/changelog-generator@v1.0.0
+      with:
+        myToken: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
@@ -56,4 +62,5 @@ jobs:
         release_name: Version ${{ github.ref }}
         body: |
           Version ${{ github.ref }}
+          ${{ steps.changelog.outputs.changelog }}
         draft: true

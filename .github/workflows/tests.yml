@@ -14,7 +14,7 @@ on:
 jobs:
   # Use the `flake8` tool to check for syntax errors
   flake8:
-    name: Flake8
+    name: Flake8 and data download
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -49,6 +49,16 @@ jobs:
         flake8 --select=E9,F63,F7,F82 --ignore=G001 --show-source
         # exit-zero treats all errors as warnings.
         flake8 --exit-zero
+
+    - name: Download cache
+      run: python run_download_cache.py -q
+
+    - name: Upload training sets artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: training_sets
+        path: starclass/training_sets/data/
+        retention-days: 1
 
 
   # Run unit tests on Linux, OSX and Windows
@@ -124,8 +134,10 @@ jobs:
     #    sudo apt-get install -y openmpi-bin libopenmpi-dev
     #    pip install mpi4py
 
-    - name: Download cache
-      run: python run_download_cache.py -q
+    - name: Download training sets artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: training_sets
 
     - name: Testing
       run: pytest --cov
@@ -139,7 +151,7 @@ jobs:
   # Use sphinx to build the documentation
   docs:
     name: Build documentation
-    needs: flake8 # Don't bother if flake8 failed
+    needs: flake8
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code

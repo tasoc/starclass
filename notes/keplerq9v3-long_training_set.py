@@ -58,7 +58,7 @@ def create_constant_star(fpath, timelen=90.0, sampling=30.0, random_state=None):
 	identifier = os.path.basename(fpath).replace('.txt', '')
 	sigma = const_stars_sigma[const_stars_ids == identifier]
 	if len(sigma) != 1:
-		raise Exception("SIGMA not found")
+		raise RuntimeError("SIGMA not found")
 	sigma = float(sigma)
 
 	# Create random lightcurve:
@@ -84,17 +84,63 @@ def create_constant_star(fpath, timelen=90.0, sampling=30.0, random_state=None):
 		fid.write("#-------------------------------------------\n")
 
 #--------------------------------------------------------------------------------------------------
+def create_fake_rrlyr(fpath, timelen=90.0, sampling=30.0, random_state=None):
+
+	# Directory where original simulations by Laszlo Molnar are stored:
+	rootdir = r'G:\keplerq9\fake_cepheids_kepler-tess\fake_cepheids_kepler'
+
+	# FIXME: How do these map to each other???
+	identifier = os.path.basename(fpath).replace('.txt', '')
+	identifier_laszlo = '202064435'
+
+	timelen_name = str(timelen)
+	sampling_name = str(sampling)
+	if sampling == 30:
+		sampling_name = '29.425'
+
+	# Load the original data provided by Laszlo:
+	fname = f'{identifier_laszlo:s}_{timelen_name:s}_{sampling_name:s}.txt'
+	fpath_orig = os.path.join(rootdir, fname)
+	data = np.genfromtxt(fpath_orig, delimiter=' ', comments='#', dtype='float64', encoding='utf-8')
+
+	# Create lightcurve in correct units:
+	time = data[:,0]
+	m = np.nanmedian(data[:,1])
+	flux = 1e6*(data[:,1]/m - 1)
+	flux_err = flux
+
+	# Save the lightcurve to file:
+	os.makedirs(os.path.dirname(fpath), exist_ok=True)
+	with open(fpath, 'w') as fid:
+		fid.write("# Kepler Q9 Training Set Targets artificial RRLyr/Cepheid star\n")
+		fid.write(f"# Identifier: {identifier:s}\n")
+		fid.write("# Column 1: Time (days)\n")
+		fid.write("# Column 2: Flux (ppm)\n")
+		fid.write("# Column 3: Flux error (ppm)\n")
+		fid.write("#-------------------------------------------\n")
+		for k in range(len(time)):
+			fid.write(f"{time[k]:.16e}  {flux[k]:.16e}  {flux_err[k]:.16e}\n")
+		fid.write("#-------------------------------------------\n")
+
+#--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	plots_interactive()
+
+	# Standard "TESS-like" Kepler data:
+	#output_dir = r'G:\keplerq9\keplerq9v3'  # Where output will be saved
+	#timelen = 27.4
+	#sampling = 30
+
+	# Long (90 day) Kepler dataset primarily to be used with K2:
+	output_dir = r'G:\keplerq9\keplerq9v3-long'  # Where output will be saved
+	timelen = 90
+	sampling = 29.425
 
 	# Seed the random state used below to ensure reproducability:
 	rng = np.random.RandomState(42)
 
 	# Directory where KeplerQ9 files are stored locally:
 	thisdir = r'G:\keplerq9\full_fits'
-
-	# Where output will be saved:
-	output_dir = r'G:\keplerq9\keplerq9v3-long'
 
 	# Make sure directories exists:
 	os.makedirs(output_dir, exist_ok=True)
@@ -120,7 +166,13 @@ if __name__ == '__main__':
 			for line in starlist[indx, :]:
 				print('%s,%s' % tuple(line))
 
-		raise Exception("%d duplicate starids" % (len(starlist) - len(us)))
+		raise RuntimeError("%d duplicate starids" % (len(starlist) - len(us)))
+
+	# Just to catch the obvious problems:
+	if sampling not in (30, 29.425):
+		raise NotImplementedError("Only 'long cadence' kepler sampling is implemented")
+	if timelen not in (27.4, 90):
+		raise NotImplementedError("Time length is not supported")
 
 	# Open the diagnostics file for writing and loop through the
 	# list of starids, load the data file, restructure the timeseries,
@@ -139,15 +191,18 @@ if __name__ == '__main__':
 				fpath_save = os.path.join(output_dir, sclass, starid + '.txt')
 				starid = -10000 - int(starid[9:])
 				if not os.path.isfile(fpath_save):
-					create_constant_star(fpath_save, random_state=rng)
+					create_constant_star(fpath_save, timelen=timelen, sampling=sampling, random_state=rng)
 
 			elif starid.startswith('fakerrlyr_'):
 				fpath_save = os.path.join(output_dir, sclass, starid + '.txt')
 				starid = -20000 - int(starid[10:])
+				if not os.path.isfile(fpath_save):
+					create_fake_rrlyr(fpath_save, timelen=timelen, sampling=sampling, random_state=rng)
+
 			else:
 				starid = int(starid)
 				# The path to save the final timeseries:
-				fname = 'kplr{starid:09d}-2011177032512_llc.fits'.format(starid=starid)
+				fname = f'kplr{starid:09d}-2011177032512_llc.fits'
 				fpath_save = os.path.join(output_dir, sclass, fname)
 
 			if starid < 0:
@@ -156,7 +211,7 @@ if __name__ == '__main__':
 				# Load file that should already exist:
 				lc = io.load_lightcurve(fpath_save + '.gz')
 			else:
-				subdir = os.path.join(thisdir, '{0:09d}'.format(starid)[:5])
+				subdir = os.path.join(thisdir, f'{starid:09d}'[:5])
 				fpath = os.path.join(subdir, fname)
 
 				# Check if the file is available as gzipped FITS:
@@ -168,10 +223,8 @@ if __name__ == '__main__':
 				# at a time. Making debugging a little easier:
 				#tqdm.write(fpath)
 				if not os.path.isfile(fpath):
-					url = 'https://mast.stsci.edu/api/v0.1/Download/file?uri=mast:Kepler/url/missions/kepler/lightcurves/{subdir:s}/{starid:09d}/{fname:s}'.format(
-						subdir='{0:09d}'.format(starid)[:4],
-						starid=starid,
-						fname=fname)
+					urlsubdir = f'{starid:09d}'[:4]
+					url = f'https://mast.stsci.edu/api/v0.1/Download/file?uri=mast:Kepler/url/missions/kepler/lightcurves/{urlsubdir:s}/{starid:09d}/{fname:s}'
 					os.makedirs(subdir, exist_ok=True)
 					download_file(url, fpath)
 

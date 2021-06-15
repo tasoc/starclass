@@ -31,8 +31,9 @@ jobs:
       uses: actions/cache@v2
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        key: ${{ runner.os }}-pip-py3.7-${{ hashFiles('requirements.txt') }}
         restore-keys: |
+          ${{ runner.os }}-pip-py3.7-
           ${{ runner.os }}-pip-
 
     - name: Install dependencies
@@ -105,8 +106,9 @@ jobs:
       uses: actions/cache@v2
       with:
         path: ${{ matrix.pippath }}
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        key: ${{ runner.os }}-pip-py${{ matrix.python-version }}-${{ hashFiles('requirements.txt') }}
         restore-keys: |
+          ${{ runner.os }}-pip-py${{ matrix.python-version }}-
           ${{ runner.os }}-pip-
 
     - name: Install dependencies
@@ -151,8 +153,9 @@ jobs:
       uses: actions/cache@v2
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        key: ${{ runner.os }}-pip-py3.7-${{ hashFiles('requirements.txt') }}
         restore-keys: |
+          ${{ runner.os }}-pip-py3.7-
           ${{ runner.os }}-pip-
 
     - name: Install dependencies

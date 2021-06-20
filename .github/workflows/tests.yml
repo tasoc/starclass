@@ -224,11 +224,9 @@ jobs:
     - name: Update VERSION file
       run: python -c "from starclass import version; version.update_release_version();"
 
-    - name: Generate changelog
-      id: changelog
-      uses: metcalfc/changelog-generator@v1.0.0
-      with:
-        myToken: ${{ secrets.GITHUB_TOKEN }}
+    - name: Set env
+      id: vars
+      run: echo ::set-output name=tag::${GITHUB_REF#refs/tags/v}
 
     - name: Create Release
       id: create_release
@@ -237,8 +235,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ github.ref }}
-        release_name: Version ${GITHUB_REF##*/}
+        release_name: Version ${{ steps.vars.outputs.tag }}
         body: |
-          Version ${GITHUB_REF##*/}
-          ${{ steps.changelog.outputs.changelog }}
+          Version ${{ steps.vars.outputs.tag }}
         draft: true

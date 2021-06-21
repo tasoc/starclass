@@ -135,7 +135,7 @@ class TrainingSet(object):
 
 	#----------------------------------------------------------------------------------------------
 	def __len__(self):
-		return self.nobjects
+		return len(self.train_idx)
 
 	#----------------------------------------------------------------------------------------------
 	def folds(self, n_splits=5, tf=0.2):
@@ -386,8 +386,7 @@ class TrainingSet(object):
 							# Lightcurve file to load:
 							# We do not use the one from the database because in the simulations the
 							# raw and corrected light curves are stored in different files.
-							fname = os.path.join(self.input_folder, task['lightcurve'])
-							yield stcl.load_star(task, fname)
+							yield stcl.load_star(task)
 
 		finally:
 			if os.path.exists(tmpdir.name):
@@ -422,18 +421,13 @@ class TrainingSet(object):
 				# Make sure overwrite=False, or else previous results will be deleted,
 				# meaning there would be no results for the MetaClassifier to work with
 				with TaskManager(tmpdir.name, overwrite=False, cleanup=False, classes=self.StellarClasses) as tm:
-					# NOTE: This does not propergate the 'data_dir' keyword to the BaseClassifier,
-					#       But since we are not doing anything other than loading data,
-					#       this should not cause any problems.
-					with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
-						for rowidx in self.test_idx:
-							task = tm.get_task(priority=rowidx+1, change_classifier=False)
+					for rowidx in self.test_idx:
+						task = tm.get_task(priority=rowidx+1, change_classifier=False)
 
-							# Lightcurve file to load:
-							# We do not use the one from the database because in the simulations the
-							# raw and corrected light curves are stored in different files.
-							fname = os.path.join(self.input_folder, task['lightcurve'])
-							yield stcl.load_star(task, fname)
+						# Lightcurve file to load:
+						# We do not use the one from the database because in the simulations the
+						# raw and corrected light curves are stored in different files.
+						yield task
 
 		finally:
 			if os.path.exists(tmpdir.name):
@@ -482,3 +476,21 @@ class TrainingSet(object):
 			lookup.append(tuple(set(lbls)))
 
 		return tuple(lookup)
+
+	#----------------------------------------------------------------------------------------------
+	def clear_cache(self):
+		"""
+		Clear features cache.
+
+		This will delete the features cache directory in the training-set data directory,
+		and delete all MOAT cache tables in the training-set.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		# Delete the features cache directory:
+		if os.path.exists(self.features_cache):
+			shutil.rmtree(self.features_cache)
+
+		# Delete the MOAT tables from the training-set todo-file:
+		with TaskManager(self.todo_file, overwrite=False, classes=self.StellarClasses) as tm:
+			tm.moat_clear()

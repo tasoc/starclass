@@ -9,6 +9,7 @@ Extract frequencies from timeseries.
 
 import numpy as np
 import logging
+import itertools
 from bottleneck import median
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
@@ -419,3 +420,116 @@ def freqextr(lightcurve, n_peaks=6, n_harmonics=0, hifac=1, ofac=4, snrlim=None,
 	tab.meta['conseclim'] = conseclim
 
 	return tab
+
+#--------------------------------------------------------------------------------------------------
+def freqextr_table_from_dict(feat, n_peaks=None, n_harmonics=None, flux_unit=None):
+	"""
+	Reconstruct freqextr table from features dict.
+
+	Please note that not all information can be recreated from features dictionaries.
+	The ``deviation`` column will be all NaN, since it can not be recreated, and
+	only ``n_peaks`` and ``n_harmonics`` will be available in the meta-information.
+
+	Parameters:
+		feat (dict): Dictionary of features.
+		n_peaks (int): If not provided, it will be determined from ``feat``.
+		n_harmonics (int): If not provided, it will be determined from ``feat``.
+		flux_unit (:class:`astropy.units.Unit`): Unit to put on the amplitude, alpha and beta columns.
+
+	Returns:
+		:class:`astropy.table.Table`:
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
+
+	if n_peaks is None:
+		n_peaks = 0
+		while True:
+			n_peaks += 1
+			if 'freq{0:d}'.format(n_peaks) not in feat:
+				n_peaks -= 1
+				break
+
+	if n_harmonics is None:
+		n_harmonics = 0
+		while True:
+			n_harmonics += 1
+			if 'freq1_harmonic{0:d}'.format(n_harmonics) not in feat:
+				n_harmonics -= 1
+				break
+
+	rows = []
+	for num, harmonic in itertools.product(range(1, n_peaks+1), range(n_harmonics+1)):
+		if harmonic == 0:
+			key = '{0:d}'.format(num)
+		else:
+			key = '{0:d}_harmonic{1:d}'.format(num, harmonic)
+
+		amp = feat.get('amp' + key, np.NaN)
+		freq = feat.get('freq' + key, np.NaN)
+		phase = feat.get('phase' + key, np.NaN)
+		rows.append([
+			num,
+			harmonic,
+			freq,
+			amp,
+			phase,
+			amp*np.cos(phase),
+			amp*np.sin(phase),
+			np.NaN # There is no way to recover this information
+		])
+
+	tab = Table(
+		rows=rows,
+		names=['num', 'harmonic', 'frequency', 'amplitude', 'phase', 'alpha', 'beta', 'deviation'],
+		dtype=['int32', 'int32', 'float64', 'float64', 'float64', 'float64', 'float64', 'float64'])
+
+	# Add units to columns:
+	tab['frequency'].unit = u.uHz
+	tab['amplitude'].unit = flux_unit
+	tab['phase'].unit = u.rad
+	tab['alpha'].unit = flux_unit
+	tab['beta'].unit = flux_unit
+
+	# Add meta data to table on how the list was created:
+	tab.meta['n_peaks'] = n_peaks
+	tab.meta['n_harmonics'] = n_harmonics
+	#tab.meta['harmonics_list'] = harmonics_list
+	#tab.meta['hifac'] = hifac
+	#tab.meta['ofac'] = ofac
+	#tab.meta['snrlim'] = snrlim
+	#tab.meta['snr_width'] = snr_width * u.uHz
+	#tab.meta['faplim'] = faplim
+	#tab.meta['devlim'] = devlim
+	#tab.meta['conseclim'] = conseclim
+
+	return tab
+
+#--------------------------------------------------------------------------------------------------
+def freqextr_table_to_dict(tab):
+	"""
+	Convert freqextr output table to features dictionary.
+
+	This will return a dictionary with ``freq``, ``amp``, and ``phase`` keys.
+	Please not that this operation does not conserve all information from the table.
+
+	Parameters:
+		tab (:class:`astropy.table.Table`): Table extracted by :func:`freqextr`.
+
+	Returns:
+		dict: Dictionary with frequencies, amplitudes and phases.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
+	features = {}
+	for row in tab:
+		if row['harmonic'] == 0:
+			key = '{0:d}'.format(row['num'])
+		else:
+			key = '{0:d}_harmonic{1:d}'.format(row['num'], row['harmonic'])
+
+		features['freq' + key] = row['frequency']
+		features['amp' + key] = row['amplitude']
+		features['phase' + key] = row['phase']
+
+	return features

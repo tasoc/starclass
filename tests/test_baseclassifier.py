@@ -57,9 +57,7 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit):
 				task = tm.get_task(priority=17)
 				print(task)
 
-				fname = os.path.join(PRIVATE_INPUT_DIR, 'tess00029281992-s01-c1800-dr01-v04-tasoc-cbv_lc.fits.gz')
-
-				feat = cl.load_star(task, fname)
+				feat = cl.load_star(task)
 				print(feat)
 
 				# Check the complex objects:
@@ -129,8 +127,8 @@ def test_linfit(PRIVATE_INPUT_DIR):
 
 	with BaseClassifier(tset=tset) as cl:
 		# This is only used to easier load the original lightcurve:
-		task = {'priority': 1, 'starid': 29281992, 'tmag': None, 'variance': None, 'rms_hour': None, 'ptp': None, 'other_classifiers': None}
-		feat = cl.load_star(task, fname)
+		task = {'priority': 1, 'starid': 29281992, 'tmag': None, 'variance': None, 'rms_hour': None, 'ptp': None, 'other_classifiers': None, 'lightcurve': fname}
+		feat = cl.load_star(task)
 		lc = feat['lightcurve']
 		p_rem = feat['detrend_coeff']
 
@@ -152,7 +150,8 @@ def test_linfit(PRIVATE_INPUT_DIR):
 				fid.write("{0:.12f}  {1:.18e}  {2:.18e}\n".format(lc.time[k], lc.flux[k], lc.flux_err[k]))
 
 		# Now load the modified
-		feat = cl.load_star(task, fname_modified)
+		task['lightcurve'] = fname_modified
+		feat = cl.load_star(task)
 		lc = feat['lightcurve']
 		psd2 = feat['powerspectrum']
 		p = feat['detrend_coeff']

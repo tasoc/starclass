@@ -5,8 +5,6 @@ import os
 import shutil
 import warnings
 from datetime import datetime
-import matplotlib.pyplot as plt
-plt.switch_backend('Agg')
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the

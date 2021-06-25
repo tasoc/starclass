@@ -202,8 +202,8 @@ def main():
 						tasks = list(tasks)
 
 					# Run the classification prediction:
-					if task[0]['classifier'] != current_classifier or stcl is None:
-						current_classifier = task[0]['classifier']
+					if tasks[0]['classifier'] != current_classifier or stcl is None:
+						current_classifier = tasks[0]['classifier']
 						if stcl:
 							stcl.close()
 						stcl = starclass.get_classifier(current_classifier)

@@ -65,6 +65,25 @@ def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
 		assert task1_status == STATUS.STARTED.value
 
 #--------------------------------------------------------------------------------------------------
+def test_taskmanager_chunks(PRIVATE_TODO_FILE):
+	"""Test TaskManager, getting chunks of tasks at a time"""
+
+	# Reset the TODO-file completely, and mark the first task as STARTED:
+	with TaskManager(PRIVATE_TODO_FILE) as tm:
+		task1 = tm.get_task(classifier='rfgc')
+		assert isinstance(task1, dict)
+
+		task10 = tm.get_task(classifier='rfgc', chunk=10)
+		assert isinstance(task10, list)
+		assert len(task10) == 10
+		for task in task10:
+			assert isinstance(task, dict)
+
+		tm.start_task(task10)
+		tm.cursor.execute("SELECT COUNT(*) FROM starclass_diagnostics WHERE classifier='rfgc' AND status=?;", [STATUS.STARTED.value])
+		assert tm.cursor.fetchone()[0] == 10
+
+#--------------------------------------------------------------------------------------------------
 def test_taskmanager_get_tasks_priority(PRIVATE_TODO_FILE):
 	"""Test of TaskManager.get_tasks with priority"""
 

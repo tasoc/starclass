@@ -39,6 +39,7 @@ def main():
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
+	parser.add_argument('--chunks', type=int, default=10, help="Number of tasks sent to each worker at a time.")
 	parser.add_argument('--clear-cache', help='Clear existing features cache tables before running. Can only be used together with --overwrite.', action='store_true')
 	# Option to select which classifier to run:
 	parser.add_argument('-c', '--classifier',
@@ -69,6 +70,9 @@ def main():
 	# Otherwise we could end up with non-complete MOAT tables.
 	if args.clear_cache and not args.overwrite:
 		parser.error("--clear-cache can not be used without --overwrite")
+	# Make sure chunks are sensible:
+	if args.chunks < 1:
+		parser.error("--chunks should be an integer larger than 0.")
 
 	# Get input and output folder from environment variables:
 	input_folder = args.input_folder
@@ -117,7 +121,8 @@ def main():
 					change_classifier = True
 					initial_classifiers = []
 					for k, c in enumerate(itertools.cycle(tm.all_classifiers)):
-						if k >= num_workers: break
+						if k >= num_workers:
+							break
 						initial_classifiers.append(c)
 				else:
 					initial_classifiers = [args.classifier]*num_workers
@@ -144,7 +149,7 @@ def main():
 						# Worker is ready, so send it a task
 						# If provided, try to find a task that is with the same classifier
 						cl = initial_classifiers[source-1] if data is None else data.get('classifier')
-						tasks = tm.get_task(classifier=cl, change_classifier=change_classifier)
+						tasks = tm.get_task(classifier=cl, change_classifier=change_classifier, chunk=args.chunks)
 						if tasks:
 							tm.start_task(tasks)
 							tm.logger.debug("Sending %d tasks to worker %d", len(tasks), source)

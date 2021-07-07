@@ -364,7 +364,7 @@ class TaskManager(object):
 	def moat_create(self, classifier, columns):
 		# Just some checks of the input:
 		if classifier != 'common' and classifier not in self.all_classifiers:
-			raise ValueError("Invalid classifier: %s" % classifier)
+			raise ValueError(f"Invalid classifier: {classifier}")
 		if not columns:
 			raise ValueError("Invalid column names provided")
 
@@ -377,35 +377,23 @@ class TaskManager(object):
 		placeholders = ",".join([':' + key for key in columns])
 
 		# Create table:
-		#print("ATTACH DATABASE '' AS {db_name:s};".format(
-		#	db_name=db_name
-		#))
-		query_create = """
+		#print(f"ATTACH DATABASE '' AS {db_name:s};")
+		query_create = f"""
 		CREATE TABLE IF NOT EXISTS {table_name:s} (
 			priority INTEGER NOT NULL PRIMARY KEY,
-			{columns:s},
+			{columns_create:s},
 			FOREIGN KEY (priority) REFERENCES diagnostics_corr(priority) ON DELETE CASCADE ON UPDATE CASCADE
-		);""".format(
-			table_name=table_name,
-			columns=columns_create
-		)
+		);"""
 		self.cursor.execute(query_create)
 		self.cursor.execute("ANALYZE;")
 
 		# Generate SQL statement which will be used to insert extracted features
 		# into this table:
-		query_insert = "INSERT OR REPLACE INTO {table_name:s} (priority,{columns:s}) VALUES (:priority,{placeholders:s});".format(
-			table_name=table_name,
-			columns=columns_insert,
-			placeholders=placeholders
-		)
+		query_insert = f"INSERT OR REPLACE INTO {table_name:s} (priority,{columns_insert:s}) VALUES (:priority,{placeholders:s});"
 
 		# Generate SQL statement which will be used to select extracted features
 		# from this table:
-		query_select = "SELECT {columns:s} FROM {table_name:s} WHERE priority=?;".format(
-			table_name=table_name,
-			columns=columns_insert
-		)
+		query_select = f"SELECT {columns_insert:s} FROM {table_name:s} WHERE priority=?;"
 
 		# Gather into dict and save to memory for later reuse:
 		query = {
@@ -466,20 +454,24 @@ class TaskManager(object):
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-		for query in self._moat_tables.values():
-			self.cursor.execute("DROP TABLE {table_name:s};".format(
-				table_name=query['table_name']
-			))
-		self.conn.commit()
-		self._moat_tables.clear()
+		self.cursor.execute("BEGIN TRANSACTION;")
+		try:
+			for query in self._moat_tables.values():
+				self.cursor.execute(f"DROP TABLE {query['table_name']:s};")
+			self.conn.commit()
+			self._moat_tables.clear()
+		except: # noqa: E722, pragma: no cover
+			self.conn.rollback()
+			raise
 
 		# Run a VACUUM of todo-file after potentially deleting many tables:
 		self.logger.debug("Cleaning TODOLIST after moat_clear...")
+		tmp_isolevel = self.conn.isolation_level
 		try:
 			self.conn.isolation_level = None
 			self.cursor.execute("VACUUM;")
 		finally:
-			self.conn.isolation_level = ''
+			self.conn.isolation_level = tmp_isolevel
 
 	#----------------------------------------------------------------------------------------------
 	def save_results(self, results):
@@ -507,7 +499,7 @@ class TaskManager(object):
 				self.tset = tset
 				self.save_settings()
 			elif tset != self.tset:
-				raise ValueError("Attempting to mix results from multiple training sets. Previous='%s', New='%s'." % (self.tset, tset))
+				raise ValueError(f"Attempting to mix results from multiple training sets. Previous='{self.tset}', New='{tset}'.")
 
 			priority = result.get('priority')
 			classifier = result.get('classifier')
@@ -573,6 +565,7 @@ class TaskManager(object):
 		else:
 			params = [(int(task['priority']), task['classifier']) for task in tasks]
 
+		self.cursor.execute("BEGIN TRANSACTION;")
 		try:
 			self.cursor.executemany(f"INSERT INTO starclass_diagnostics (priority,classifier,status) VALUES (?,?,{STATUS.STARTED.value:d});", params)
 			#self.summary['STARTED'] += self.cursor.rowcount

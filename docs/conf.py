@@ -5,8 +5,6 @@ import os
 import shutil
 import warnings
 from datetime import datetime
-import matplotlib.pyplot as plt
-plt.switch_backend('Agg')
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -83,7 +81,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = "TASOC Pipeline"
-copyright = datetime.now().strftime("%Y") + ", T'DA"
+copyright = datetime.now().strftime("%Y") + ", T'DA"  # noqa: A001
 author = "T'DA members"
 
 # The version info for the project you're documenting, acts as replacement for
@@ -269,17 +267,17 @@ htmlhelp_basename = 'TDAdoc'
 # -- Options for LaTeX output ---------------------------------------------
 
 latex_elements = {
-# The paper size ('letterpaper' or 'a4paper').
-'papersize': 'a4paper',
+	# The paper size ('letterpaper' or 'a4paper').
+	'papersize': 'a4paper',
 
-# The font size ('10pt', '11pt' or '12pt').
-#'pointsize': '10pt',
+	# The font size ('10pt', '11pt' or '12pt').
+	#'pointsize': '10pt',
 
-# Additional stuff for the LaTeX preamble.
-#'preamble': '',
+	# Additional stuff for the LaTeX preamble.
+	#'preamble': '',
 
-# Latex figure (float) alignment
-#'figure_align': 'htbp',
+	# Latex figure (float) alignment
+	#'figure_align': 'htbp',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples

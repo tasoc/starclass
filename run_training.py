@@ -19,6 +19,9 @@ def main():
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
+	parser.add_argument('--log', type=str, default=None, metavar='{LOGFILE}', help="Log to file.")
+	parser.add_argument('--log-level', type=str, default=None, choices=['debug','info','warning','error'],
+		help="Logging level to use in file-logging. If not set, use the same level as the console.")
 	parser.add_argument('--clear-cache', help='Clear existing features cache before running.', action='store_true')
 	# Option to select which classifier to train:
 	parser.add_argument('-c', '--classifier',
@@ -54,11 +57,22 @@ def main():
 	formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 	console = logging.StreamHandler()
 	console.setFormatter(formatter)
+	console.setLevel(logging_level)
 	logger = logging.getLogger(__name__)
 	logger.addHandler(console)
-	logger.setLevel(logging_level)
 	logger_parent = logging.getLogger('starclass')
 	logger_parent.addHandler(console)
+	# Add log-file if the user asked for it:
+	if args.log is not None:
+		filehandler = logging.FileHandler(args.log, mode='w', encoding='utf8')
+		filehandler.setFormatter(formatter)
+		filehandler.setLevel(logging_level if args.log_level is None else args.log_level.upper())
+		logging_level = min(logging_level, filehandler.level)
+		logger.addHandler(filehandler)
+		logger_parent.addHandler(filehandler)
+	# The logging level of the logger objects needs to be the smallest
+	# logging level enabled in either of the handlers:
+	logger.setLevel(logging_level)
 	logger_parent.setLevel(logging_level)
 
 	# Choose which classifier to use

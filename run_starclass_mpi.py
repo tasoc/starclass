@@ -39,6 +39,7 @@ def main():
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
+	parser.add_argument('--chunks', type=int, default=10, help="Number of tasks sent to each worker at a time.")
 	parser.add_argument('--clear-cache', help='Clear existing features cache tables before running. Can only be used together with --overwrite.', action='store_true')
 	# Option to select which classifier to run:
 	parser.add_argument('-c', '--classifier',
@@ -69,6 +70,9 @@ def main():
 	# Otherwise we could end up with non-complete MOAT tables.
 	if args.clear_cache and not args.overwrite:
 		parser.error("--clear-cache can not be used without --overwrite")
+	# Make sure chunks are sensible:
+	if args.chunks < 1:
+		parser.error("--chunks should be an integer larger than 0.")
 
 	# Get input and output folder from environment variables:
 	input_folder = args.input_folder
@@ -117,7 +121,8 @@ def main():
 					change_classifier = True
 					initial_classifiers = []
 					for k, c in enumerate(itertools.cycle(tm.all_classifiers)):
-						if k >= num_workers: break
+						if k >= num_workers:
+							break
 						initial_classifiers.append(c)
 				else:
 					initial_classifiers = [args.classifier]*num_workers
@@ -144,11 +149,11 @@ def main():
 						# Worker is ready, so send it a task
 						# If provided, try to find a task that is with the same classifier
 						cl = initial_classifiers[source-1] if data is None else data.get('classifier')
-						task = tm.get_task(classifier=cl, change_classifier=change_classifier)
-						if task:
-							tm.start_task(task)
-							comm.send(task, dest=source, tag=tags.START)
-							tm.logger.debug("Sending task %d to worker %d", task['priority'], source)
+						tasks = tm.get_task(classifier=cl, change_classifier=change_classifier, chunk=args.chunks)
+						if tasks:
+							tm.start_task(tasks)
+							tm.logger.debug("Sending %d tasks to worker %d", len(tasks), source)
+							comm.send(tasks, dest=source, tag=tags.START)
 						else:
 							comm.send(None, dest=source, tag=tags.EXIT)
 
@@ -160,7 +165,7 @@ def main():
 					else: # pragma: no cover
 						# This should never happen, but just to
 						# make sure we don't run into an infinite loop:
-						raise Exception("Master received an unknown tag: '{0}'".format(tag))
+						raise RuntimeError(f"Master received an unknown tag: '{tag}'")
 
 				tm.logger.info("Master finishing")
 
@@ -190,26 +195,35 @@ def main():
 			while True:
 				# Receive a task from the master:
 				tic_wait = default_timer()
-				task = comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
+				tasks = comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
 				tag = status.Get_tag()
 				toc_wait = default_timer()
 
 				if tag == tags.START:
+					# Make sure we can loop through tasks,
+					# even in the case we have only gotten one:
+					results = []
+					if not isinstance(tasks, (list, tuple)):
+						tasks = list(tasks)
+
 					# Run the classification prediction:
-					if task['classifier'] != current_classifier or stcl is None:
-						current_classifier = task['classifier']
+					if tasks[0]['classifier'] != current_classifier or stcl is None:
+						current_classifier = tasks[0]['classifier']
 						if stcl:
 							stcl.close()
 						stcl = starclass.get_classifier(current_classifier)
 						stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate)
 
-					result = stcl.classify(task)
+					# Loop through the tasks given to us:
+					for task in tasks:
+						result = stcl.classify(task)
 
-					# Pad results with metadata and return to TaskManager to be saved:
-					result['worker_wait_time'] = toc_wait - tic_wait
+						# Pad results with metadata and return to TaskManager to be saved:
+						result['worker_wait_time'] = toc_wait - tic_wait
+						results.append(result)
 
 					# Send the result back to the master:
-					comm.send(result, dest=0, tag=tags.DONE)
+					comm.send(results, dest=0, tag=tags.DONE)
 
 					# Attempt some cleanup:
 					# TODO: Is this even needed?
@@ -222,7 +236,7 @@ def main():
 				else: # pragma: no cover
 					# This should never happen, but just to
 					# make sure we don't run into an infinite loop:
-					raise Exception("Worker received an unknown tag: '{0}'".format(tag))
+					raise RuntimeError(f"Worker received an unknown tag: '{tag}'")
 
 		except: # noqa: E722, pragma: no cover
 			logger.exception("Something failed in worker")

@@ -104,13 +104,13 @@ def main():
 			tm.moat_clear()
 
 		while True:
-			task = tm.get_task(classifier=current_classifier, change_classifier=change_classifier)
-			if task is None:
+			tasks = tm.get_task(classifier=current_classifier, change_classifier=change_classifier)
+			if tasks is None:
 				break
-			tm.start_task(task)
+			tm.start_task(tasks)
 
-			if task['classifier'] != current_classifier or stcl is None:
-				current_classifier = task['classifier']
+			if tasks[0]['classifier'] != current_classifier or stcl is None:
+				current_classifier = tasks[0]['classifier']
 				if stcl:
 					stcl.close()
 				stcl = starclass.get_classifier(current_classifier)
@@ -118,12 +118,20 @@ def main():
 
 			# ----------------- This code would run on each worker ------------------------
 
-			res = stcl.classify(task)
+			# Make sure we can loop through tasks,
+			# even in the case we have only gotten one:
+			results = []
+			if not isinstance(tasks, (list, tuple)):
+				tasks = list(tasks)
+
+			for task in tasks:
+				res = stcl.classify(task)
+				results.append(res)
 
 			# ----------------- This code would run on each worker ------------------------
 
 			# Return to TaskManager to be saved:
-			tm.save_results(res)
+			tm.save_results(results)
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

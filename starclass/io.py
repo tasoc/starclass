@@ -112,6 +112,8 @@ def savePickle(fname, obj):
 		fname (str): File name to save to. If the name ends in '.gz' the file
 			will be automatically gzipped.
 		obj (object): Any pickalble object to be saved to file.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 	if fname.endswith('.gz'):
 		o = gzip.open
@@ -132,6 +134,8 @@ def loadPickle(fname):
 
 	Returns:
 		object: The unpickled object from the file.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 	if fname.endswith('.gz'):
 		o = gzip.open
@@ -142,6 +146,17 @@ def loadPickle(fname):
 		return pickle.load(fid)
 
 #--------------------------------------------------------------------------------------------------
+class NumpyEncoder(json.JSONEncoder):
+	def default(self, obj):
+		if isinstance(obj, np.ndarray):
+			return obj.tolist()
+		elif isinstance(obj, np.floating):
+			return float(obj)
+		elif isinstance(obj, np.integer):
+			return int(obj)
+		return json.JSONEncoder.default(self, obj)
+
+#--------------------------------------------------------------------------------------------------
 def saveJSON(fname, obj):
 	"""
 	Save an object to JSON file.
@@ -150,6 +165,8 @@ def saveJSON(fname, obj):
 		fname (str): File name to save to. If the name ends in '.gz' the file
 			will be automatically gzipped.
 		obj (object): Any pickalble object to be saved to file.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 	if fname.endswith('.gz'):
 		o = gzip.open
@@ -157,7 +174,7 @@ def saveJSON(fname, obj):
 		o = open
 
 	with o(fname, 'wt', encoding='utf-8') as fid:
-		json.dump(obj, fid, ensure_ascii=False, indent='\t')
+		json.dump(obj, fid, ensure_ascii=False, indent='\t', cls=NumpyEncoder)
 
 #--------------------------------------------------------------------------------------------------
 def loadJSON(fname):
@@ -170,8 +187,9 @@ def loadJSON(fname):
 
 	Returns:
 		object: The object from the file.
-	"""
 
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
 	if fname.endswith('.gz'):
 		o = gzip.open
 	else:

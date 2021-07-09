@@ -7,8 +7,10 @@ Plotting utilities for stellar classification.
 """
 
 import logging
+import os.path
 import numpy as np
 import matplotlib
+from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
 
 # Change to a non-GUI backend since this
@@ -58,7 +60,7 @@ def plots_noninteractive():
 	plt.switch_backend('Agg')
 
 #--------------------------------------------------------------------------------------------------
-def plotConfMatrix(confmatrix, ticklabels, ax=None, cmap='Blues'):
+def plotConfMatrix(confmatrix, ticklabels, ax=None, cmap='Blues', style=None):
 	"""
 	Plot a confusion matrix. Axes size and labels are hardwired.
 
@@ -78,29 +80,86 @@ def plotConfMatrix(confmatrix, ticklabels, ax=None, cmap='Blues'):
 
 	if ax is None:
 		ax = plt.gca()
+	if style is None:
+		style = os.path.abspath(os.path.join(os.path.dirname(__file__), 'starclass.mplstyle'))
 
-	ax.imshow(confmatrix, interpolation='nearest', origin='lower', cmap=cmap)
+	with plt.style.context(style):
+		ax.imshow(confmatrix, interpolation='nearest', origin='lower', cmap=cmap)
 
-	text_settings = {'va': 'center', 'ha': 'center', 'fontsize': 14}
-	for x in range(N):
-		for y in range(N):
-			if confmatrix[y,x] > 0.7:
-				ax.text(x, y, "%d" % np.round(confmatrix[y,x]*100), color='w', **text_settings)
-			elif confmatrix[y,x] < 0.01 and confmatrix[y,x] > 0:
-				ax.text(x, y, "<1", **text_settings)
-			elif confmatrix[y,x] > 0:
-				ax.text(x, y, "%d" % np.round(confmatrix[y,x]*100), **text_settings)
+		text_settings = {'va': 'center', 'ha': 'center', 'fontsize': 14}
+		for x in range(N):
+			for y in range(N):
+				if confmatrix[y,x] > 0.7:
+					ax.text(x, y, "%d" % np.round(confmatrix[y,x]*100), color='w', **text_settings)
+				elif confmatrix[y,x] < 0.01 and confmatrix[y,x] > 0:
+					ax.text(x, y, "<1", **text_settings)
+				elif confmatrix[y,x] > 0:
+					ax.text(x, y, "%d" % np.round(confmatrix[y,x]*100), **text_settings)
 
-	for x in np.arange(confmatrix.shape[0]):
-		ax.plot([x+0.5,x+0.5], [-0.5,N-0.5], ':', color='0.5', lw=0.5)
-		ax.plot([-0.5,N-0.5], [x+0.5,x+0.5], ':', color='0.5', lw=0.5)
+		for x in np.arange(confmatrix.shape[0]):
+			ax.plot([x+0.5,x+0.5], [-0.5,N-0.5], ':', color='0.5', lw=0.5)
+			ax.plot([-0.5,N-0.5], [x+0.5,x+0.5], ':', color='0.5', lw=0.5)
 
-	ax.set_xlim(-0.5, N-0.5)
-	ax.set_ylim(-0.5, N-0.5)
-	ax.set_xlabel('Predicted Class', fontsize=18)
-	ax.set_ylabel('True Class', fontsize=18)
+		ax.set_xlim(-0.5, N-0.5)
+		ax.set_ylim(-0.5, N-0.5)
+		ax.set_xlabel('Predicted Class', fontsize=18)
+		ax.set_ylabel('True Class', fontsize=18)
 
-	#class labels
-	plt.xticks(np.arange(N), ticklabels, rotation='vertical')
-	plt.yticks(np.arange(N), ticklabels)
-	ax.tick_params(axis='both', which='major', labelsize=18)
+		#class labels
+		plt.xticks(np.arange(N), ticklabels, rotation='vertical')
+		plt.yticks(np.arange(N), ticklabels)
+		ax.tick_params(axis='both', which='major', labelsize=18)
+
+#--------------------------------------------------------------------------------------------------
+def plot_roc_curve(diagnostics, ax=None, style=None):
+	"""
+	Plot Receiver Operating Characteristic (ROC) curve.
+
+	Parameters:
+		diagnostics (dict): Diagnostics coming from :py:func:`utilities.roc_curve` or saved to file
+			during :py:func:`BaseClassifier.test`.
+
+	See also:
+		:py:func:`utilities.roc_curve`
+
+	.. codeauthor:: Jeroen
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
+
+	if ax is None:
+		ax = plt.gca()
+	if style is None:
+		style = os.path.abspath(os.path.join(os.path.dirname(__file__), 'starclass.mplstyle'))
+
+	# Pull things out from the diagnostics dict:
+	fpr = diagnostics['false_positive_rate']
+	tpr = diagnostics['true_positive_rate']
+	roc_auc = diagnostics['roc_auc']
+	idx = diagnostics['roc_threshold_index']
+	all_classes = list(idx.keys())
+
+	with plt.style.context(style):
+
+		# Reference line for a pure random classifier:
+		ax.plot([0, 1], [0, 1], color='k', lw=0.5, linestyle='--')
+
+		# Plot individual classes:
+		lw = 1
+		for cname in all_classes:
+			ax.plot(fpr[cname], tpr[cname],
+				label=f'{cname:s} (area = {roc_auc[cname]:.4f})',
+				lw=lw)
+			ax.scatter(fpr[cname][idx[cname]], tpr[cname][idx[cname]], marker='o')
+
+		ax.plot(fpr['micro'], tpr['micro'], lw=lw, label=f"micro avg (area = {roc_auc['micro']:.4f})")
+
+		ax.set_xlim(-0.05, 1.05)
+		ax.set_ylim(-0.05, 1.05)
+		ax.set_xlabel('False Positive Rate')
+		ax.set_ylabel('True Positive Rate')
+		ax.legend(loc="lower right")
+
+		ax.xaxis.set_major_locator(MultipleLocator(0.1))
+		ax.xaxis.set_minor_locator(MultipleLocator(0.05))
+		ax.yaxis.set_major_locator(MultipleLocator(0.1))
+		ax.yaxis.set_minor_locator(MultipleLocator(0.05))

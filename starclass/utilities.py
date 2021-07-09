@@ -126,9 +126,11 @@ def get_periods(featdict, nfreqs, time, in_days=True, ignore_harmonics=False):
 	return periods.value, n_usedfreqs, usedfreqs
 
 #--------------------------------------------------------------------------------------------------
-def roc_curve(labels_test, y_prob, class_names):
+def roc_curve(labels_test, y_prob, sclasses):
 	"""
 	Calculate ROC values and return optimal thresholds
+
+	https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html
 
 	Parameters:
 		labels_test (dict):
@@ -143,19 +145,23 @@ def roc_curve(labels_test, y_prob, class_names):
 			- roc_threshold_index (dict)
 			- roc_best_thresholds (dict)
 
-	https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html
+	.. codeauthor:: Jeroen Audenaert <jeroen.audenaert@kuleuven.be>
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
+
+	class_keys = [s.name for s in sclasses]
+	class_names = [s.value for s in sclasses]
 
 	# Binarize the output
 	y_true_bin = label_binarize(labels_test, classes=class_names)
 
 	# Compute ROC curve and ROC area for each class
-	fpr = dict()
-	tpr = dict()
-	idx = dict()
-	roc_auc = dict()
+	fpr = {}
+	tpr = {}
+	idx = {}
+	roc_auc = {}
 	best_thresholds = {}
-	for i, cname in enumerate(class_names):
+	for i, cname in enumerate(class_keys):
 		fpr[cname], tpr[cname], thresholds = metrics.roc_curve(y_true_bin[:, i], y_prob[:, i])
 		roc_auc[cname] = metrics.auc(fpr[cname], tpr[cname])
 

@@ -337,7 +337,8 @@ class BaseClassifier(object):
 		diagnostics = {
 			'tset': tset.key,
 			'classifier': self.classifier_key,
-			'level': tset.level
+			'level': tset.level,
+			'classes': {s.name: s.value for s in self.StellarClasses}
 		}
 
 		# Compare to known labels:
@@ -360,13 +361,12 @@ class BaseClassifier(object):
 
 		# Prepare input for ROC/AUC
 		logger.info('Calculating ROC curve...')
-		diag_roc = utilities.roc_curve(labels_test, probs, all_classes)
+		diag_roc = utilities.roc_curve(labels_test, probs, self.StellarClasses)
 		diagnostics.update(diag_roc)
 
 		# Create plot of ROC curves:
 		fig, ax = plt.subplots(figsize=(9.6, 7.2), dpi=100)
 		plot_roc_curve(diagnostics, ax=ax)
-		ax.set_title('ROC Curve - ' + self.classifier_key + ' - ' + tset.key + ' - ' + tset.level)
 		fig.savefig(os.path.join(self.data_dir, 'roc_curve_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 

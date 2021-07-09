@@ -62,11 +62,14 @@ def plots_noninteractive():
 #--------------------------------------------------------------------------------------------------
 def plotConfMatrix(confmatrix, ticklabels, ax=None, cmap='Blues', style=None):
 	"""
-	Plot a confusion matrix. Axes size and labels are hardwired.
+	Plot a confusion matrix.
 
 	Parameters:
 		cfmatrix (ndarray, [nobj x n_classes]): Confusion matrix.
 		ticklabels (array, [n_classes]): labels for plot axes.
+		ax (:py:class:`matplotlib.pyplot.Axes`):
+		cmap (str, optional):
+		style (str, optional):
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
@@ -118,11 +121,13 @@ def plot_roc_curve(diagnostics, ax=None, style=None):
 	Parameters:
 		diagnostics (dict): Diagnostics coming from :py:func:`utilities.roc_curve` or saved to file
 			during :py:func:`BaseClassifier.test`.
+		ax (:py:class:`matplotlib.pyplot.Axes`):
+		style (str, optional):
 
 	See also:
 		:py:func:`utilities.roc_curve`
 
-	.. codeauthor:: Jeroen
+	.. codeauthor:: Jeroen Audenaert <jeroen.audenaert@kuleuven.be>
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
@@ -136,7 +141,7 @@ def plot_roc_curve(diagnostics, ax=None, style=None):
 	tpr = diagnostics['true_positive_rate']
 	roc_auc = diagnostics['roc_auc']
 	idx = diagnostics['roc_threshold_index']
-	all_classes = list(idx.keys())
+	classes = diagnostics['classes']
 
 	with plt.style.context(style):
 
@@ -145,11 +150,11 @@ def plot_roc_curve(diagnostics, ax=None, style=None):
 
 		# Plot individual classes:
 		lw = 1
-		for cname in all_classes:
-			ax.plot(fpr[cname], tpr[cname],
-				label=f'{cname:s} (area = {roc_auc[cname]:.4f})',
+		for ckey, cname in classes.items():
+			ax.plot(fpr[ckey], tpr[ckey],
+				label=f'{cname:s} (area = {roc_auc[ckey]:.4f})',
 				lw=lw)
-			ax.scatter(fpr[cname][idx[cname]], tpr[cname][idx[cname]], marker='o')
+			ax.scatter(fpr[ckey][idx[ckey]], tpr[ckey][idx[ckey]], marker='o')
 
 		ax.plot(fpr['micro'], tpr['micro'], lw=lw, label=f"micro avg (area = {roc_auc['micro']:.4f})")
 
@@ -157,6 +162,7 @@ def plot_roc_curve(diagnostics, ax=None, style=None):
 		ax.set_ylim(-0.05, 1.05)
 		ax.set_xlabel('False Positive Rate')
 		ax.set_ylabel('True Positive Rate')
+		ax.set_title('ROC Curve - ' + diagnostics['classifier'] + ' - ' + diagnostics['tset'] + ' - ' + diagnostics['level'])
 		ax.legend(loc="lower right")
 
 		ax.xaxis.set_major_locator(MultipleLocator(0.1))

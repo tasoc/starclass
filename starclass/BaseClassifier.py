@@ -334,7 +334,11 @@ class BaseClassifier(object):
 		labels_test = self.parse_labels(tset.labels_test())
 
 		# Create dictionary which will gather all the diagnostics from the testing:
-		diagnostics = {}
+		diagnostics = {
+			'tset': tset.key,
+			'classifier': self.classifier_key,
+			'level': tset.level
+		}
 
 		# Compare to known labels:
 		diagnostics['accuracy_score'] = metrics.accuracy_score(labels_test, y_pred)

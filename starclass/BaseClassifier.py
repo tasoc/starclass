@@ -14,7 +14,7 @@ import traceback
 from tqdm import tqdm
 import enum
 import warnings
-from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn import metrics
 from bottleneck import nanvar
 from timeit import default_timer
 from .io import load_lightcurve, savePickle, loadPickle
@@ -328,16 +328,20 @@ class BaseClassifier(object):
 		labels_test = self.parse_labels(tset.labels_test())
 
 		# Compare to known labels:
-		acc = accuracy_score(labels_test, y_pred)
+		acc = metrics.accuracy_score(labels_test, y_pred)
+		f1_macro = metrics.f1_score(labels_test, y_pred, average='macro')
+		f1_weighted = metrics.f1_score(labels_test, y_pred, average='weighted')
 		logger.info('Accuracy: %.2f%%', acc*100)
+		logger.info('Macro F1 score: %.2f%%', f1_macro*100)
+		logger.info('Weighted F1 score: %.2f%%', f1_weighted*100)
 
 		# Confusion Matrix:
-		cf = confusion_matrix(labels_test, y_pred, labels=all_classes)
+		cf = metrics.confusion_matrix(labels_test, y_pred, labels=all_classes)
 
 		# Create plot of confusion matrix:
-		fig = plt.figure(figsize=(12,12))
-		plotConfMatrix(cf, all_classes)
-		plt.title(self.classifier_key + ' - ' + tset.key + ' - ' + tset.level)
+		fig, ax = plt.subplots(figsize=(12,12))
+		plotConfMatrix(cf, all_classes, ax=ax)
+		ax.set_title(self.classifier_key + ' - ' + tset.key + ' - ' + tset.level)
 		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 

@@ -186,7 +186,7 @@ class MetaClassifier(BaseClassifier):
 		# Save this to object, we are using it to keep track of which features were used
 		# to train the classifier:
 		self.features_used = list(itertools.product(all_classifiers, self.StellarClasses))
-		self.features_names = ['{0:s}_{1:s}'.format(classifier, stcl.name) for classifier, stcl in self.features_used]
+		self.features_names = [f'{classifier:s}_{stcl.name:s}' for classifier, stcl in self.features_used]
 
 		# Create table of features:
 		# Create as float32, since that is what RandomForestClassifier converts it to anyway.
@@ -204,7 +204,7 @@ class MetaClassifier(BaseClassifier):
 		# Throw an error if a classifier is not run at all:
 		run_classifiers = set([fu[0] for fu in self.features_used])
 		if run_classifiers != set(all_classifiers):
-			raise Exception("Classifier did not contribute at all: %s" % set(all_classifiers).difference(run_classifiers))
+			raise RuntimeError("Classifier did not contribute at all: %s" % set(all_classifiers).difference(run_classifiers))
 
 		# Raise an exception if there are NaNs left in the features:
 		if anynan(features):

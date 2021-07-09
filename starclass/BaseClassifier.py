@@ -202,7 +202,7 @@ class BaseClassifier(object):
 			# Basic checks of results:
 			for key, value in res.items():
 				if key not in self.StellarClasses:
-					raise ValueError("Classifier returned unknown stellar class: '%s'" % key)
+					raise ValueError(f"Classifier returned unknown stellar class: '{key}'")
 				if value < 0 or value > 1:
 					raise ValueError("Classifier should return probability between 0 and 1.")
 

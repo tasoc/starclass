@@ -29,7 +29,7 @@ class SLOSHClassifier(BaseClassifier):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	def __init__(self, clfile='SLOSH_Classifier_Model.h5', mc_iterations=10, *args, **kwargs):
+	def __init__(self, clfile='SLOSH_Classifier_Model.hdf5', mc_iterations=10, *args, **kwargs):
 		"""
 		Initialization for the class.
 

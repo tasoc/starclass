@@ -99,11 +99,12 @@ def main():
 				# except that they will run through different subsets of the training and test sets:
 				cla = starclass.get_classifier(cla_key)
 				for tset_fold in tset.folds(n_splits=5, tf=0.2):
-					data_dir = tset.key + '/meta_fold{0:02d}'.format(tset_fold.fold)
+					data_dir = tset.key + f'/meta_fold{tset_fold.fold:02d}'
 					with cla(tset=tset, features_cache=tset.features_cache, data_dir=data_dir) as stcl:
 						logger.info('Training %s on Fold %d/%d...', stcl.classifier_key, tset_fold.fold, tset_fold.crossval_folds)
 						stcl.train(tset_fold)
-						logger.info("Classifying test-set...")
+						logger.info("Training done.")
+						logger.info("Classifying test-set using %s...", stcl.classifier_key)
 						stcl.test(tset_fold, save=tm.save_results)
 
 				# Now train all classifiers on the full training-set (minus the holdout-set),
@@ -111,7 +112,8 @@ def main():
 				with cla(tset=tset, features_cache=tset.features_cache) as stcl:
 					logger.info('Training %s on full training-set...', stcl.classifier_key)
 					stcl.train(tset)
-					logger.info("Classifying test-set using %s...", stcl.classifier_key)
+					logger.info("Training done.")
+					logger.info("Classifying holdout-set using %s...", stcl.classifier_key)
 					stcl.test(tset, save=tm.save_results)
 
 	# Initialize the classifier:
@@ -121,8 +123,8 @@ def main():
 			# Run the training of the classifier:
 			logger.info("Training %s on full training-set...", current_classifier)
 			stcl.train(tset)
-			logger.info("Training done...")
-			logger.info("Classifying test-set using %s...", current_classifier)
+			logger.info("Training done.")
+			logger.info("Classifying holdout-set using %s...", current_classifier)
 			stcl.test(tset, save=tm.save_results)
 
 #--------------------------------------------------------------------------------------------------

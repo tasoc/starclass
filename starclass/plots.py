@@ -150,11 +150,11 @@ def plot_roc_curve(diagnostics, ax=None, style=None):
 
 		# Plot individual classes:
 		lw = 1
-		for ckey, cname in classes.items():
-			ax.plot(fpr[ckey], tpr[ckey],
-				label=f'{cname:s} (area = {roc_auc[ckey]:.4f})',
+		for c in classes:
+			ax.plot(fpr[c.name], tpr[c.name],
+				label=f'{c.value:s} (area = {roc_auc[c.name]:.4f})',
 				lw=lw)
-			ax.scatter(fpr[ckey][idx[ckey]], tpr[ckey][idx[ckey]], marker='o')
+			ax.scatter(fpr[c.name][idx[c.name]], tpr[c.name][idx[c.name]], marker='o')
 
 		ax.plot(fpr['micro'], tpr['micro'], lw=lw, label=f"micro avg (area = {roc_auc['micro']:.4f})")
 

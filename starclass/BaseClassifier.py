@@ -338,7 +338,7 @@ class BaseClassifier(object):
 			'tset': tset.key,
 			'classifier': self.classifier_key,
 			'level': tset.level,
-			'classes': {s.name: s.value for s in self.StellarClasses}
+			'classes': self.StellarClasses
 		}
 
 		# Compare to known labels:

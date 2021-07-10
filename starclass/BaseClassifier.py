@@ -354,8 +354,7 @@ class BaseClassifier(object):
 
 		# Create plot of confusion matrix:
 		fig, ax = plt.subplots(figsize=(12,12), dpi=100)
-		plotConfMatrix(diagnostics['confusion_matrix'], all_classes, ax=ax)
-		ax.set_title(self.classifier_key + ' - ' + tset.key + ' - ' + tset.level)
+		plotConfMatrix(diagnostics=diagnostics, ax=ax)
 		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 

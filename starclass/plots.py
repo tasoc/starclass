@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Plotting utilities for stellar classification.
@@ -60,7 +60,7 @@ def plots_noninteractive():
 	plt.switch_backend('Agg')
 
 #--------------------------------------------------------------------------------------------------
-def plotConfMatrix(diagnostics=None, cfmatrix=None, ticklabels=None,
+def plot_confusion_matrix(diagnostics=None, cfmatrix=None, ticklabels=None,
 	ax=None, cmap='Blues', style=None):
 	"""
 	Plot a confusion matrix.
@@ -89,7 +89,7 @@ def plotConfMatrix(diagnostics=None, cfmatrix=None, ticklabels=None,
 		if cfmatrix is None:
 			cfmatrix = diagnostics['confusion_matrix']
 		if ticklabels is None:
-			ticklabels = [s.value for s in diagnostics['classes']]
+			ticklabels = [s['value'] for s in diagnostics['classes']]
 
 	cfmatrix = np.asarray(cfmatrix, dtype='float64')
 	N = cfmatrix.shape[0]
@@ -103,12 +103,15 @@ def plotConfMatrix(diagnostics=None, cfmatrix=None, ticklabels=None,
 		logger.warning("No class names were provided for confusion matrix. Assigning dummy-labels for plotting.")
 		ticklabels = ['#{k:d}' for k in range(N)]
 
-	if ax is None:
-		ax = plt.gca()
 	if style is None:
 		style = os.path.abspath(os.path.join(os.path.dirname(__file__), 'starclass.mplstyle'))
 
 	with plt.style.context(style):
+		if ax is None:
+			fig, ax = plt.subplots()
+		else:
+			fig = ax.figure
+
 		ax.imshow(cfmatrix, interpolation='nearest', origin='lower', cmap=cmap)
 
 		text_settings = {'va': 'center', 'ha': 'center', 'fontsize': 14}
@@ -129,13 +132,15 @@ def plotConfMatrix(diagnostics=None, cfmatrix=None, ticklabels=None,
 		ax.set_ylim(-0.5, N-0.5)
 		ax.set_xlabel('Predicted Class', fontsize=18)
 		ax.set_ylabel('True Class', fontsize=18)
-		if diagnostics:
-			ax.set_title(diagnostics['classifier'] + ' - ' + diagnostics['tset'] + ' - ' + diagnostics['level'])
+		if diagnostics is not None:
+			ax.set_title(diagnostics.get('classifier', '') + ' - ' + diagnostics.get('tset', '') + ' - ' + diagnostics.get('level', ''))
 
 		# Class labels:
 		plt.xticks(np.arange(N), ticklabels, rotation='vertical')
 		plt.yticks(np.arange(N), ticklabels)
 		ax.tick_params(axis='both', which='major', labelsize=18)
+
+	return fig
 
 #--------------------------------------------------------------------------------------------------
 def plot_roc_curve(diagnostics, ax=None, style=None):
@@ -155,11 +160,6 @@ def plot_roc_curve(diagnostics, ax=None, style=None):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	if ax is None:
-		ax = plt.gca()
-	if style is None:
-		style = os.path.abspath(os.path.join(os.path.dirname(__file__), 'starclass.mplstyle'))
-
 	# Pull things out from the diagnostics dict:
 	fpr = diagnostics['false_positive_rate']
 	tpr = diagnostics['true_positive_rate']
@@ -167,7 +167,14 @@ def plot_roc_curve(diagnostics, ax=None, style=None):
 	idx = diagnostics['roc_threshold_index']
 	classes = diagnostics['classes']
 
+	if style is None:
+		style = os.path.abspath(os.path.join(os.path.dirname(__file__), 'starclass.mplstyle'))
+
 	with plt.style.context(style):
+		if ax is None:
+			fig, ax = plt.subplots()
+		else:
+			fig = ax.figure
 
 		# Reference line for a pure random classifier:
 		ax.plot([0, 1], [0, 1], color='k', lw=0.5, linestyle='--')
@@ -175,10 +182,12 @@ def plot_roc_curve(diagnostics, ax=None, style=None):
 		# Plot individual classes:
 		lw = 1
 		for c in classes:
-			ax.plot(fpr[c.name], tpr[c.name],
-				label=f'{c.value:s} (area = {roc_auc[c.name]:.4f})',
+			cname = c['name']
+			cvalue = c['value']
+			ax.plot(fpr[cname], tpr[cname],
+				label=f'{cvalue:s} (area = {roc_auc[cname]:.4f})',
 				lw=lw)
-			ax.scatter(fpr[c.name][idx[c.name]], tpr[c.name][idx[c.name]], marker='o')
+			ax.scatter(fpr[cname][idx[cname]], tpr[cname][idx[cname]], marker='o')
 
 		ax.plot(fpr['micro'], tpr['micro'], lw=lw, label=f"micro avg (area = {roc_auc['micro']:.4f})")
 
@@ -186,10 +195,12 @@ def plot_roc_curve(diagnostics, ax=None, style=None):
 		ax.set_ylim(-0.05, 1.05)
 		ax.set_xlabel('False Positive Rate')
 		ax.set_ylabel('True Positive Rate')
-		ax.set_title('ROC Curve - ' + diagnostics['classifier'] + ' - ' + diagnostics['tset'] + ' - ' + diagnostics['level'])
+		ax.set_title('ROC Curve - ' + diagnostics.get('classifier', '') + ' - ' + diagnostics.get('tset', '') + ' - ' + diagnostics.get('level', ''))
 		ax.legend(loc="lower right")
 
 		ax.xaxis.set_major_locator(MultipleLocator(0.1))
 		ax.xaxis.set_minor_locator(MultipleLocator(0.05))
 		ax.yaxis.set_major_locator(MultipleLocator(0.1))
 		ax.yaxis.set_minor_locator(MultipleLocator(0.05))
+
+	return fig

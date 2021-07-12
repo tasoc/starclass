@@ -21,7 +21,7 @@ from .features.freqextr import freqextr, freqextr_table_from_dict, freqextr_tabl
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import rms_timescale, ptp
-from .plots import plt, plotConfMatrix, plot_roc_curve
+from .plots import plt, plot_confusion_matrix, plot_roc_curve
 from .StellarClasses import StellarClassesLevel1
 from . import utilities, io
 
@@ -338,7 +338,7 @@ class BaseClassifier(object):
 			'tset': tset.key,
 			'classifier': self.classifier_key,
 			'level': tset.level,
-			'classes': self.StellarClasses
+			'classes': [{'name': s.name, 'value': s.value} for s in self.StellarClasses]
 		}
 
 		# Compare to known labels:
@@ -353,8 +353,7 @@ class BaseClassifier(object):
 		diagnostics['confusion_matrix'] = metrics.confusion_matrix(labels_test, y_pred, labels=all_classes)
 
 		# Create plot of confusion matrix:
-		fig, ax = plt.subplots(figsize=(12,12), dpi=100)
-		plotConfMatrix(diagnostics=diagnostics, ax=ax)
+		fig = plot_confusion_matrix(diagnostics=diagnostics)
 		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 
@@ -364,8 +363,7 @@ class BaseClassifier(object):
 		diagnostics.update(diag_roc)
 
 		# Create plot of ROC curves:
-		fig, ax = plt.subplots(figsize=(9.6, 7.2), dpi=100)
-		plot_roc_curve(diagnostics, ax=ax)
+		fig = plot_roc_curve(diagnostics)
 		fig.savefig(os.path.join(self.data_dir, 'roc_curve_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 

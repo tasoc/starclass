@@ -17,13 +17,13 @@ import warnings
 from sklearn import metrics
 from bottleneck import nanvar
 from timeit import default_timer
-from .io import load_lightcurve, savePickle, loadPickle
 from .features.freqextr import freqextr, freqextr_table_from_dict, freqextr_table_to_dict
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import rms_timescale, ptp
-from .plots import plotConfMatrix, plt
+from .plots import plt, plot_confusion_matrix, plot_roc_curve
 from .StellarClasses import StellarClassesLevel1
+from . import utilities, io
 
 __docformat__ = 'restructuredtext'
 
@@ -306,8 +306,11 @@ class BaseClassifier(object):
 		all_classes = [lbl.value for lbl in self.StellarClasses]
 
 		# Classify test set (has to be one by one unless we change classifiers)
+		N = len(tset.test_idx)
+		Nclasses = len(all_classes)
 		y_pred = []
-		for task in tqdm(tset.features_test(), total=len(tset.test_idx)):
+		probs = np.full((N, Nclasses), np.NaN, dtype='float32')
+		for k, task in enumerate(tqdm(tset.features_test(), total=N)):
 
 			# Classify this star from the test-set:
 			result = self.classify(task)
@@ -316,6 +319,9 @@ class BaseClassifier(object):
 			# FIXME: Only keeping the first label
 			prediction = max(result['starclass_results'], key=lambda key: result['starclass_results'][key]).value
 			y_pred.append(prediction)
+
+			# All probabilities for each class:
+			probs[k, :] = [result['starclass_results'].get(key, np.NaN) for key in self.StellarClasses]
 
 			# Save results for this classifier/trainingset in database:
 			if save is not None:
@@ -327,23 +333,43 @@ class BaseClassifier(object):
 		y_pred = np.array(y_pred)
 		labels_test = self.parse_labels(tset.labels_test())
 
+		# Create dictionary which will gather all the diagnostics from the testing:
+		diagnostics = {
+			'tset': tset.key,
+			'classifier': self.classifier_key,
+			'level': tset.level,
+			'classes': [{'name': s.name, 'value': s.value} for s in self.StellarClasses]
+		}
+
 		# Compare to known labels:
-		acc = metrics.accuracy_score(labels_test, y_pred)
-		f1_macro = metrics.f1_score(labels_test, y_pred, average='macro')
-		f1_weighted = metrics.f1_score(labels_test, y_pred, average='weighted')
-		logger.info('Accuracy: %.2f%%', acc*100)
-		logger.info('Macro F1 score: %.2f%%', f1_macro*100)
-		logger.info('Weighted F1 score: %.2f%%', f1_weighted*100)
+		diagnostics['accuracy_score'] = metrics.accuracy_score(labels_test, y_pred)
+		diagnostics['f1_macro'] = metrics.f1_score(labels_test, y_pred, average='macro')
+		diagnostics['f1_weighted'] = metrics.f1_score(labels_test, y_pred, average='weighted')
+		logger.info('Accuracy: %.2f%%', diagnostics['accuracy_score']*100)
+		logger.info('Macro F1 score: %.2f%%', diagnostics['f1_macro']*100)
+		logger.info('Weighted F1 score: %.2f%%', diagnostics['f1_weighted']*100)
 
 		# Confusion Matrix:
-		cf = metrics.confusion_matrix(labels_test, y_pred, labels=all_classes)
+		diagnostics['confusion_matrix'] = metrics.confusion_matrix(labels_test, y_pred, labels=all_classes)
 
 		# Create plot of confusion matrix:
-		fig, ax = plt.subplots(figsize=(12,12))
-		plotConfMatrix(cf, all_classes, ax=ax)
-		ax.set_title(self.classifier_key + ' - ' + tset.key + ' - ' + tset.level)
+		fig = plot_confusion_matrix(diagnostics=diagnostics)
 		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
+
+		# Prepare input for ROC/AUC
+		logger.info('Calculating ROC curve...')
+		diag_roc = utilities.roc_curve(labels_test, probs, self.StellarClasses)
+		diagnostics.update(diag_roc)
+
+		# Create plot of ROC curves:
+		fig = plot_roc_curve(diagnostics)
+		fig.savefig(os.path.join(self.data_dir, 'roc_curve_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
+		plt.close(fig)
+
+		# Save test diagnostics:
+		diagnostics_file = os.path.join(self.data_dir, 'diagnostics_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.json')
+		io.saveJSON(diagnostics_file, diagnostics)
 
 	#----------------------------------------------------------------------------------------------
 	def load_star(self, task):
@@ -377,7 +403,7 @@ class BaseClassifier(object):
 			if self.features_cache:
 				features_file = os.path.join(self.features_cache, 'features-' + str(task['priority']) + '.pickle')
 				if os.path.exists(features_file):
-					features = loadPickle(features_file)
+					features = io.loadPickle(features_file)
 				else:
 					save_to_cache = True
 
@@ -399,7 +425,7 @@ class BaseClassifier(object):
 			if 'lightcurve' in features:
 				lightcurve = features['lightcurve']
 			else:
-				lightcurve = load_lightcurve(task['lightcurve'],
+				lightcurve = io.load_lightcurve(task['lightcurve'],
 					starid=task['starid'],
 					truncate_lightcurve=self.truncate_lightcurves)
 
@@ -470,7 +496,7 @@ class BaseClassifier(object):
 
 			# Save features in cache file for later use:
 			if save_to_cache:
-				savePickle(features_file, features)
+				io.savePickle(features_file, features)
 
 		# Add the results from other classifiers to the features:
 		# TODO: Only add this for the MetaClassifier. This can not be done now because

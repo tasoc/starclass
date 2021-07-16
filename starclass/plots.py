@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib
 from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
+from shap import summary_plot
 
 # Change to a non-GUI backend since this
 # should be able to run on a cluster:
@@ -202,5 +203,52 @@ def plot_roc_curve(diagnostics, ax=None, style=None):
 		ax.xaxis.set_minor_locator(MultipleLocator(0.05))
 		ax.yaxis.set_major_locator(MultipleLocator(0.1))
 		ax.yaxis.set_minor_locator(MultipleLocator(0.05))
+
+	return fig
+
+#--------------------------------------------------------------------------------------------------
+def plot_feature_importance(shap_values, X_test, features_names, class_names, ax=None, style=None):
+
+	if style is None:
+		style = os.path.abspath(os.path.join(os.path.dirname(__file__), 'starclass.mplstyle'))
+
+	with plt.style.context(style):
+		if ax is None:
+			fig, ax = plt.subplots()
+		else:
+			fig = ax.figure
+
+		summary_plot(shap_values,
+			features=X_test,
+			feature_names=features_names,
+			class_names=class_names,
+			max_display=len(features_names),
+			plot_type='bar',
+			show=False)
+
+		ax.set_frame_on(True)
+
+	return fig
+
+#--------------------------------------------------------------------------------------------------
+def plot_feature_scatter_density(shap_values, X_test, features_names, class_name, ax=None, style=None):
+
+	if style is None:
+		style = os.path.abspath(os.path.join(os.path.dirname(__file__), 'starclass.mplstyle'))
+
+	with plt.style.context(style):
+		if ax is None:
+			fig, ax = plt.subplots()
+		else:
+			fig = ax.figure
+
+		summary_plot(shap_values,
+			features=X_test,
+			feature_names=features_names,
+			class_names=class_name,
+			plot_type='dot',
+			show=False)
+
+		ax.set_title(class_name)
 
 	return fig

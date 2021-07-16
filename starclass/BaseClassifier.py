@@ -17,11 +17,12 @@ import warnings
 from sklearn import metrics
 from bottleneck import nanvar
 from timeit import default_timer
+import shap
 from .features.freqextr import freqextr, freqextr_table_from_dict, freqextr_table_to_dict
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import rms_timescale, ptp
-from .plots import plt, plot_confusion_matrix, plot_roc_curve
+from .plots import plt, plot_confusion_matrix, plot_roc_curve, plot_feature_importance, plot_feature_scatter_density
 from .StellarClasses import StellarClassesLevel1
 from . import utilities, io
 
@@ -284,7 +285,7 @@ class BaseClassifier(object):
 		raise NotImplementedError()
 
 	#----------------------------------------------------------------------------------------------
-	def test(self, tset, save=None):
+	def test(self, tset, save=None, feature_importance=False):
 		"""
 		Test classifier using training-set, which has been created with a test-fraction.
 
@@ -310,6 +311,7 @@ class BaseClassifier(object):
 		Nclasses = len(all_classes)
 		y_pred = []
 		probs = np.full((N, Nclasses), np.NaN, dtype='float32')
+		features = np.full((N, len(self.features_names)), np.NaN, dtype='float32')
 		for k, task in enumerate(tqdm(tset.features_test(), total=N)):
 
 			# Classify this star from the test-set:
@@ -322,6 +324,10 @@ class BaseClassifier(object):
 
 			# All probabilities for each class:
 			probs[k, :] = [result['starclass_results'].get(key, np.NaN) for key in self.StellarClasses]
+
+
+			feat = {**result['features_common'], **result['features']}
+			features[k, :] = [feat[key] for key in self.features_names]
 
 			# Save results for this classifier/trainingset in database:
 			if save is not None:
@@ -370,6 +376,20 @@ class BaseClassifier(object):
 		# Save test diagnostics:
 		diagnostics_file = os.path.join(self.data_dir, 'diagnostics_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.json')
 		io.saveJSON(diagnostics_file, diagnostics)
+
+		if feature_importance:
+			logger.info('Calculating feature importances...')
+			explainer = shap.TreeExplainer(self.classifier)
+			shap_values = explainer.shap_values(features)
+
+			fig = plot_feature_importance(shap_values, features, self.features_names, all_classes)
+			fig.savefig(os.path.join(self.data_dir, 'feature_importance_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
+			plt.close(fig)
+
+			for cname in all_classes:
+				fig = plot_feature_scatter_density(shap_values, features, self.features_names, cname)
+				fig.savefig(os.path.join(self.data_dir, 'scatter_density_' + cname + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
+				plt.close(fig)
 
 	#----------------------------------------------------------------------------------------------
 	def load_star(self, task):

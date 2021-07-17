@@ -113,6 +113,10 @@ class RFGCClassifier(BaseClassifier):
 		if self.linfit:
 			self.features_names.append('detrend_coeff_norm')
 
+		# Link to the internal RandomForestClassifier classifier model,
+		# which can be used for calculating feature importances:
+		self._classifier_model = self.classifier
+
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile, somoutfile='som.txt'):
 		"""

@@ -86,6 +86,10 @@ class XGBClassifier(BaseClassifier):
 			'psi_Rcs'
 		]
 
+		# Link to the internal XBB classifier model,
+		# which can be used for calculating feature importances:
+		self._classifier_model = self.classifier
+
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):
 		"""

@@ -13,6 +13,7 @@ import numpy as np
 import itertools
 from bottleneck import allnan, anynan
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
 from .. import BaseClassifier, io
 from ..constants import classifier_list
 
@@ -70,6 +71,10 @@ class MetaClassifier(BaseClassifier):
 		# Set up classifier
 		if self.classifier is None:
 			self.classifier = Classifier_obj(random_state=self.random_state)
+
+		# Link to the internal RandomForestClassifier classifier model,
+		# which can be used for calculating feature importances:
+		self._classifier_model = self.classifier
 
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):
@@ -223,3 +228,11 @@ class MetaClassifier(BaseClassifier):
 			if overwrite or not os.path.exists(self.clfile):
 				logger.info("Saving pickled classifier instance to '%s'", self.clfile)
 				self.save(self.clfile)
+
+	#----------------------------------------------------------------------------------------------
+	def test_complete(self, tset, probs, diagnostics):
+
+		logger = logging.getLogger(__name__)
+
+		labels_test = self.parse_labels(tset.labels_test())
+		logger.info(classification_report(labels_test, y_pred))

@@ -10,21 +10,25 @@ All other specific stellar classification algorithms will inherit from BaseClass
 import numpy as np
 import os.path
 import logging
-import traceback
-from tqdm import tqdm
-import enum
 import warnings
+import traceback
+import enum
+from tqdm import tqdm
 from sklearn import metrics
 from bottleneck import nanvar
 from timeit import default_timer
-import shap
+
+with warnings.catch_warnings():
+	warnings.filterwarnings('ignore', module='shap', message="IPython could not be loaded!")
+	import shap
+
 from .features.freqextr import freqextr, freqextr_table_from_dict, freqextr_table_to_dict
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import rms_timescale, ptp
-from .plots import plt, plot_confusion_matrix, plot_roc_curve, plot_feature_importance, plot_feature_scatter_density
+from .plots import plt
 from .StellarClasses import StellarClassesLevel1
-from . import utilities, io
+from . import utilities, io, plots
 
 __docformat__ = 'restructuredtext'
 
@@ -96,6 +100,7 @@ class BaseClassifier(object):
 		self._random_seed = 2187
 		self.truncate_lightcurves = truncate_lightcurves
 		self.features_names = None
+		self._classifier_model = None
 
 		# Inherit settings from the Training Set, just as a conveience:
 		if tset is None:
@@ -165,6 +170,11 @@ class BaseClassifier(object):
 	def random_state(self):
 		"""Random state (:class:`numpy.random.RandomState`) corresponding to ``random_seed``."""
 		return np.random.RandomState(self._random_seed)
+
+	#----------------------------------------------------------------------------------------------
+	@property
+	def classifier_model(self):
+		return self._classifier_model
 
 	#----------------------------------------------------------------------------------------------
 	def classify(self, task):
@@ -359,7 +369,7 @@ class BaseClassifier(object):
 		diagnostics['confusion_matrix'] = metrics.confusion_matrix(labels_test, y_pred, labels=all_classes)
 
 		# Create plot of confusion matrix:
-		fig = plot_confusion_matrix(diagnostics=diagnostics)
+		fig = plots.plot_confusion_matrix(diagnostics=diagnostics)
 		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 
@@ -369,7 +379,7 @@ class BaseClassifier(object):
 		diagnostics.update(diag_roc)
 
 		# Create plot of ROC curves:
-		fig = plot_roc_curve(diagnostics)
+		fig = plots.plot_roc_curve(diagnostics)
 		fig.savefig(os.path.join(self.data_dir, 'roc_curve_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 
@@ -377,19 +387,49 @@ class BaseClassifier(object):
 		diagnostics_file = os.path.join(self.data_dir, 'diagnostics_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.json')
 		io.saveJSON(diagnostics_file, diagnostics)
 
+		#self.test_complete(tset, features, probs, diagnostics)
+
 		if feature_importance:
 			logger.info('Calculating feature importances...')
-			explainer = shap.TreeExplainer(self.classifier)
-			shap_values = explainer.shap_values(features)
+			if self.classifier_model is not None:
+				explainer = shap.TreeExplainer(self.classifier_model)
+				shap_values = explainer.shap_values(features)
 
-			fig = plot_feature_importance(shap_values, features, self.features_names, all_classes)
-			fig.savefig(os.path.join(self.data_dir, 'feature_importance_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
-			plt.close(fig)
-
-			for cname in all_classes:
-				fig = plot_feature_scatter_density(shap_values, features, self.features_names, cname)
-				fig.savefig(os.path.join(self.data_dir, 'scatter_density_' + cname + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
+				#plots.plots_interactive()
+				fig = plots.plot_feature_importance(shap_values, features, self.features_names, all_classes)
+				fig.savefig(os.path.join(self.data_dir, 'feature_importance_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 				plt.close(fig)
+
+				for k, cl in enumerate(self.StellarClasses):
+					fig = plots.plot_feature_scatter_density(shap_values[k], features, self.features_names, cl.value)
+					fig.savefig(os.path.join(self.data_dir, 'scatter_density_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '_' + cl.name + '.png'), bbox_inches='tight')
+					plt.close(fig)
+
+			#self.feature_importance_complete(tset, features, probs, diagnostics)
+
+	#----------------------------------------------------------------------------------------------
+	def test_complete(self, tset, features, probs, diagnostics):
+		"""
+		Function which will be called when training is finishing.
+
+		See Also:
+			:py:func:`BaseClassifier.train`
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		pass
+
+	#----------------------------------------------------------------------------------------------
+	def feature_importance_complete(self, tset, features, probs, diagnostics):
+		"""
+		Function which will be called when feature importance is finishing.
+
+		See Also:
+			:py:func:`BaseClassifier.train`
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		pass
 
 	#----------------------------------------------------------------------------------------------
 	def load_star(self, task):

@@ -230,9 +230,12 @@ class MetaClassifier(BaseClassifier):
 				self.save(self.clfile)
 
 	#----------------------------------------------------------------------------------------------
-	def test_complete(self, tset, probs, diagnostics):
+	def test_complete(self, tset, features, probs, diagnostics):
 
 		logger = logging.getLogger(__name__)
 
+		all_classes = [lbl.value for lbl in self.StellarClasses]
+		y_pred = np.array(all_classes)[np.nanargmax(probs, axis=1)]
 		labels_test = self.parse_labels(tset.labels_test())
+
 		logger.info(classification_report(labels_test, y_pred))

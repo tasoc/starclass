@@ -319,18 +319,12 @@ class BaseClassifier(object):
 		# Classify test set (has to be one by one unless we change classifiers)
 		N = len(tset.test_idx)
 		Nclasses = len(all_classes)
-		y_pred = []
 		probs = np.full((N, Nclasses), np.NaN, dtype='float32')
 		features = np.full((N, len(self.features_names)), np.NaN, dtype='float32')
 		for k, task in enumerate(tqdm(tset.features_test(), total=N)):
 
 			# Classify this star from the test-set:
 			result = self.classify(task)
-			#features = {'freq1': 32432, 'amp1': 4, 'unique_feature': 42} # FIXME: This should be returned by do_classify!
-
-			# FIXME: Only keeping the first label
-			prediction = max(result['starclass_results'], key=lambda key: result['starclass_results'][key]).value
-			y_pred.append(prediction)
 
 			# All probabilities for each class:
 			probs[k, :] = [result['starclass_results'].get(key, np.NaN) for key in self.StellarClasses]
@@ -346,7 +340,7 @@ class BaseClassifier(object):
 
 		# Convert labels to ndarray:
 		# FIXME: Only comparing to the first label
-		y_pred = np.array(y_pred)
+		y_pred = np.array(all_classes)[np.nanargmax(probs, axis=1)]
 		labels_test = self.parse_labels(tset.labels_test())
 
 		# Create dictionary which will gather all the diagnostics from the testing:
@@ -387,7 +381,7 @@ class BaseClassifier(object):
 		diagnostics_file = os.path.join(self.data_dir, 'diagnostics_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.json')
 		io.saveJSON(diagnostics_file, diagnostics)
 
-		#self.test_complete(tset, features, probs, diagnostics)
+		self.test_complete(tset, features, probs, diagnostics)
 
 		if feature_importance:
 			logger.info('Calculating feature importances...')
@@ -405,7 +399,7 @@ class BaseClassifier(object):
 					fig.savefig(os.path.join(self.data_dir, 'scatter_density_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '_' + cl.name + '.png'), bbox_inches='tight')
 					plt.close(fig)
 
-			#self.feature_importance_complete(tset, features, probs, diagnostics)
+			self.feature_importance_complete(tset, features, probs, diagnostics)
 
 	#----------------------------------------------------------------------------------------------
 	def test_complete(self, tset, features, probs, diagnostics):

@@ -235,7 +235,12 @@ class MetaClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		all_classes = [lbl.value for lbl in self.StellarClasses]
+		class_names = [lbl.name for lbl in self.StellarClasses]
 		y_pred = np.array(all_classes)[np.nanargmax(probs, axis=1)]
 		labels_test = self.parse_labels(tset.labels_test())
 
-		logger.info(classification_report(labels_test, y_pred))
+		logger.info("\n%s", classification_report(
+			labels_test,
+			y_pred,
+			labels=all_classes,
+			target_names=class_names))

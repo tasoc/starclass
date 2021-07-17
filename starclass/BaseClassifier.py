@@ -329,8 +329,11 @@ class BaseClassifier(object):
 			# All probabilities for each class:
 			probs[k, :] = [result['starclass_results'].get(key, np.NaN) for key in self.StellarClasses]
 
-
-			feat = {**result['features_common'], **result['features']}
+			# Gather up features used for testing:
+			if result['features'] is None:
+				feat = result['features_common']
+			else:
+				feat = {**result['features_common'], **result['features']}
 			features[k, :] = [feat[key] for key in self.features_names]
 
 			# Save results for this classifier/trainingset in database:
@@ -381,7 +384,7 @@ class BaseClassifier(object):
 		diagnostics_file = os.path.join(self.data_dir, 'diagnostics_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.json')
 		io.saveJSON(diagnostics_file, diagnostics)
 
-		self.test_complete(tset, features, probs, diagnostics)
+		self.test_complete(tset=tset, features=features, probs=probs, diagnostics=diagnostics)
 
 		if feature_importance:
 			logger.info('Calculating feature importances...')
@@ -399,12 +402,18 @@ class BaseClassifier(object):
 					fig.savefig(os.path.join(self.data_dir, 'scatter_density_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '_' + cl.name + '.png'), bbox_inches='tight')
 					plt.close(fig)
 
-			self.feature_importance_complete(tset, features, probs, diagnostics)
+			self.feature_importance_complete(tset=tset, features=features, probs=probs, diagnostics=diagnostics)
 
 	#----------------------------------------------------------------------------------------------
-	def test_complete(self, tset, features, probs, diagnostics):
+	def test_complete(self, tset=None, features=None, probs=None, diagnostics=None):
 		"""
 		Function which will be called when training is finishing.
+
+		Parameters:
+			tset:
+			features:
+			probs:
+			diagnostics:
 
 		See Also:
 			:py:func:`BaseClassifier.train`
@@ -414,9 +423,15 @@ class BaseClassifier(object):
 		pass
 
 	#----------------------------------------------------------------------------------------------
-	def feature_importance_complete(self, tset, features, probs, diagnostics):
+	def feature_importance_complete(self, tset=None, features=None, probs=None, diagnostics=None):
 		"""
 		Function which will be called when feature importance is finishing.
+
+		Parameters:
+			tset:
+			features:
+			probs:
+			diagnostics:
 
 		See Also:
 			:py:func:`BaseClassifier.train`

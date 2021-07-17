@@ -230,7 +230,7 @@ class MetaClassifier(BaseClassifier):
 				self.save(self.clfile)
 
 	#----------------------------------------------------------------------------------------------
-	def test_complete(self, tset, features, probs, diagnostics):
+	def test_complete(self, tset=None, features=None, probs=None, diagnostics=None):
 
 		logger = logging.getLogger(__name__)
 

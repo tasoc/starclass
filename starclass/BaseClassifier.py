@@ -222,7 +222,7 @@ class BaseClassifier(object):
 				if rm in features_common:
 					del features_common[rm]
 
-			if self.features_names and self.classifier_key != 'meta':
+			if self.features_names:
 				# If needed, convert features to dictionary:
 				if not isinstance(features, dict):
 					if isinstance(features, np.ndarray):

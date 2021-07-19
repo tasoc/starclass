@@ -148,7 +148,7 @@ def main():
 					if tag in (tags.DONE, tags.READY):
 						# Worker is ready, so send it a task
 						# If provided, try to find a task that is with the same classifier
-						cl = initial_classifiers[source-1] if data is None else data.get('classifier')
+						cl = initial_classifiers[source-1] if data is None else data[0].get('classifier')
 						tasks = tm.get_task(classifier=cl, change_classifier=change_classifier, chunk=args.chunks)
 						if tasks:
 							tm.start_task(tasks)
@@ -203,8 +203,8 @@ def main():
 					# Make sure we can loop through tasks,
 					# even in the case we have only gotten one:
 					results = []
-					if not isinstance(tasks, (list, tuple)):
-						tasks = list(tasks)
+					if isinstance(tasks, dict):
+						tasks = [tasks]
 
 					# Run the classification prediction:
 					if tasks[0]['classifier'] != current_classifier or stcl is None:

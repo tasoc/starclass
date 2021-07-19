@@ -109,20 +109,20 @@ def main():
 				break
 			tm.start_task(tasks)
 
+			# ----------------- This code would run on each worker ------------------------
+
+			# Make sure we can loop through tasks,
+			# even in the case we have only gotten one:
+			results = []
+			if isinstance(tasks, dict):
+				tasks = [tasks]
+
 			if tasks[0]['classifier'] != current_classifier or stcl is None:
 				current_classifier = tasks[0]['classifier']
 				if stcl:
 					stcl.close()
 				stcl = starclass.get_classifier(current_classifier)
 				stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate)
-
-			# ----------------- This code would run on each worker ------------------------
-
-			# Make sure we can loop through tasks,
-			# even in the case we have only gotten one:
-			results = []
-			if not isinstance(tasks, (list, tuple)):
-				tasks = list(tasks)
 
 			for task in tasks:
 				res = stcl.classify(task)

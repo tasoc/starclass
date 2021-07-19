@@ -542,7 +542,7 @@ class TaskManager(object):
 					self._moat_insert('common', priority, common)
 
 				# Save classifier-specific features if they are provided:
-				if features:
+				if features and classifier != 'meta':
 					self._moat_insert(classifier, priority, features)
 
 				self.conn.commit()

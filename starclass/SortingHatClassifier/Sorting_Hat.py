@@ -86,6 +86,10 @@ class SortingHatClassifier(BaseClassifier):
 				min_samples_split=min_samples_split,
 				random_state=self.random_state)
 
+		# Link to the internal RandomForestClassifier classifier model,
+		# which can be used for calculating feature importances:
+		self._classifier_model = self.classifier
+
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):
 		"""

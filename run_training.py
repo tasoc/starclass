@@ -125,7 +125,7 @@ def main():
 			stcl.train(tset)
 			logger.info("Training done.")
 			logger.info("Classifying holdout-set using %s...", current_classifier)
-			stcl.test(tset, save=tm.save_results)
+			stcl.test(tset, save=tm.save_results, feature_importance=True)
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

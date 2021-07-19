@@ -53,7 +53,7 @@ def test_classifiers_train_test(classifier):
 				assert len(cl.features_names) > 0
 
 			# Run testing phase:
-			cl.test(tset)
+			cl.test(tset, feature_importance=True)
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

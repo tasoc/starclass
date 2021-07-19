@@ -10,20 +10,25 @@ All other specific stellar classification algorithms will inherit from BaseClass
 import numpy as np
 import os.path
 import logging
-import traceback
-from tqdm import tqdm
-import enum
 import warnings
+import traceback
+import enum
+from tqdm import tqdm
 from sklearn import metrics
 from bottleneck import nanvar
 from timeit import default_timer
+
+with warnings.catch_warnings():
+	warnings.filterwarnings('ignore', module='shap', message="IPython could not be loaded!")
+	import shap
+
 from .features.freqextr import freqextr, freqextr_table_from_dict, freqextr_table_to_dict
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import rms_timescale, ptp
-from .plots import plt, plot_confusion_matrix, plot_roc_curve
+from .plots import plt
 from .StellarClasses import StellarClassesLevel1
-from . import utilities, io
+from . import utilities, io, plots
 
 __docformat__ = 'restructuredtext'
 
@@ -95,6 +100,7 @@ class BaseClassifier(object):
 		self._random_seed = 2187
 		self.truncate_lightcurves = truncate_lightcurves
 		self.features_names = None
+		self._classifier_model = None
 
 		# Inherit settings from the Training Set, just as a conveience:
 		if tset is None:
@@ -166,6 +172,11 @@ class BaseClassifier(object):
 		return np.random.RandomState(self._random_seed)
 
 	#----------------------------------------------------------------------------------------------
+	@property
+	def classifier_model(self):
+		return self._classifier_model
+
+	#----------------------------------------------------------------------------------------------
 	def classify(self, task):
 		"""
 		Classify a star from the lightcurve and other features.
@@ -211,7 +222,7 @@ class BaseClassifier(object):
 				if rm in features_common:
 					del features_common[rm]
 
-			if self.features_names and self.classifier_key != 'meta':
+			if self.features_names:
 				# If needed, convert features to dictionary:
 				if not isinstance(features, dict):
 					if isinstance(features, np.ndarray):
@@ -284,7 +295,7 @@ class BaseClassifier(object):
 		raise NotImplementedError()
 
 	#----------------------------------------------------------------------------------------------
-	def test(self, tset, save=None):
+	def test(self, tset, save=None, feature_importance=False):
 		"""
 		Test classifier using training-set, which has been created with a test-fraction.
 
@@ -308,20 +319,22 @@ class BaseClassifier(object):
 		# Classify test set (has to be one by one unless we change classifiers)
 		N = len(tset.test_idx)
 		Nclasses = len(all_classes)
-		y_pred = []
 		probs = np.full((N, Nclasses), np.NaN, dtype='float32')
+		features = np.full((N, len(self.features_names)), np.NaN, dtype='float32')
 		for k, task in enumerate(tqdm(tset.features_test(), total=N)):
 
 			# Classify this star from the test-set:
 			result = self.classify(task)
-			#features = {'freq1': 32432, 'amp1': 4, 'unique_feature': 42} # FIXME: This should be returned by do_classify!
-
-			# FIXME: Only keeping the first label
-			prediction = max(result['starclass_results'], key=lambda key: result['starclass_results'][key]).value
-			y_pred.append(prediction)
 
 			# All probabilities for each class:
 			probs[k, :] = [result['starclass_results'].get(key, np.NaN) for key in self.StellarClasses]
+
+			# Gather up features used for testing:
+			if result['features'] is None:
+				feat = result['features_common']
+			else:
+				feat = {**result['features_common'], **result['features']}
+			features[k, :] = [feat[key] for key in self.features_names]
 
 			# Save results for this classifier/trainingset in database:
 			if save is not None:
@@ -330,7 +343,7 @@ class BaseClassifier(object):
 
 		# Convert labels to ndarray:
 		# FIXME: Only comparing to the first label
-		y_pred = np.array(y_pred)
+		y_pred = np.array(all_classes)[np.nanargmax(probs, axis=1)]
 		labels_test = self.parse_labels(tset.labels_test())
 
 		# Create dictionary which will gather all the diagnostics from the testing:
@@ -342,18 +355,30 @@ class BaseClassifier(object):
 		}
 
 		# Compare to known labels:
-		diagnostics['accuracy_score'] = metrics.accuracy_score(labels_test, y_pred)
-		diagnostics['f1_macro'] = metrics.f1_score(labels_test, y_pred, average='macro')
-		diagnostics['f1_weighted'] = metrics.f1_score(labels_test, y_pred, average='weighted')
-		logger.info('Accuracy: %.2f%%', diagnostics['accuracy_score']*100)
-		logger.info('Macro F1 score: %.2f%%', diagnostics['f1_macro']*100)
-		logger.info('Weighted F1 score: %.2f%%', diagnostics['f1_weighted']*100)
+		# For some reason we have to call the function twice to generate both the dict and string
+		# version of the report. Luckily this is not a demanding function to call.
+		report = metrics.classification_report(
+			labels_test,
+			y_pred,
+			labels=all_classes,
+			target_names=[lbl.name for lbl in self.StellarClasses],
+			output_dict=True)
+		diagnostics.update(report)
+
+		logger.info("Classification report:\n%s", metrics.classification_report(
+			labels_test,
+			y_pred,
+			labels=all_classes,
+			target_names=[lbl.name for lbl in self.StellarClasses],
+			digits=4,
+			output_dict=False))
 
 		# Confusion Matrix:
+		logger.info('Calculating confusion matrix...')
 		diagnostics['confusion_matrix'] = metrics.confusion_matrix(labels_test, y_pred, labels=all_classes)
 
 		# Create plot of confusion matrix:
-		fig = plot_confusion_matrix(diagnostics=diagnostics)
+		fig = plots.plot_confusion_matrix(diagnostics=diagnostics)
 		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 
@@ -363,13 +388,71 @@ class BaseClassifier(object):
 		diagnostics.update(diag_roc)
 
 		# Create plot of ROC curves:
-		fig = plot_roc_curve(diagnostics)
+		fig = plots.plot_roc_curve(diagnostics)
 		fig.savefig(os.path.join(self.data_dir, 'roc_curve_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
 
 		# Save test diagnostics:
 		diagnostics_file = os.path.join(self.data_dir, 'diagnostics_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.json')
 		io.saveJSON(diagnostics_file, diagnostics)
+
+		# Call function-hook where individual classifiers can execute custom diagnostics:
+		self.test_complete(tset=tset, features=features, probs=probs, diagnostics=diagnostics)
+
+		# If we are asked to do so, calculate and plot the feature importances:
+		if feature_importance:
+			logger.info('Calculating feature importances...')
+			if self.classifier_model is not None:
+				explainer = shap.TreeExplainer(self.classifier_model)
+				shap_values = explainer.shap_values(features)
+
+				fig = plots.plot_feature_importance(shap_values, features, self.features_names, all_classes)
+				fig.savefig(os.path.join(self.data_dir, 'feature_importance_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
+				plt.close(fig)
+
+				for k, cl in enumerate(self.StellarClasses):
+					fig = plots.plot_feature_scatter_density(shap_values[k], features, self.features_names, cl.value)
+					fig.savefig(os.path.join(self.data_dir, 'scatter_density_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '_' + cl.name + '.png'), bbox_inches='tight')
+					plt.close(fig)
+
+			# Call function-hook where individual classifiers can execute custom diagnostics:
+			self.feature_importance_complete(tset=tset, features=features, probs=probs, diagnostics=diagnostics)
+
+	#----------------------------------------------------------------------------------------------
+	def test_complete(self, tset=None, features=None, probs=None, diagnostics=None):
+		"""
+		Function which will be called when training is finishing.
+
+		Parameters:
+			tset:
+			features:
+			probs:
+			diagnostics:
+
+		See Also:
+			:py:func:`BaseClassifier.train`
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		pass
+
+	#----------------------------------------------------------------------------------------------
+	def feature_importance_complete(self, tset=None, features=None, probs=None, diagnostics=None):
+		"""
+		Function which will be called when feature importance is finishing.
+
+		Parameters:
+			tset:
+			features:
+			probs:
+			diagnostics:
+
+		See Also:
+			:py:func:`BaseClassifier.train`
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		pass
 
 	#----------------------------------------------------------------------------------------------
 	def load_star(self, task):

@@ -228,19 +228,3 @@ class MetaClassifier(BaseClassifier):
 			if overwrite or not os.path.exists(self.clfile):
 				logger.info("Saving pickled classifier instance to '%s'", self.clfile)
 				self.save(self.clfile)
-
-	#----------------------------------------------------------------------------------------------
-	def test_complete(self, tset=None, features=None, probs=None, diagnostics=None):
-
-		logger = logging.getLogger(__name__)
-
-		all_classes = [lbl.value for lbl in self.StellarClasses]
-		class_names = [lbl.name for lbl in self.StellarClasses]
-		y_pred = np.array(all_classes)[np.nanargmax(probs, axis=1)]
-		labels_test = self.parse_labels(tset.labels_test())
-
-		logger.info("\n%s", classification_report(
-			labels_test,
-			y_pred,
-			labels=all_classes,
-			target_names=class_names))

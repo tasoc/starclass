@@ -355,14 +355,26 @@ class BaseClassifier(object):
 		}
 
 		# Compare to known labels:
-		diagnostics['accuracy_score'] = metrics.accuracy_score(labels_test, y_pred)
-		diagnostics['f1_macro'] = metrics.f1_score(labels_test, y_pred, average='macro')
-		diagnostics['f1_weighted'] = metrics.f1_score(labels_test, y_pred, average='weighted')
-		logger.info('Accuracy: %.2f%%', diagnostics['accuracy_score']*100)
-		logger.info('Macro F1 score: %.2f%%', diagnostics['f1_macro']*100)
-		logger.info('Weighted F1 score: %.2f%%', diagnostics['f1_weighted']*100)
+		# For some reason we have to call the function twice to generate both the dict and string
+		# version of the report. Luckily this is not a demanding function to call.
+		report = metrics.classification_report(
+			labels_test,
+			y_pred,
+			labels=all_classes,
+			target_names=[lbl.name for lbl in self.StellarClasses],
+			output_dict=True)
+		diagnostics.update(report)
+
+		logger.info("Classification report:\n%s", metrics.classification_report(
+			labels_test,
+			y_pred,
+			labels=all_classes,
+			target_names=[lbl.name for lbl in self.StellarClasses],
+			digits=4,
+			output_dict=False))
 
 		# Confusion Matrix:
+		logger.info('Calculating confusion matrix...')
 		diagnostics['confusion_matrix'] = metrics.confusion_matrix(labels_test, y_pred, labels=all_classes)
 
 		# Create plot of confusion matrix:
@@ -384,15 +396,16 @@ class BaseClassifier(object):
 		diagnostics_file = os.path.join(self.data_dir, 'diagnostics_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.json')
 		io.saveJSON(diagnostics_file, diagnostics)
 
+		# Call function-hook where individual classifiers can execute custom diagnostics:
 		self.test_complete(tset=tset, features=features, probs=probs, diagnostics=diagnostics)
 
+		# If we are asked to do so, calculate and plot the feature importances:
 		if feature_importance:
 			logger.info('Calculating feature importances...')
 			if self.classifier_model is not None:
 				explainer = shap.TreeExplainer(self.classifier_model)
 				shap_values = explainer.shap_values(features)
 
-				#plots.plots_interactive()
 				fig = plots.plot_feature_importance(shap_values, features, self.features_names, all_classes)
 				fig.savefig(os.path.join(self.data_dir, 'feature_importance_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 				plt.close(fig)
@@ -402,6 +415,7 @@ class BaseClassifier(object):
 					fig.savefig(os.path.join(self.data_dir, 'scatter_density_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '_' + cl.name + '.png'), bbox_inches='tight')
 					plt.close(fig)
 
+			# Call function-hook where individual classifiers can execute custom diagnostics:
 			self.feature_importance_complete(tset=tset, features=features, probs=probs, diagnostics=diagnostics)
 
 	#----------------------------------------------------------------------------------------------

@@ -40,6 +40,7 @@ def main():
 	parser.add_argument('--linfit', help='Enable linfit in training set.', action='store_true')
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
 	parser.add_argument('-tf', '--testfraction', help='Holdout/test-set fraction', type=float, default=0.0)
+	parser.add_argument('--output', type=str, default=None, help='Directory where trained models and diagnostics will be saved. Default is to save in the programs data directory.')
 	args = parser.parse_args()
 
 	# Check args
@@ -119,7 +120,7 @@ def main():
 	# Initialize the classifier:
 	classifier = starclass.get_classifier(current_classifier)
 	with starclass.TaskManager(tset.todo_file, overwrite=False, classes=tset.StellarClasses) as tm:
-		with classifier(tset=tset, features_cache=tset.features_cache) as stcl:
+		with classifier(tset=tset, features_cache=tset.features_cache, data_dir=args.output) as stcl:
 			# Run the training of the classifier:
 			logger.info("Training %s on full training-set...", current_classifier)
 			stcl.train(tset)

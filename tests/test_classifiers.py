@@ -10,7 +10,7 @@ Common tests of all classifiers, excluding the Meta Classifier.
 import pytest
 import tempfile
 import os
-import conftest # noqa: F401
+from conftest import capture_run_cli
 import starclass
 from starclass.training_sets.testing_tset import testing_tset
 
@@ -54,6 +54,23 @@ def test_classifiers_train_test(classifier):
 
 			# Run testing phase:
 			cl.test(tset, feature_importance=True)
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('classifier', AVALIABLE_CLASSIFIERS)
+def test_run_training(classifier):
+
+	dd = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'starclass', 'data', 'L1'))
+	with tempfile.TemporaryDirectory(dir=dd, prefix='testing-') as tmpdir:
+		output_dir = os.path.basename(tmpdir)
+
+		out, err, exitcode = capture_run_cli('run_training.py', [
+			'--classifier=' + classifier,
+			'--trainingset=testing',
+			'--level=L1',
+			'--testfraction=0.2',
+			f'--output={output_dir}'
+		])
+		assert exitcode == 0
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

@@ -306,6 +306,7 @@ class BaseClassifier(object):
 
 		# Start logger:
 		logger = logging.getLogger(__name__)
+		tqdm_settings = {'disable': None if logger.isEnabledFor(logging.INFO) else True}
 
 		# If the training-set is created with zero testfraction,
 		# simply don't do anything:
@@ -321,7 +322,7 @@ class BaseClassifier(object):
 		Nclasses = len(all_classes)
 		probs = np.full((N, Nclasses), np.NaN, dtype='float32')
 		features = np.full((N, len(self.features_names)), np.NaN, dtype='float32')
-		for k, task in enumerate(tqdm(tset.features_test(), total=N)):
+		for k, task in enumerate(tqdm(tset.features_test(), total=N, **tqdm_settings)):
 
 			# Classify this star from the test-set:
 			result = self.classify(task)

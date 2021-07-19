@@ -13,7 +13,6 @@ import numpy as np
 import itertools
 from bottleneck import allnan, anynan
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report
 from .. import BaseClassifier, io
 from ..constants import classifier_list
 
@@ -27,7 +26,7 @@ class Classifier_obj(RandomForestClassifier):
 			n_estimators=n_estimators,
 			min_samples_split=min_samples_split,
 			class_weight='balanced',
-			max_depth=3,
+			max_depth=7,
 			random_state=random_state
 		)
 		self.trained = False

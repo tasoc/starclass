@@ -62,15 +62,21 @@ def test_run_training(classifier):
 	dd = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'starclass', 'data', 'L1'))
 	with tempfile.TemporaryDirectory(dir=dd, prefix='testing-') as tmpdir:
 		output_dir = os.path.basename(tmpdir)
+		logfile = os.path.join(tmpdir, 'training.log')
 
 		out, err, exitcode = capture_run_cli('run_training.py', [
 			'--classifier=' + classifier,
 			'--trainingset=testing',
 			'--level=L1',
 			'--testfraction=0.2',
+			'--log=' + logfile,
+			'--log-level=info',
 			f'--output={output_dir}'
 		])
 		assert exitcode == 0
+
+		# Check that a log-file was indeed generated:
+		assert os.path.isfile(logfile), "Log-file not generated"
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

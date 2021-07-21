@@ -39,7 +39,7 @@ def main():
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
 	parser.add_argument('--linfit', help='Enable linfit in training set.', action='store_true')
 	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
-	parser.add_argument('-tf', '--testfraction', help='Holdout/test-set fraction', type=float, default=0.0)
+	parser.add_argument('-tf', '--testfraction', type=float, default=0.0, help='Holdout/test-set fraction')
 	parser.add_argument('--output', type=str, default=None, help='Directory where trained models and diagnostics will be saved. Default is to save in the programs data directory.')
 	args = parser.parse_args()
 
@@ -76,9 +76,6 @@ def main():
 	logger.setLevel(logging_level)
 	logger_parent.setLevel(logging_level)
 
-	# Choose which classifier to use
-	current_classifier = args.classifier
-
 	# Pick the training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
 	tset = tsetclass(level=args.level, tf=args.testfraction, linfit=args.linfit)
@@ -89,19 +86,19 @@ def main():
 
 	# The Meta-classifier requires us to first train all of the other classifiers
 	# using cross-validation
-	if current_classifier == 'meta':
+	if args.classifier == 'meta':
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in parallel?
 		# TODO: Check if results are already present
 		with starclass.TaskManager(tset.todo_file, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
+			# Loop through all classifiers, excluding the MetaClassifier:
 			for cla_key in tm.all_classifiers:
 				# Split the tset object into cross-validation folds.
 				# These are objects with exactly the same properties as the original one,
 				# except that they will run through different subsets of the training and test sets:
 				cla = starclass.get_classifier(cla_key)
 				for tset_fold in tset.folds(n_splits=5, tf=0.2):
-					data_dir = tset.key + f'/meta_fold{tset_fold.fold:02d}'
-					with cla(tset=tset, features_cache=tset.features_cache, data_dir=data_dir) as stcl:
+					with cla(tset=tset_fold, features_cache=tset.features_cache, data_dir=args.output) as stcl:
 						logger.info('Training %s on Fold %d/%d...', stcl.classifier_key, tset_fold.fold, tset_fold.crossval_folds)
 						stcl.train(tset_fold)
 						logger.info("Training done.")
@@ -110,22 +107,22 @@ def main():
 
 				# Now train all classifiers on the full training-set (minus the holdout-set),
 				# and test on the holdout set:
-				with cla(tset=tset, features_cache=tset.features_cache) as stcl:
+				with cla(tset=tset, features_cache=tset.features_cache, data_dir=args.output) as stcl:
 					logger.info('Training %s on full training-set...', stcl.classifier_key)
 					stcl.train(tset)
 					logger.info("Training done.")
 					logger.info("Classifying holdout-set using %s...", stcl.classifier_key)
-					stcl.test(tset, save=tm.save_results)
+					stcl.test(tset, save=tm.save_results, feature_importance=True)
 
 	# Initialize the classifier:
-	classifier = starclass.get_classifier(current_classifier)
+	classifier = starclass.get_classifier(args.classifier)
 	with starclass.TaskManager(tset.todo_file, overwrite=False, classes=tset.StellarClasses) as tm:
 		with classifier(tset=tset, features_cache=tset.features_cache, data_dir=args.output) as stcl:
 			# Run the training of the classifier:
-			logger.info("Training %s on full training-set...", current_classifier)
+			logger.info("Training %s on full training-set...", args.classifier)
 			stcl.train(tset)
 			logger.info("Training done.")
-			logger.info("Classifying holdout-set using %s...", current_classifier)
+			logger.info("Classifying holdout-set using %s...", args.classifier)
 			stcl.test(tset, save=tm.save_results, feature_importance=True)
 
 #--------------------------------------------------------------------------------------------------

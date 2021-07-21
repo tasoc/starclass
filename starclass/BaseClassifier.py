@@ -36,7 +36,7 @@ __docformat__ = 'restructuredtext'
 @enum.unique
 class STATUS(enum.Enum):
 	"""
-	Status indicator of the status of the photometry.
+	Status indicator of the processing.
 	"""
 	UNKNOWN = 0 #: The status is unknown. The actual calculation has not started yet.
 	STARTED = 6 #: The calculation has started, but not yet finished.
@@ -120,12 +120,15 @@ class BaseClassifier(object):
 		logger.debug("Truncate lightcurves = %s", self.truncate_lightcurves)
 
 		# Set the data directory, where results (trained models) will be saved:
+		if data_dir is None:
+			data_dir = os.environ.get('STARCLASS_DATADIR',
+				os.path.join(os.path.dirname(__file__), 'data'))
+
+		self.data_dir = os.path.abspath(data_dir)
 		if tset is not None:
-			if data_dir is None:
-				data_dir = tset.key
-			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', tset.level, data_dir))
-		else:
-			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
+			self.data_dir = os.path.join(data_dir, tset.level, tset.key)
+			if tset.fold > 0:
+				self.data_dir = os.path.join(self.data_dir, f'meta_fold{tset.fold:02d}')
 
 		logger.debug("Data Directory: %s", self.data_dir)
 		os.makedirs(self.data_dir, exist_ok=True)

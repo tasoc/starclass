@@ -41,8 +41,10 @@ def main():
 	group.add_argument('--truncate', dest='truncate', action='store_true', help='Force light curve truncation.')
 	group.add_argument('--no-truncate', dest='truncate', action='store_false', help='Force no light curve truncation.')
 	parser.set_defaults(truncate=None)
+	# Data directory:
+	parser.add_argument('--datadir', type=str, default=None, help='Directory where trained models and diagnostics will be loaded. Default is to load from the programs data directory.')
 	# Input todo-file/directory:
-	parser.add_argument('input_folder', type=str, help='Input directory to run classification on.', nargs='?', default=None)
+	parser.add_argument('input_folder', type=str, nargs='?', default=None, help='Input directory to run classification on.')
 	args = parser.parse_args()
 
 	# Cache tables (MOAT) should not be cleared unless results tables are also cleared.
@@ -122,7 +124,7 @@ def main():
 				if stcl:
 					stcl.close()
 				stcl = starclass.get_classifier(current_classifier)
-				stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate)
+				stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate, data_dir=args.datadir)
 
 			for task in tasks:
 				res = stcl.classify(task)

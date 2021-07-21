@@ -118,11 +118,11 @@ jobs:
         pip install -r requirements.txt
         pip install codecov pytest-cov
 
-    #- name: Setup MPI
-    #  if: runner.os == 'Linux'
-    #  run: |
-    #    sudo apt-get install -y openmpi-bin libopenmpi-dev
-    #    pip install mpi4py
+    - name: Setup MPI
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get install -y openmpi-bin libopenmpi-dev
+        pip install mpi4py
 
     - name: Download cache
       run: python run_download_cache.py -q

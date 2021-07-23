@@ -90,7 +90,12 @@ class TaskManager(object):
 			self.cursor.execute("PRAGMA table_info(" + row['name'] + ");")
 			columns = [col['name'] for col in self.cursor.fetchall()]
 			columns.remove('priority')
-			self.moat_create(classifier, columns)
+			# Make sure we close the database connection in case of an error:
+			try:
+				self.moat_create(classifier, columns)
+			except: # noqa: E722
+				self.close()
+				raise
 
 		# Reset the status of everything for a new run:
 		if overwrite:

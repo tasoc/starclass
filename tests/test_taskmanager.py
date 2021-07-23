@@ -6,9 +6,10 @@ Tests of starclass.TaskManager.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-import sqlite3
 import pytest
 import os.path
+import sqlite3
+from contextlib import closing
 from astropy.table import Table
 import conftest # noqa: F401
 import starclass
@@ -107,12 +108,11 @@ def test_taskmanager_invalid():
 		TaskManager(os.path.join(INPUT_DIR, 'does-not-exists'))
 
 #--------------------------------------------------------------------------------------------------
-@pytest.mark.xfail(strict=False, reason='Bug that sqlite connection not closed as it should.')
 def test_taskmanager_no_diagnostics(PRIVATE_TODO_FILE):
 	"""Test of TaskManager with invalid TODO-file, missing diagnostics_corr table."""
 
 	# Delete the table from the TODO-file:
-	with sqlite3.connect(PRIVATE_TODO_FILE) as conn:
+	with closing(sqlite3.connect(PRIVATE_TODO_FILE)) as conn:
 		conn.execute('DROP TABLE IF EXISTS diagnostics_corr;')
 		conn.commit()
 
@@ -120,6 +120,24 @@ def test_taskmanager_no_diagnostics(PRIVATE_TODO_FILE):
 	with pytest.raises(ValueError) as err:
 		TaskManager(PRIVATE_TODO_FILE)
 	assert str(err.value) == "The TODO-file does not contain diagnostics_corr. Are you sure corrections have been run?"
+
+#--------------------------------------------------------------------------------------------------
+def test_taskmanager_moat_wrong_existing_table(PRIVATE_TODO_FILE):
+	"""Test of TaskManager with invalid TODO-file, missing diagnostics_corr table."""
+
+	# Add a table to the TODO-file, following the naming scheme, but from
+	# a wrong (dummy) classifier:
+	with closing(sqlite3.connect(PRIVATE_TODO_FILE)) as conn:
+		conn.execute("""CREATE TABLE starclass_features_dummy (
+			priority integer not null,
+			dummy_var real
+		);""")
+		conn.commit()
+
+	# The TaskManager should now throw an error:
+	with pytest.raises(ValueError) as err:
+		TaskManager(PRIVATE_TODO_FILE)
+	assert str(err.value) == "Invalid classifier: dummy"
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize('chunk', [1, 10])

@@ -11,6 +11,11 @@ on:
   schedule:
     - cron: '0 6 1 * *'  # once a month in the morning
 
+# Change default shell to bash for all OS:
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # Use the `flake8` tool to check for syntax errors
   flake8:

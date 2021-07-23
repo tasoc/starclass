@@ -80,6 +80,7 @@ class TaskManager(object):
 		# Find out if corrections have been run:
 		self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
 		if self.cursor.fetchone() is None:
+			self.close()
 			raise ValueError("The TODO-file does not contain diagnostics_corr. Are you sure corrections have been run?")
 
 		# Find existing MOAT tables in the todo-file:

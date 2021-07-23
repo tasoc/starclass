@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Utility functions.
@@ -10,6 +10,8 @@ import numpy as np
 from bottleneck import nanmedian, nanmean, allnan
 from scipy.stats import binned_statistic
 import astropy.units as u
+from sklearn import metrics
+from sklearn.preprocessing import label_binarize
 
 # Constants:
 mad_to_sigma = 1.482602218505602 #: Conversion constant from MAD to Sigma. Constant is 1/norm.ppf(3/4)
@@ -122,3 +124,57 @@ def get_periods(featdict, nfreqs, time, in_days=True, ignore_harmonics=False):
 	n_usedfreqs = len(usedfreqs)
 
 	return periods.value, n_usedfreqs, usedfreqs
+
+#--------------------------------------------------------------------------------------------------
+def roc_curve(labels_test, y_prob, sclasses):
+	"""
+	Calculate ROC values and return optimal thresholds
+
+	https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html
+
+	Parameters:
+		labels_test (dict):
+		y_prob ():
+		class_names (list):
+
+	Returns:
+		dict:
+			- false_positive_rate (dict)
+			- true_positive_rate (dict)
+			- roc_auc (dict)
+			- roc_threshold_index (dict)
+			- roc_best_thresholds (dict)
+
+	.. codeauthor:: Jeroen Audenaert <jeroen.audenaert@kuleuven.be>
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
+
+	class_keys = [s.name for s in sclasses]
+	class_names = [s.value for s in sclasses]
+
+	# Binarize the output
+	y_true_bin = label_binarize(labels_test, classes=class_names)
+
+	# Compute ROC curve and ROC area for each class
+	fpr = {}
+	tpr = {}
+	idx = {}
+	roc_auc = {}
+	best_thresholds = {}
+	for i, cname in enumerate(class_keys):
+		fpr[cname], tpr[cname], thresholds = metrics.roc_curve(y_true_bin[:, i], y_prob[:, i])
+		roc_auc[cname] = metrics.auc(fpr[cname], tpr[cname])
+
+		idx[cname] = np.argmax(tpr[cname] - fpr[cname])
+		best_thresholds[cname] = thresholds[idx[cname]]
+
+	fpr["micro"], tpr["micro"], _ = metrics.roc_curve(y_true_bin.ravel(), y_prob.ravel())
+	roc_auc["micro"] = metrics.auc(fpr["micro"], tpr["micro"])
+
+	return {
+		'false_positive_rate': fpr,
+		'true_positive_rate': tpr,
+		'roc_auc': roc_auc,
+		'roc_threshold_index': idx,
+		'roc_best_threshold': best_thresholds
+	}

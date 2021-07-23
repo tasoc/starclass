@@ -19,12 +19,28 @@ def main():
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
-	parser.add_argument('-c', '--classifier', help='Classifier to train.', default='meta', choices=starclass.classifier_list)
+	parser.add_argument('--log', type=str, default=None, metavar='{LOGFILE}', help="Log to file.")
+	parser.add_argument('--log-level', type=str, default=None, choices=['debug','info','warning','error'],
+		help="Logging level to use in file-logging. If not set, use the same level as the console.")
+	parser.add_argument('--clear-cache', help='Clear existing features cache before running.', action='store_true')
+	# Option to select which classifier to train:
+	parser.add_argument('-c', '--classifier',
+		default='meta',
+		choices=starclass.classifier_list,
+		metavar='{CLASSIFIER}',
+		help='Classifier to train. Choises are ' + ", ".join(starclass.classifier_list) + '.')
+	# Option to select training set:
+	parser.add_argument('-t', '--trainingset',
+		default='keplerq9v3',
+		choices=starclass.trainingset_list,
+		metavar='{TSET}',
+		help='Train classifier using this training-set. Choises are ' + ", ".join(starclass.trainingset_list) + '.')
+
 	parser.add_argument('-l', '--level', help='Classification level', default='L1', choices=('L1', 'L2'))
-	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
-	parser.add_argument('-t', '--trainingset', help='Train classifier using this training-set.', default='keplerq9v3', choices=starclass.trainingset_list)
 	parser.add_argument('--linfit', help='Enable linfit in training set.', action='store_true')
-	parser.add_argument('-tf', '--testfraction', help='Holdout/test-set fraction', type=float, default=0.0)
+	#parser.add_argument('--datalevel', help="", default='corr', choices=('raw', 'corr')) # TODO: Come up with better name than "datalevel"?
+	parser.add_argument('-tf', '--testfraction', type=float, default=0.0, help='Holdout/test-set fraction')
+	parser.add_argument('--output', type=str, default=None, help='Directory where trained models and diagnostics will be saved. Default is to save in the programs data directory.')
 	args = parser.parse_args()
 
 	# Check args
@@ -42,58 +58,72 @@ def main():
 	formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 	console = logging.StreamHandler()
 	console.setFormatter(formatter)
+	console.setLevel(logging_level)
 	logger = logging.getLogger(__name__)
 	logger.addHandler(console)
-	logger.setLevel(logging_level)
 	logger_parent = logging.getLogger('starclass')
 	logger_parent.addHandler(console)
+	# Add log-file if the user asked for it:
+	if args.log is not None:
+		filehandler = logging.FileHandler(args.log, mode='w', encoding='utf8')
+		filehandler.setFormatter(formatter)
+		filehandler.setLevel(logging_level if args.log_level is None else args.log_level.upper())
+		logging_level = min(logging_level, filehandler.level)
+		logger.addHandler(filehandler)
+		logger_parent.addHandler(filehandler)
+	# The logging level of the logger objects needs to be the smallest
+	# logging level enabled in either of the handlers:
+	logger.setLevel(logging_level)
 	logger_parent.setLevel(logging_level)
-
-	# Choose which classifier to use
-	current_classifier = args.classifier
 
 	# Pick the training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
 	tset = tsetclass(level=args.level, tf=args.testfraction, linfit=args.linfit)
 
+	# If we were asked to do so, clear the cache before proceding:
+	if args.clear_cache:
+		tset.clear_cache()
+
 	# The Meta-classifier requires us to first train all of the other classifiers
 	# using cross-validation
-	if current_classifier == 'meta':
+	if args.classifier == 'meta':
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in parallel?
 		# TODO: Check if results are already present
 		with starclass.TaskManager(tset.todo_file, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
+			# Loop through all classifiers, excluding the MetaClassifier:
 			for cla_key in tm.all_classifiers:
 				# Split the tset object into cross-validation folds.
 				# These are objects with exactly the same properties as the original one,
 				# except that they will run through different subsets of the training and test sets:
 				cla = starclass.get_classifier(cla_key)
 				for tset_fold in tset.folds(n_splits=5, tf=0.2):
-					data_dir = tset.key + '/meta_fold{0:02d}'.format(tset_fold.fold)
-					with cla(tset=tset, features_cache=tset.features_cache, data_dir=data_dir) as stcl:
+					with cla(tset=tset_fold, features_cache=tset.features_cache, data_dir=args.output) as stcl:
 						logger.info('Training %s on Fold %d/%d...', stcl.classifier_key, tset_fold.fold, tset_fold.crossval_folds)
 						stcl.train(tset_fold)
-						logger.info("Classifying test-set...")
+						logger.info("Training done.")
+						logger.info("Classifying test-set using %s...", stcl.classifier_key)
 						stcl.test(tset_fold, save=tm.save_results)
 
 				# Now train all classifiers on the full training-set (minus the holdout-set),
 				# and test on the holdout set:
-				with cla(tset=tset, features_cache=tset.features_cache) as stcl:
+				with cla(tset=tset, features_cache=tset.features_cache, data_dir=args.output) as stcl:
 					logger.info('Training %s on full training-set...', stcl.classifier_key)
 					stcl.train(tset)
-					logger.info("Classifying test-set using %s...", stcl.classifier_key)
-					stcl.test(tset, save=tm.save_results)
+					logger.info("Training done.")
+					logger.info("Classifying holdout-set using %s...", stcl.classifier_key)
+					stcl.test(tset, save=tm.save_results, feature_importance=True)
 
 	# Initialize the classifier:
-	classifier = starclass.get_classifier(current_classifier)
+	classifier = starclass.get_classifier(args.classifier)
 	with starclass.TaskManager(tset.todo_file, overwrite=False, classes=tset.StellarClasses) as tm:
-		with classifier(tset=tset, features_cache=tset.features_cache) as stcl:
+		with classifier(tset=tset, features_cache=tset.features_cache, data_dir=args.output) as stcl:
 			# Run the training of the classifier:
-			logger.info("Training %s on full training-set...", current_classifier)
+			logger.info("Training %s on full training-set...", args.classifier)
 			stcl.train(tset)
-			logger.info("Training done...")
-			logger.info("Classifying test-set using %s...", current_classifier)
-			stcl.test(tset, save=tm.save_results)
+			logger.info("Training done.")
+			logger.info("Classifying holdout-set using %s...", args.classifier)
+			stcl.test(tset, save=tm.save_results, feature_importance=True)
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

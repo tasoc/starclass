@@ -58,7 +58,8 @@ def get_trainingset(tset_key='keplerq9v3'):
 		'keplerq9': tsets.keplerq9,
 		'tdasim': tsets.tdasim,
 		'tdasim-raw': tsets.tdasim_raw,
-		'tdasim-clean': tsets.tdasim_clean
+		'tdasim-clean': tsets.tdasim_clean,
+		'testing': tsets.testing_tset
 	}.get(tset_key, None)
 
 	if TsetClass is None:

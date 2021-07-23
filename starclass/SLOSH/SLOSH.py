@@ -29,7 +29,7 @@ class SLOSHClassifier(BaseClassifier):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	def __init__(self, clfile='SLOSH_Classifier_Model.h5', mc_iterations=10, *args, **kwargs):
+	def __init__(self, clfile='SLOSH_Classifier_Model.hdf5', mc_iterations=10, *args, **kwargs):
 		"""
 		Initialization for the class.
 
@@ -102,7 +102,7 @@ class SLOSHClassifier(BaseClassifier):
 		for k, stcl in enumerate(self.StellarClasses):
 			result[stcl] = pred[k]
 
-		return result
+		return result, []
 
 	#----------------------------------------------------------------------------------------------
 	def train(self, tset):
@@ -157,7 +157,7 @@ class SLOSHClassifier(BaseClassifier):
 		datasets = []
 		with h5py.File(hdf5_file, 'a') as hdf:
 			images = hdf.require_group('images')
-			for feat in tqdm(tset.features(), total=len(tset.train_idx), **tqdm_settings):
+			for feat in tqdm(tset.features(), total=len(tset), **tqdm_settings):
 				dset_name = str(feat['priority'])
 				datasets.append(dset_name)
 				if dset_name not in images:

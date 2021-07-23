@@ -12,95 +12,6 @@ import os
 import logging
 from tqdm import tqdm
 from . import selfsom
-from ..utilities import get_periods
-
-NFREQUENCIES = 6
-
-#--------------------------------------------------------------------------------------------------
-def feature_names(linfit):
-	"""
-	Returns a list with the feature names.
-	"""
-	names = []
-	for i in range(NFREQUENCIES):
-		names.append('p' + str(i+1))
-	names.extend(['amp21','amp31','phi21','phi31','SOM_map','SOM_range','p2p_98_phasefold','p2p_mean_phasefold','p2p_98_lc','p2p_mean_lc''psi','zc','Fp07','Fp7','Fp20','Fp50'])
-	if linfit:
-		names.append('detrend_coeff_norm')
-	return names
-
-#--------------------------------------------------------------------------------------------------
-def featcalc(features, som, nfrequencies=6, cardinality=64,
-	linflatten=False, savefeat=None, recalc=False):
-	"""
-	Calculates features for set of lightcurves
-	"""
-
-	if isinstance(features, dict): # trick for single features
-		features = [features]
-
-	# Loop through the provided features and build feature table:
-	linfit = None
-	for obj in features:
-		# We have to do it in this (inelegant) way, since we have are in a independent
-		# function and therefore have to examine the first feature dict to see
-		# if linfit was enabled:
-		if linfit is None:
-			linfit = ('detrend_coeff' in obj)
-
-			# Find the number of featues to use:
-			Nfeat = nfrequencies + 16
-			if linfit:
-				Nfeat += 1
-
-			# Create full table to gather feature into:
-			featout = np.zeros([1, Nfeat], dtype='float32')
-
-		# Load from cache if it exists:
-		# The cache will never contain the slope feature, which
-		# is only calculated when linfit is enabled.
-		precalc = False
-		if savefeat is not None:
-			featfile = os.path.join(savefeat, str(obj['priority']) + '.txt')
-			if not recalc and os.path.exists(featfile):
-				objfeatures = np.loadtxt(featfile, delimiter=',')
-				precalc = True
-
-		if not precalc:
-			objfeatures = np.zeros(nfrequencies+16, dtype='float32')
-			lc = prepLCs(obj['lightcurve'], linflatten=linflatten)
-
-			periods, n_usedfreqs, usedfreqs = get_periods(obj, nfrequencies, lc.time, ignore_harmonics=True)
-
-			objfeatures[:nfrequencies] = periods
-			objfeatures[nfrequencies:nfrequencies+2] = freq_ampratios(obj, n_usedfreqs, usedfreqs)
-			objfeatures[nfrequencies+2:nfrequencies+4] = freq_phasediffs(obj, n_usedfreqs, usedfreqs)
-
-			EBper = EBperiod(lc.time, lc.flux, periods[0], linflatten=True)
-			objfeatures[0] = EBper # overwrites top period
-
-			objfeatures[nfrequencies+4:nfrequencies+6] = SOMloc(som, lc.time, lc.flux, EBper, cardinality)
-			objfeatures[nfrequencies+6:nfrequencies+8] = phase_features(lc.time, lc.flux, EBper)
-			objfeatures[nfrequencies+8:nfrequencies+10] = p2p_features(lc.flux)
-
-			psi, zc = compute_hocs(lc.time, lc.flux, 5)
-			objfeatures[nfrequencies+10] = psi
-			objfeatures[nfrequencies+11] = zc[0]
-			objfeatures[nfrequencies+12:nfrequencies+16] = obj['Fp07'], obj['Fp7'], obj['Fp20'], obj['Fp50']
-
-			if savefeat is not None:
-				np.savetxt(featfile, objfeatures, delimiter=',')
-
-		# If we are running with linfit enabled, add an extra feature
-		# which is the absoulte value of the fitted linear trend, divided
-		# with the point-to-point scatter:
-		if linfit:
-			slope_feature = np.abs(obj['detrend_coeff'][0]) / obj['ptp']
-			objfeatures = np.append(objfeatures, slope_feature)
-
-		featout = np.vstack((featout, objfeatures))
-
-	return featout[1:,:]
 
 #--------------------------------------------------------------------------------------------------
 def prepLCs(lc, linflatten=False):
@@ -120,7 +31,7 @@ def prepLCs(lc, linflatten=False):
 
 #--------------------------------------------------------------------------------------------------
 def makeSOM(features, outfile, overwrite=False, cardinality=64, dimx=1, dimy=400,
-	nsteps=300, learningrate=0.1):
+	nsteps=300, learningrate=0.1, random_seed=None):
 	"""
 	Top level function for training a SOM.
 	"""
@@ -128,12 +39,12 @@ def makeSOM(features, outfile, overwrite=False, cardinality=64, dimx=1, dimy=400
 	logger.info('Preparing lightcurves for SOM')
 	SOMarray = SOM_alldataprep(features, cardinality=cardinality)
 	logger.info('%d lightcurves prepared. Training SOM', SOMarray.shape[0])
-	som = SOM_train(SOMarray, outfile, overwrite, cardinality, dimx, dimy, nsteps, learningrate)
+	som = SOM_train(SOMarray, outfile, overwrite, cardinality, dimx, dimy, nsteps, learningrate, random_seed=random_seed)
 	logger.info('SOM trained.')
 	return som
 
 #--------------------------------------------------------------------------------------------------
-def loadSOM(somfile):
+def loadSOM(somfile, random_seed=None):
 	"""
 	Loads a previously trained SOM.
 
@@ -147,18 +58,20 @@ def loadSOM(somfile):
 	som:	 object
 		Trained som object
 	"""
-	with open(somfile,'r') as f:
-		lines = f.readlines()
-	newshape = lines[0].strip('\n').split(',')
-	dimx,dimy,cardinality = int(newshape[0]),int(newshape[1]),int(newshape[2])
+	np.random.seed(random_seed)
+
+	with open(somfile, 'r') as f:
+		firstline = f.readline()
+	newshape = firstline.strip('\n').split(',')
+	dimx, dimy, cardinality = int(newshape[0]), int(newshape[1]), int(newshape[2])
 
 	def Init(sample):
 		'''
 		Initialisation function for SOM.
 		'''
-		return np.random.uniform(0,1,size=(dimx,dimy,cardinality))
+		return np.random.uniform(0, 1, size=(dimx, dimy, cardinality))
 
-	som = selfsom.SimpleSOMMapper((dimx,dimy),1,initialization_func=Init,learning_rate=0.1)
+	som = selfsom.SimpleSOMMapper((dimx, dimy), 1, initialization_func=Init, learning_rate=0.1, random_seed=random_seed)
 	loadk = kohonenLoad(somfile)
 	som.train(loadk) # purposeless but tricks the SOM into thinking it's been trained. Don't ask.
 	som._K = loadk
@@ -179,7 +92,7 @@ def kohonenLoad(infile):
 	out: ndarray, size [i,j,k]
 		Loaded array.
 	"""
-	with open(infile,'r') as f:
+	with open(infile, 'r') as f:
 		lines = f.readlines()
 	newshape = lines[0].strip('\n').split(',')
 	out = np.zeros([int(newshape[0]),int(newshape[1]),int(newshape[2])])
@@ -254,7 +167,7 @@ def SOM_alldataprep(features, outfile=None, cardinality=64):
 
 		EBper = EBperiod(time, flux, per)
 		if EBper > 0: # ignores others
-			binlc, range = prepFilePhasefold(time, flux, EBper, cardinality)
+			binlc, flux_range = prepFilePhasefold(time, flux, EBper, cardinality)
 			SOMarray = np.vstack((SOMarray, binlc))
 
 	logger.info("Total features: %d", SOMarray.shape[0]-1)
@@ -265,7 +178,7 @@ def SOM_alldataprep(features, outfile=None, cardinality=64):
 
 #--------------------------------------------------------------------------------------------------
 def SOM_train(SOMarray, outfile=None, overwrite=False, cardinality=64, dimx=1, dimy=400,
-	nsteps=300, learningrate=0.1):
+	nsteps=300, learningrate=0.1, random_seed=None):
 	''' Function to train a SOM
 
 	Parameters
@@ -289,6 +202,7 @@ def SOM_train(SOMarray, outfile=None, overwrite=False, cardinality=64, dimx=1, d
 	som object:		object
 		Trained som
 	'''
+	np.random.seed(random_seed)
 
 	cardinality = SOMarray.shape[1]
 
@@ -296,7 +210,7 @@ def SOM_train(SOMarray, outfile=None, overwrite=False, cardinality=64, dimx=1, d
 		return np.random.uniform(0,1,size=(dimx,dimy,cardinality))
 
 	som = selfsom.SimpleSOMMapper((dimx,dimy),nsteps,initialization_func=Init,
-									learning_rate=learningrate)
+									learning_rate=learningrate, random_seed=random_seed)
 	som.train(SOMarray)
 	if outfile:
 		if not os.path.exists(outfile) or overwrite:
@@ -383,20 +297,20 @@ def binPhaseLC(phase, flux, nbins, cut_outliers=0):
 	"""
 	bin_edges = np.arange(nbins)/float(nbins)
 	bin_indices = np.digitize(phase, bin_edges) - 1
-	binnedlc = np.zeros([nbins,2])
+	binnedlc = np.zeros([nbins, 2])
 	#fixes phase of all bins - means ignoring locations of points in bin
 	binnedlc[:,0] = 1./nbins * 0.5 + bin_edges
-	for bin in range(nbins):
-		if np.sum(bin_indices == bin) > 0:
-			inbin = np.where(bin_indices == bin)[0]
-			if cut_outliers and np.sum(bin_indices == bin) > 2:
+	for b in range(nbins):
+		if np.sum(bin_indices == b) > 0:
+			inbin = np.where(bin_indices == b)[0]
+			if cut_outliers and np.sum(bin_indices == b) > 2:
 				mad = np.median(np.abs(flux[inbin]-np.median(flux[inbin])))
 				outliers = np.abs((flux[inbin] - np.median(flux[inbin])))/mad <= cut_outliers
 				inbin = inbin[outliers]
-			binnedlc[bin,1] = np.mean(flux[inbin])
+			binnedlc[b, 1] = np.mean(flux[inbin])
 		else:
 			#bit awkward this, but only alternative is to interpolate?
-			binnedlc[bin,1] = np.mean(flux)
+			binnedlc[b, 1] = np.mean(flux)
 	return binnedlc
 
 #--------------------------------------------------------------------------------------------------
@@ -433,7 +347,7 @@ def prepFilePhasefold(time, flux, period, cardinality):
 	#offset so minimum is at phase 0
 	binnedlc[:,0] = np.mod(binnedlc[:,0]-binnedlc[np.argmin(binnedlc[:,1]),0],1)
 	binnedlc = binnedlc[np.argsort(binnedlc[:,0]),:]
-	return binnedlc[:,1],maxflux-minflux
+	return binnedlc[:,1], maxflux-minflux
 
 #--------------------------------------------------------------------------------------------------
 def SOMloc(som, time, flux, per, cardinality):
@@ -459,11 +373,11 @@ def SOMloc(som, time, flux, per, cardinality):
 	"""
 	if per < 0:
 		return -10
-	SOMarray,range = prepFilePhasefold(time, flux, per, cardinality)
+	SOMarray, flux_range = prepFilePhasefold(time, flux, per, cardinality)
 	SOMarray = np.vstack((SOMarray,np.ones(len(SOMarray)))) # tricks som code into thinking we have more than one
-	map = som(SOMarray)
-	map = map[0,1]
-	return map, range
+	som_loc = som(SOMarray)
+	som_loc = som_loc[0, 1]
+	return som_loc, flux_range
 
 #--------------------------------------------------------------------------------------------------
 def freq_ampratios(featdictrow, n_usedfreqs, usedfreqs):

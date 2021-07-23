@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Command-line interface downloading auxillary data.
+
+.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+"""
 
 import argparse
 import logging
 import starclass
 
 #--------------------------------------------------------------------------------------------------
-if __name__ == '__main__':
-
+def main():
 	# Parse command line arguments:
-	parser = argparse.ArgumentParser(description='Download all axillary data for pipeline.')
+	parser = argparse.ArgumentParser(description='Download all auxillary data for pipeline.')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('--all', help='Download all training sets.', action='store_true')
@@ -35,3 +39,7 @@ if __name__ == '__main__':
 
 	# Download all data:
 	starclass.download_cache(all_trainingsets=args.all)
+
+#--------------------------------------------------------------------------------------------------
+if __name__ == '__main__':
+	main()

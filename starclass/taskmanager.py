@@ -332,7 +332,13 @@ class TaskManager(object):
 
 			# Pick the classifier that has reached the lowest priority:
 			if all_tasks:
-				indx = np.argmin([t['priority'] for t in all_tasks])
+				# We have to go a little deeper depending if we have chunk=1 (dict returned)
+				# or chunk>1 (list of dicts returned). We can get away with just taking the
+				# first priority in the latter case, since they are already sorted by priority:
+				if chunk == 1:
+					indx = np.argmin([t['priority'] for t in all_tasks])
+				else:
+					indx = np.argmin([t[0]['priority'] for t in all_tasks])
 				return all_tasks[indx]
 
 			# If this is reached, all classifiers are done, and we can

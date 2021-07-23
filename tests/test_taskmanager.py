@@ -106,7 +106,8 @@ def test_taskmanager_invalid():
 		TaskManager(os.path.join(INPUT_DIR, 'does-not-exists'))
 
 #--------------------------------------------------------------------------------------------------
-def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE):
+@pytest.mark.parametrize('chunk', [1, 10])
+def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE, chunk):
 	"""Test of TaskManager - Automatic switching between classifiers."""
 
 	with TaskManager(PRIVATE_TODO_FILE, overwrite=True) as tm:
@@ -116,10 +117,13 @@ def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE):
 		tm.conn.commit()
 
 		# Get the first task in the TODO file:
-		task1 = tm.get_task(classifier='slosh')
+		task1 = tm.get_task(classifier='slosh', chunk=chunk)
 		print(task1)
 
 		# It should be the only missing task with SLOSH:
+		if chunk > 1:
+			assert len(task1) == 1
+			task1 = task1[0]
 		assert task1['priority'] == 17
 		assert task1['classifier'] == 'slosh'
 
@@ -127,8 +131,11 @@ def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE):
 		tm.start_task(task1)
 
 		# Get the next task, which should be the one with priority=2:
-		task2 = tm.get_task(classifier='slosh')
+		task2 = tm.get_task(classifier='slosh', chunk=chunk)
 		print(task2)
+		if chunk > 1:
+			assert len(task2) == chunk
+			task2 = task2[0]
 
 		# We should now get the highest priority target, but not with SLOSH:
 		assert task2['priority'] == 17

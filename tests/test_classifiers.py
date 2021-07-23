@@ -22,11 +22,11 @@ try:
 except ImportError:
 	MPI_AVAILABLE = False
 
-AVALIABLE_CLASSIFIERS = list(starclass.classifier_list)
-AVALIABLE_CLASSIFIERS.remove('meta')
+AVAILABLE_CLASSIFIERS = list(starclass.classifier_list)
+AVAILABLE_CLASSIFIERS.remove('meta')
 
 #--------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize('classifier', AVALIABLE_CLASSIFIERS)
+@pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS)
 def test_classifiers_train_test(classifier):
 
 	stcl = starclass.get_classifier(classifier)
@@ -63,7 +63,7 @@ def test_classifiers_train_test(classifier):
 			cl.test(tset, feature_importance=True)
 
 #--------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize('classifier', AVALIABLE_CLASSIFIERS)
+@pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS)
 def test_run_training(PRIVATE_INPUT_DIR, classifier):
 
 	tset = testing_tset(tf=0.2, random_seed=42)

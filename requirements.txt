@@ -17,3 +17,4 @@ tqdm
 pyentrp == 0.6.0
 h5py
 shap == 0.39.0
+--no-binary=shap

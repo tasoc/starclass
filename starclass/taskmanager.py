@@ -80,6 +80,7 @@ class TaskManager(object):
 		# Find out if corrections have been run:
 		self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
 		if self.cursor.fetchone() is None:
+			self.close()
 			raise ValueError("The TODO-file does not contain diagnostics_corr. Are you sure corrections have been run?")
 
 		# Find existing MOAT tables in the todo-file:
@@ -89,7 +90,12 @@ class TaskManager(object):
 			self.cursor.execute("PRAGMA table_info(" + row['name'] + ");")
 			columns = [col['name'] for col in self.cursor.fetchall()]
 			columns.remove('priority')
-			self.moat_create(classifier, columns)
+			# Make sure we close the database connection in case of an error:
+			try:
+				self.moat_create(classifier, columns)
+			except: # noqa: E722
+				self.close()
+				raise
 
 		# Reset the status of everything for a new run:
 		if overwrite:
@@ -332,7 +338,13 @@ class TaskManager(object):
 
 			# Pick the classifier that has reached the lowest priority:
 			if all_tasks:
-				indx = np.argmin([t['priority'] for t in all_tasks])
+				# We have to go a little deeper depending if we have chunk=1 (dict returned)
+				# or chunk>1 (list of dicts returned). We can get away with just taking the
+				# first priority in the latter case, since they are already sorted by priority:
+				if chunk == 1:
+					indx = np.argmin([t['priority'] for t in all_tasks])
+				else:
+					indx = np.argmin([t[0]['priority'] for t in all_tasks])
 				return all_tasks[indx]
 
 			# If this is reached, all classifiers are done, and we can

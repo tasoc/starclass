@@ -8,6 +8,8 @@ Tests of starclass.TaskManager.
 
 import pytest
 import os.path
+import sqlite3
+from contextlib import closing
 from astropy.table import Table
 import conftest # noqa: F401
 import starclass
@@ -106,7 +108,40 @@ def test_taskmanager_invalid():
 		TaskManager(os.path.join(INPUT_DIR, 'does-not-exists'))
 
 #--------------------------------------------------------------------------------------------------
-def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE):
+def test_taskmanager_no_diagnostics(PRIVATE_TODO_FILE):
+	"""Test of TaskManager with invalid TODO-file, missing diagnostics_corr table."""
+
+	# Delete the table from the TODO-file:
+	with closing(sqlite3.connect(PRIVATE_TODO_FILE)) as conn:
+		conn.execute('DROP TABLE IF EXISTS diagnostics_corr;')
+		conn.commit()
+
+	# The TaskManager should now throw an error:
+	with pytest.raises(ValueError) as err:
+		TaskManager(PRIVATE_TODO_FILE)
+	assert str(err.value) == "The TODO-file does not contain diagnostics_corr. Are you sure corrections have been run?"
+
+#--------------------------------------------------------------------------------------------------
+def test_taskmanager_moat_wrong_existing_table(PRIVATE_TODO_FILE):
+	"""Test of TaskManager with invalid TODO-file, missing diagnostics_corr table."""
+
+	# Add a table to the TODO-file, following the naming scheme, but from
+	# a wrong (dummy) classifier:
+	with closing(sqlite3.connect(PRIVATE_TODO_FILE)) as conn:
+		conn.execute("""CREATE TABLE starclass_features_dummy (
+			priority integer not null,
+			dummy_var real
+		);""")
+		conn.commit()
+
+	# The TaskManager should now throw an error:
+	with pytest.raises(ValueError) as err:
+		TaskManager(PRIVATE_TODO_FILE)
+	assert str(err.value) == "Invalid classifier: dummy"
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('chunk', [1, 10])
+def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE, chunk):
 	"""Test of TaskManager - Automatic switching between classifiers."""
 
 	with TaskManager(PRIVATE_TODO_FILE, overwrite=True) as tm:
@@ -116,10 +151,13 @@ def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE):
 		tm.conn.commit()
 
 		# Get the first task in the TODO file:
-		task1 = tm.get_task(classifier='slosh')
+		task1 = tm.get_task(classifier='slosh', chunk=chunk)
 		print(task1)
 
 		# It should be the only missing task with SLOSH:
+		if chunk > 1:
+			assert len(task1) == 1
+			task1 = task1[0]
 		assert task1['priority'] == 17
 		assert task1['classifier'] == 'slosh'
 
@@ -127,8 +165,11 @@ def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE):
 		tm.start_task(task1)
 
 		# Get the next task, which should be the one with priority=2:
-		task2 = tm.get_task(classifier='slosh')
+		task2 = tm.get_task(classifier='slosh', chunk=chunk)
 		print(task2)
+		if chunk > 1:
+			assert len(task2) == chunk
+			task2 = task2[0]
 
 		# We should now get the highest priority target, but not with SLOSH:
 		assert task2['priority'] == 17

@@ -368,6 +368,8 @@ class TrainingSet(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
+		cl = 'meta' if self.fake_metaclassifier else None
+
 		# Create a temporary copy of the TODO-file that we are going to read from.
 		# This is due to errors we have detected, where the database is unexpectively locked
 		# when opened several times in parallel.
@@ -386,7 +388,7 @@ class TrainingSet(object):
 					#       this should not cause any problems.
 					with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
 						for rowidx in self.train_idx:
-							task = tm.get_task(priority=rowidx+1, change_classifier=False)
+							task = tm.get_task(priority=rowidx+1, classifier=cl, change_classifier=False)
 
 							# Lightcurve file to load:
 							# We do not use the one from the database because in the simulations the
@@ -413,6 +415,8 @@ class TrainingSet(object):
 		if self.testfraction <= 0:
 			raise ValueError('features_test requires testfraction > 0')
 
+		cl = 'meta' if self.fake_metaclassifier else None
+
 		# Create a temporary copy of the TODO-file that we are going to read from.
 		# This is due to errors we have detected, where the database is unexpectively locked
 		# when opened several times in parallel.
@@ -427,7 +431,7 @@ class TrainingSet(object):
 				# meaning there would be no results for the MetaClassifier to work with
 				with TaskManager(tmpdir.name, overwrite=False, cleanup=False, classes=self.StellarClasses) as tm:
 					for rowidx in self.test_idx:
-						task = tm.get_task(priority=rowidx+1, change_classifier=False)
+						task = tm.get_task(priority=rowidx+1, classifier=cl, change_classifier=False)
 
 						# Lightcurve file to load:
 						# We do not use the one from the database because in the simulations the

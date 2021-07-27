@@ -145,7 +145,10 @@ class BaseClassifier(object):
 			'MetaClassifier': 'meta'
 		}[self.__class__.__name__]
 
-		if self.classifier_key == 'base' and tset.fake_metaclassifier:
+		# If the training-set has fake_metaclassifier enabled, we change the
+		# classifier key to the MetaClassifier, so we can load things in load_star
+		# as if we are the MetaClassifier.
+		if self.classifier_key == 'base' and tset is not None and tset.fake_metaclassifier:
 			self.classifier_key = 'meta'
 
 		# Just for catching all those places random numbers are used without explicitly requesting

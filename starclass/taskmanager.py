@@ -276,8 +276,7 @@ class TaskManager(object):
 
 				# If the classifier that is running is the meta-classifier,
 				# add the results from all other classifiers to the task dict:
-				# FIXME: Enforce this for META only. The problem is the TrainingSet class, which doesn't know about which classifier is running it
-				if classifier == 'meta' or classifier is None:
+				if classifier == 'meta':
 					self.cursor.execute("SELECT starclass_results.classifier,class,prob FROM starclass_results INNER JOIN starclass_diagnostics ON starclass_results.priority=starclass_diagnostics.priority AND starclass_results.classifier=starclass_diagnostics.classifier WHERE starclass_results.priority=? AND status=? AND starclass_results.classifier != 'meta' ORDER BY starclass_results.classifier, class;", [
 						task['priority'],
 						STATUS.OK.value

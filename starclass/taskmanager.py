@@ -291,8 +291,6 @@ class TaskManager(object):
 						rows=rows,
 						names=('classifier', 'class', 'prob'),
 					)
-				else:
-					task['other_classifiers'] = None
 
 			if chunk == 1:
 				return tasks[0]

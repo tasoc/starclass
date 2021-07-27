@@ -38,7 +38,6 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit, fake_metaclassifier
 	tsetclass = get_trainingset()
 	tset = tsetclass(linfit=linfit)
 	tset.fake_metaclassifier = fake_metaclassifier
-	print(tset.fake_metaclassifier)
 
 	# Set a dummy features cache inside the private input dir:
 	features_cache_name = 'features_cache'
@@ -60,7 +59,8 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit, fake_metaclassifier
 					else:
 						assert os.listdir(features_cache) == ['features-17.pickle']
 
-				task = tm.get_task(priority=17)
+				clfier = 'meta' if fake_metaclassifier else None
+				task = tm.get_task(priority=17, classifier=clfier)
 				print(task)
 
 				feat = cl.load_star(task)
@@ -73,10 +73,10 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit, fake_metaclassifier
 
 				if fake_metaclassifier:
 					# Check the complex objects:
-					assert 'lightcurve' not in feat
-					assert 'powerspectrum' not in feat
-					assert 'frequencies' not in feat
-					assert isinstance(feat['other_classifiers'], Table)
+					assert 'lightcurve' not in feat, "lightcurve should not be available"
+					assert 'powerspectrum' not in feat, "powerspectrum should not be available"
+					assert 'frequencies' not in feat, "frequencies should not be available"
+					assert isinstance(feat['other_classifiers'], Table), "other_classifiers should be a Table"
 
 					# Linfit-related parameters:
 					assert 'detrend_coeff' not in feat
@@ -85,7 +85,7 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit, fake_metaclassifier
 					assert isinstance(feat['lightcurve'], TessLightCurve)
 					assert isinstance(feat['powerspectrum'], powerspectrum)
 					assert isinstance(feat['frequencies'], Table)
-					assert 'other_classifiers' not in feat
+					assert 'other_classifiers' not in feat, "other_classifiers not be available"
 
 					# Check "transfered" features:
 					assert feat['tmag'] == task['tmag']

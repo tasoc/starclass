@@ -145,6 +145,9 @@ class BaseClassifier(object):
 			'MetaClassifier': 'meta'
 		}[self.__class__.__name__]
 
+		if self.classifier_key == 'base' and tset.fake_metaclassifier:
+			self.classifier_key = 'meta'
+
 		# Just for catching all those places random numbers are used without explicitly requesting
 		# a random_state:
 		np.random.seed(self._random_seed)
@@ -585,11 +588,9 @@ class BaseClassifier(object):
 			if save_to_cache:
 				io.savePickle(features_file, features)
 
-		# Add the results from other classifiers to the features:
-		# TODO: Only add this for the MetaClassifier. This can not be done now because
-		#       BaseClassifier is used directly in TrainingSet, which means it doesn't know
-		#       which classifier is being used.
-		features['other_classifiers'] = task['other_classifiers']
+		else:
+			# Add the results from other classifiers to the features:
+			features['other_classifiers'] = task['other_classifiers']
 
 		# Add the fields from the task to the list of features:
 		features['priority'] = task['priority']

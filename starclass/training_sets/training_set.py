@@ -63,7 +63,7 @@ class TrainingSet(object):
 		"""
 
 		if not hasattr(self, 'key'):
-			raise Exception("Training set class does not have 'key' definied.")
+			raise RuntimeError("Training set class does not have 'key' definied.")
 
 		# Basic checks of input:
 		if level not in ('L1', 'L2'):
@@ -123,6 +123,8 @@ class TrainingSet(object):
 		self.fold = 0
 		self.crossval_folds = 0
 
+		self.fake_metaclassifier = False
+
 	#----------------------------------------------------------------------------------------------
 	def __str__(self):
 		str_fold = '' if self.fold == 0 else ', fold={0:d}/{1:d}'.format(self.fold, self.crossval_folds)
@@ -175,6 +177,9 @@ class TrainingSet(object):
 				random_seed=self.random_seed,
 				tf=0.0)
 
+			# Transfer settings not set during initialization:
+			newtset.fake_metaclassifier = self.fake_metaclassifier
+
 			# Set testfraction to value from CV i.e. 1/n_splits
 			newtset.testfraction = tf
 			newtset.train_idx = self.train_idx[train_idx]
@@ -192,7 +197,7 @@ class TrainingSet(object):
 		This is a class method, so it can be called without having to initialize the training set.
 		"""
 		if not hasattr(cls, 'key'):
-			raise Exception("Training set class does not have 'key' definied.")
+			raise RuntimeError("Training set class does not have 'key' definied.")
 
 		# Point this to the directory where the training set data are stored
 		INPUT_DIR = os.environ.get('STARCLASS_TSETS')
@@ -219,7 +224,7 @@ class TrainingSet(object):
 		"""
 
 		if not hasattr(self, 'key'):
-			raise Exception("Training set class does not have 'key' definied.")
+			raise RuntimeError("Training set class does not have 'key' definied.")
 
 		logger = logging.getLogger(__name__)
 		tqdm_settings = {
@@ -314,7 +319,7 @@ class TrainingSet(object):
 					if diagnostics is not None:
 						variance, rms_hour, ptp = diagnostics[k]
 					else:
-						# Try to load the lightcurve using the BaseClassifier method.
+						# Load the lightcurve using the load_lightcurve method.
 						# This will ensure that the lightcurve can actually be read by the system.
 						lc = io.load_lightcurve(os.path.join(self.input_folder, lightcurve))
 

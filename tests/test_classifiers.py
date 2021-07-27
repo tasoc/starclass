@@ -11,10 +11,10 @@ import pytest
 import tempfile
 import os
 import sqlite3
+import shutil
 from contextlib import closing
 from conftest import capture_run_cli
 import starclass
-from starclass.training_sets.testing_tset import testing_tset
 
 try:
 	import mpi4py # noqa: F401
@@ -26,13 +26,48 @@ AVAILABLE_CLASSIFIERS = list(starclass.classifier_list)
 AVAILABLE_CLASSIFIERS.remove('meta')
 
 #--------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS)
-def test_classifiers_train_test(classifier):
+@pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS + ['meta'])
+def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 
 	stcl = starclass.get_classifier(classifier)
-	tset = testing_tset(tf=0.2, random_seed=42)
 
 	with tempfile.TemporaryDirectory(prefix='starclass-testing-') as tmpdir:
+		if classifier == 'meta':
+			# For the MetaClassifier, we need to manipulate the training-set
+			# a little bit before we can train. We have to mimic that
+			# all the other classifiers have already been trained and cross-validated
+			# in order to fill up the training-set todo-file with probabilities
+			# which the MetaClassifier uses for training.
+			tsetclass = starclass.get_trainingset('keplerq9v3')
+			input_folder = tsetclass.find_input_folder()
+
+			# Create a copy of the root files of the trainings set (ignore that actual data)
+			# in the temp. directory:
+			tsetdir = os.path.join(tmpdir, os.path.basename(input_folder))
+			print("New dummy input folder: %s" % tsetdir)
+			os.makedirs(tsetdir)
+			for f in os.listdir(input_folder):
+				fpath = os.path.join(input_folder, f)
+				if os.path.isfile(fpath) and not f.endswith(('.sqlite', '.sqlite-journal')):
+					shutil.copy(fpath, tsetdir)
+
+			# Change the environment variable to the temp. dir:
+			monkeypatch.setenv("STARCLASS_TSETS", tmpdir)
+
+			# Copy the pre-prepared todo-file to the training-set directory:
+			prepared_todo = os.path.join(SHARED_INPUT_DIR, 'meta', 'todo.sqlite')
+			new_todo = os.path.join(tsetclass.find_input_folder(), tsetclass._todo_name + '.sqlite')
+			shutil.copyfile(prepared_todo, new_todo)
+
+			# Initialize the training-set in the temp folder,
+			# and set it to load data as if it was the MetaClassifier:
+			tset = tsetclass(tf=0.2, random_seed=42)
+			tset.fake_metaclassifier = True
+		else:
+			tsetclass = starclass.get_trainingset('testing')
+			tset = tsetclass(tf=0.2, random_seed=42)
+
+		# Initialize the classifier and run training and testing:
 		with stcl(tset=tset, features_cache=None, data_dir=tmpdir) as cl:
 			print(cl.data_dir)
 
@@ -66,7 +101,8 @@ def test_classifiers_train_test(classifier):
 @pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS)
 def test_run_training(PRIVATE_INPUT_DIR, classifier):
 
-	tset = testing_tset(tf=0.2, random_seed=42)
+	tsetclass = starclass.get_trainingset('testing')
+	tset = tsetclass(tf=0.2, random_seed=42)
 	print(tset.StellarClasses)
 
 	with tempfile.TemporaryDirectory(prefix='starclass-testing-') as tmpdir:

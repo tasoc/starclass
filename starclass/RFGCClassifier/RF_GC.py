@@ -215,7 +215,6 @@ class RFGCClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		if not self.classifier.trained:
-			logger.error('Classifier has not been trained. Exiting.')
 			raise ValueError('Classifier has not been trained. Exiting.')
 
 		# Assumes that if self.classifier.trained=True,

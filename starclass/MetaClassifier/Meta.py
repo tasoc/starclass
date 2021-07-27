@@ -94,7 +94,7 @@ class MetaClassifier(BaseClassifier):
 		self.classifier, self.features_used = io.loadPickle(infile)
 
 		# Extract the features names based on the loaded classifier:
-		self.features_names = ['{0:s}_{1:s}'.format(classifier, stcl.name) for classifier, stcl in self.features_used]
+		self.features_names = [f'{classifier:s}_{stcl.name:s}' for classifier, stcl in self.features_used]
 		logger.debug("Feature names: %s", self.features_names)
 
 	#----------------------------------------------------------------------------------------------
@@ -140,7 +140,6 @@ class MetaClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		if not self.classifier.trained:
-			logger.error('Classifier has not been trained. Exiting.')
 			raise ValueError('Classifier has not been trained. Exiting.')
 
 		# Build features array from the probabilities from the other classifiers:

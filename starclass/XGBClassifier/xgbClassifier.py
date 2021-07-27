@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 General XGB Classification
@@ -124,7 +124,6 @@ class XGBClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		if not self.trained:
-			logger.error('Please train classifer')
 			raise ValueError("Untrained Classifier")
 
 		# If classifer has been trained, calculate features

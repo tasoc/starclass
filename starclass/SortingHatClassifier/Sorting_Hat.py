@@ -156,7 +156,6 @@ class SortingHatClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		if not self.classifier.trained:
-			logger.error('Classifier has not been trained. Exiting.')
 			raise ValueError('Classifier has not been trained. Exiting.')
 
 		# If self.classifier.trained=True, calculate additional features

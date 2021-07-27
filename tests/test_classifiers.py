@@ -71,6 +71,13 @@ def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 		with stcl(tset=tset, features_cache=None, data_dir=tmpdir) as cl:
 			print(cl.data_dir)
 
+			# First make sure we throw an error when trying to classify using
+			# an untrained classifier. We are actually calling the "deep" version
+			# "do_classify" instead of the wrapper "classify", since the wrapper
+			# will catch errors and put them into the results dict instead.
+			with pytest.raises(ValueError):
+				cl.do_classify({'dummy': 'features', 'which': 'are', 'not': 'used'})
+
 			# Run training:
 			cl.train(tset)
 

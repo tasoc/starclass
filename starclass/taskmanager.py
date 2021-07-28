@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 A TaskManager which keeps track of which targets to process.
@@ -230,6 +230,12 @@ class TaskManager(object):
 			search_joins.append(f"LEFT JOIN starclass_diagnostics ON starclass_diagnostics.priority=todolist.priority AND starclass_diagnostics.classifier='{classifier:s}'")
 			search_query.append("starclass_diagnostics.status IS NULL")
 
+		# If the requested classifier is the MetaClassifier,
+		# we should only pick out the tasks where all other classifiers have returned
+		# something:
+		if classifier == 'meta':
+			search_query.append(f"(SELECT COUNT(*) FROM starclass_diagnostics d2 WHERE d2.priority=todolist.priority AND d2.classifier!='meta' AND d2.status!={STATUS.STARTED.value}) = {len(self.all_classifiers):d}")
+
 		# Build query string:
 		# Note: It is not possible for search_query to be empty!
 		search_joins = "\n".join(search_joins)
@@ -277,7 +283,21 @@ class TaskManager(object):
 				# If the classifier that is running is the meta-classifier,
 				# add the results from all other classifiers to the task dict:
 				if classifier == 'meta':
-					self.cursor.execute("SELECT starclass_results.classifier,class,prob FROM starclass_results INNER JOIN starclass_diagnostics ON starclass_results.priority=starclass_diagnostics.priority AND starclass_results.classifier=starclass_diagnostics.classifier WHERE starclass_results.priority=? AND status=? AND starclass_results.classifier != 'meta' ORDER BY starclass_results.classifier, class;", [
+					if self.StellarClasses is None:
+						raise RuntimeError("classes not provided to TaskManager.")
+
+					self.cursor.execute("""SELECT
+							r.classifier,
+							class,
+							prob
+						FROM
+							starclass_results r
+							INNER JOIN starclass_diagnostics d ON r.priority=d.priority AND r.classifier=d.classifier
+						WHERE
+							r.priority=?
+							AND status=?
+							AND r.classifier != 'meta'
+						ORDER BY r.classifier, class;""", [
 						task['priority'],
 						STATUS.OK.value
 					])
@@ -286,7 +306,8 @@ class TaskManager(object):
 					rows = []
 					for r in self.cursor.fetchall():
 						rows.append([r['classifier'], self.StellarClasses[r['class']], r['prob']])
-					if not rows: rows = None
+					if not rows:
+						rows = None
 					task['other_classifiers'] = Table(
 						rows=rows,
 						names=('classifier', 'class', 'prob'),
@@ -515,8 +536,8 @@ class TaskManager(object):
 			status = result.get('status')
 			details = result.get('details', {})
 			starclass_results = result.get('starclass_results', {})
-			common = result.get('features_common')
-			features = result.get('features')
+			common = result.get('features_common', None)
+			features = result.get('features', None)
 
 			# Save additional diagnostics:
 			error_msg = details.get('errors', None)

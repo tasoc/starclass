@@ -10,8 +10,9 @@ import pytest
 import os
 from astropy.table import Table
 import conftest # noqa: F401
-from starclass import MetaClassifier, TaskManager
-from starclass.training_sets.testing_tset import testing_tset
+from starclass import MetaClassifier, TaskManager, STATUS
+from starclass.StellarClasses import StellarClassesLevel1
+from starclass.training_sets import testing_tset
 
 #--------------------------------------------------------------------------------------------------
 def test_metaclassifier_import():
@@ -31,12 +32,21 @@ def test_metaclassifier_load_star(PRIVATE_INPUT_DIR):
 	os.makedirs(features_cache, exist_ok=True)
 
 	with TaskManager(PRIVATE_INPUT_DIR, classes=tset.StellarClasses) as tm:
+
+		for classifier in tm.all_classifiers:
+			tm.save_results({'priority': 17, 'classifier': classifier, 'status': STATUS.OK, 'starclass_results': {
+				StellarClassesLevel1.SOLARLIKE: 0.2,
+				StellarClassesLevel1.DSCT_BCEP: 0.1,
+				StellarClassesLevel1.ECLIPSE: 0.7
+			}})
+
 		for k in range(2): # Try loading twice - second time we should load from cache
 			with MetaClassifier(tset=tset, features_cache=features_cache) as cl:
 				# Check that the second time there should still be nothing in the cache:
 				assert len(os.listdir(features_cache)) == 0
 
-				task = tm.get_task(priority=17, classifier='meta')
+				task = tm.get_task(priority=17, classifier='meta', change_classifier=False)
+				assert task is not None, "task not found"
 				feat = cl.load_star(task)
 				print(feat)
 

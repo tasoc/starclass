@@ -10,6 +10,7 @@ import pytest
 import os.path
 import sqlite3
 from contextlib import closing
+import numpy as np
 from astropy.table import Table
 import conftest # noqa: F401
 import starclass
@@ -176,17 +177,79 @@ def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE, chunk):
 		assert task2['classifier'] is not None and task2['classifier'] != 'slosh'
 
 #--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('chunk', [1, 10])
+def test_taskmanager_switch_classifier_meta(PRIVATE_TODO_FILE, chunk):
+	"""Test of TaskManager - Automatic switching between classifiers."""
+
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
+
+		for classifier in tm.all_classifiers:
+			tm.cursor.execute(f"INSERT INTO starclass_diagnostics (priority,classifier,status) SELECT priority,'{classifier:s}',1 FROM todolist;")
+		tm.cursor.execute("DELETE FROM starclass_diagnostics WHERE priority=17 AND classifier='slosh';")
+		tm.conn.commit()
+
+		# Get the first task in the TODO file:
+		task1 = tm.get_task(classifier='slosh', chunk=chunk)
+		print(task1)
+
+		# It should be the only missing task with SLOSH:
+		if chunk > 1:
+			assert len(task1) == 1
+			task1 = task1[0]
+		assert task1['priority'] == 17
+		assert task1['classifier'] == 'slosh'
+
+		# Start task with priority=1:
+		tm.start_task(task1)
+
+		# Pretend we are now another worker, that have started processing with MetaClassifier.
+		# When we now ask for a new set of tasks, the above task can not be among them, since
+		# it is not yet complete.
+		task2 = tm.get_task(classifier='meta', chunk=chunk)
+		print(task2)
+		if chunk > 1:
+			assert len(task2) == chunk
+			priorities = [t['priority'] for t in task2]
+			classifiers = [t['classifier'] for t in task2]
+		else:
+			priorities = [task2['priority']]
+			classifiers = [task2['classifier']]
+
+		assert 17 not in priorities
+		assert np.all(np.array(classifiers) == 'meta')
+
+		# Now save a dummy result for the missing classifier:
+		tm.cursor.execute("UPDATE starclass_diagnostics SET status=1 WHERE priority=17 AND classifier='slosh';")
+		tm.conn.commit()
+
+		# When the next worker now ask for something to do with the MetaClassifier,
+		# the task should now be avialble:
+		task3 = tm.get_task(classifier='meta', chunk=chunk)
+		print(task3)
+		if chunk > 1:
+			assert len(task3) == chunk
+			priorities = [t['priority'] for t in task3]
+			classifiers = [t['classifier'] for t in task3]
+		else:
+			priorities = [task3['priority']]
+			classifiers = [task3['classifier']]
+
+		assert 17 in priorities
+		assert np.all(np.array(classifiers) == 'meta')
+
+#--------------------------------------------------------------------------------------------------
 def test_taskmanager_meta_classifier(PRIVATE_TODO_FILE):
 	"""Test of TaskManager when running with MetaClassifier"""
 
 	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
 
 		# Create fake results from SLOSH:
-		tm.save_results({'priority': 17, 'classifier': 'slosh', 'status': STATUS.OK, 'starclass_results': {
-			StellarClassesLevel1.SOLARLIKE: 0.2,
-			StellarClassesLevel1.DSCT_BCEP: 0.1,
-			StellarClassesLevel1.ECLIPSE: 0.7
-		}})
+		for classifier in tm.all_classifiers:
+			tm.save_results({'priority': 17, 'classifier': classifier, 'status': STATUS.OK, 'starclass_results': {
+				StellarClassesLevel1.SOLARLIKE: 0.2,
+				StellarClassesLevel1.DSCT_BCEP: 0.1,
+				StellarClassesLevel1.ECLIPSE: 0.7
+			}})
 
 		# Get the first task in the TODO file for the MetaClassifier:
 		task1 = tm.get_task(classifier='meta')
@@ -203,9 +266,9 @@ def test_taskmanager_meta_classifier(PRIVATE_TODO_FILE):
 		for row in tab:
 			assert isinstance(row['class'], StellarClassesLevel1)
 
-		assert tab[tab['class'] == StellarClassesLevel1.SOLARLIKE]['prob'] == 0.2
-		assert tab[tab['class'] == StellarClassesLevel1.DSCT_BCEP]['prob'] == 0.1
-		assert tab[tab['class'] == StellarClassesLevel1.ECLIPSE]['prob'] == 0.7
+		assert np.all(tab[tab['class'] == StellarClassesLevel1.SOLARLIKE]['prob'] == 0.2)
+		assert np.all(tab[tab['class'] == StellarClassesLevel1.DSCT_BCEP]['prob'] == 0.1)
+		assert np.all(tab[tab['class'] == StellarClassesLevel1.ECLIPSE]['prob'] == 0.7)
 
 #--------------------------------------------------------------------------------------------------
 def test_taskmanager_save_and_settings(PRIVATE_TODO_FILE):

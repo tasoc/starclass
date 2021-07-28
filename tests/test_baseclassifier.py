@@ -12,7 +12,8 @@ from lightkurve import TessLightCurve
 from astropy.table import Table
 import numpy as np
 import conftest # noqa: F401
-from starclass import BaseClassifier, TaskManager, get_trainingset
+from starclass import BaseClassifier, TaskManager, get_trainingset, STATUS
+from starclass.StellarClasses import StellarClassesLevel1
 from starclass.features.powerspectrum import powerspectrum
 from starclass.plots import plt, plots_interactive
 from starclass.training_sets.testing_tset import testing_tset
@@ -49,7 +50,18 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit, fake_metaclassifier
 	# The features cache should be empty to begin with:
 	assert len(os.listdir(features_cache)) == 0
 
-	with TaskManager(PRIVATE_INPUT_DIR) as tm:
+	with TaskManager(PRIVATE_INPUT_DIR, classes=StellarClassesLevel1) as tm:
+
+		# Create fake results from all classifiers:
+		# This is needed for the meta-classifier results to be returned
+		if fake_metaclassifier:
+			for classifier in tm.all_classifiers:
+				tm.save_results({'priority': 17, 'classifier': classifier, 'status': STATUS.OK, 'starclass_results': {
+					StellarClassesLevel1.SOLARLIKE: 0.2,
+					StellarClassesLevel1.DSCT_BCEP: 0.1,
+					StellarClassesLevel1.ECLIPSE: 0.7
+				}})
+
 		for k in range(2): # Try loading twice - second time we should load from cache
 			with BaseClassifier(tset=tset, features_cache=features_cache) as cl:
 				# Check that the second time there is something in the features cache:
@@ -60,8 +72,9 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit, fake_metaclassifier
 						assert os.listdir(features_cache) == ['features-17.pickle']
 
 				clfier = 'meta' if fake_metaclassifier else None
-				task = tm.get_task(priority=17, classifier=clfier)
+				task = tm.get_task(priority=17, classifier=clfier, change_classifier=False)
 				print(task)
+				assert task is not None, "Task not found"
 
 				feat = cl.load_star(task)
 				print(feat)

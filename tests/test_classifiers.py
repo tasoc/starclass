@@ -75,7 +75,7 @@ def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 			# an untrained classifier. We are actually calling the "deep" version
 			# "do_classify" instead of the wrapper "classify", since the wrapper
 			# will catch errors and put them into the results dict instead.
-			with pytest.raises(ValueError):
+			with pytest.raises(starclass.exceptions.UntrainedClassifierError):
 				cl.do_classify({'dummy': 'features', 'which': 'are', 'not': 'used'})
 
 			# Run training:

@@ -15,6 +15,7 @@ from bottleneck import allnan, anynan
 from sklearn.ensemble import RandomForestClassifier
 from .. import BaseClassifier, io
 from ..constants import classifier_list
+from ..exceptions import UntrainedClassifierError
 
 #--------------------------------------------------------------------------------------------------
 class Classifier_obj(RandomForestClassifier):
@@ -135,12 +136,18 @@ class MetaClassifier(BaseClassifier):
 
 		Returns:
 			dict: Dictionary of stellar classifications.
+
+		Raises:
+			UntrainedClassifierError: If classifier has not been trained.
+			ValueError: If any features are NaN.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
 
 		if not self.classifier.trained:
-			raise ValueError('Classifier has not been trained. Exiting.')
+			raise UntrainedClassifierError('Classifier has not been trained. Exiting.')
 
 		# Build features array from the probabilities from the other classifiers:
 		# TODO: What about NaN values?

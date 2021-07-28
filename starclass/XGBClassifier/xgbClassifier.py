@@ -144,7 +144,7 @@ class XGBClassifier(BaseClassifier):
 		return class_results, feature_results
 
 	#----------------------------------------------------------------------------------------------
-	def train(self, tset, savecl=True, recalc=False, overwrite=False, save_feature_importances=True):
+	def train(self, tset, savecl=True, recalc=False, overwrite=False):
 		"""
 		Training classifier using the ...
 		"""
@@ -163,16 +163,8 @@ class XGBClassifier(BaseClassifier):
 		intlookup = {key.value: value for value, key in enumerate(self.StellarClasses)}
 		fit_labels = [intlookup[lbl] for lbl in self.parse_labels(tset.labels())]
 
-		logger.info('Training ...')
-		#logger.info('SHAPES ', str(np.shape(featarray)))
-		#logger.info('SHAPES ', str(np.shape(fit_labels)))
+		logger.info('Training...')
 		self.classifier.fit(featarray, fit_labels)
-
-		if save_feature_importances:
-			importances = self.classifier.feature_importances_.astype(float)
-			feature_importances = dict(zip(self.features_names, importances))
-			io.saveJSON(os.path.join(self.data_dir, 'xgbClassifier_feature_importances.json'), feature_importances)
-
 		self.trained = True
 
 		if savecl and self.classifier_file is not None:

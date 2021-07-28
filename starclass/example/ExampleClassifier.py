@@ -1,6 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
 """
 An example classifier.
 
@@ -10,6 +9,7 @@ An example classifier.
 import logging
 import numpy as np
 from .. import BaseClassifier
+from ..exceptions import UntrainedClassifierError
 
 #--------------------------------------------------------------------------------------------------
 class ExampleClassifier(BaseClassifier):
@@ -33,6 +33,14 @@ class ExampleClassifier(BaseClassifier):
 		# Load stuff:
 		self.something = np.load('my_classifier.npy')
 
+		# Define names of features used:
+		self.features_names = ['rms', 'ptp']
+
+		# Optional: Remove if not applicable.
+		# Link to the internal classifier model,
+		# which can be used for calculating feature importances:
+		self._classifier_model = self.something
+
 	#----------------------------------------------------------------------------------------------
 	def do_classify(self, features):
 		"""
@@ -44,15 +52,24 @@ class ExampleClassifier(BaseClassifier):
 				`powerspectum` which contains the lightcurve and power density spectrum respectively.
 
 		Returns:
-			dict: Dictionary of stellar classifications.
+			tuple:
+			- dict: Dictionary of stellar classifications.
+			- list: Features used for classification.
+
+		Raises:
+			UntrainedClassifierError: If classifier has not been trained.
 		"""
 
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
 
+		if not self.trained: # This needs to be defined somehow!
+			raise UntrainedClassifierError("Classifier has not been trained")
+
 		# Do the magic:
 		logger.info("We are staring the magic...")
-		self.something.doit(features['lightcurve'], features)
+		featarray = [features['rms'], features['ptp']]
+		self.something.predict(featarray)
 
 		# Dummy result where the target is 98% a solar-like
 		# and 2% classical pulsator (delta Scuti/beta Cep):
@@ -65,7 +82,7 @@ class ExampleClassifier(BaseClassifier):
 		logger.warning("This is a warning")
 		logger.error("This is an error")
 
-		return result
+		return result, featarray
 
 	#----------------------------------------------------------------------------------------------
 	def train(self, features, labels):

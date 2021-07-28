@@ -90,6 +90,7 @@ def main():
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in parallel?
 		# TODO: Check if results are already present
+		tset.fake_metaclassifier = True
 		with starclass.TaskManager(tset.todo_file, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 			# Loop through all classifiers, excluding the MetaClassifier:
 			for cla_key in tm.all_classifiers:

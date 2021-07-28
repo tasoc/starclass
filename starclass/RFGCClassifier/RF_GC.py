@@ -16,6 +16,7 @@ from sklearn.ensemble import RandomForestClassifier
 from . import RF_GC_featcalc as fc
 from .. import BaseClassifier, io
 from ..utilities import get_periods
+from ..exceptions import UntrainedClassifierError
 
 # Number of frequencies used as features:
 NFREQUENCIES = 6
@@ -215,8 +216,7 @@ class RFGCClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		if not self.classifier.trained:
-			logger.error('Classifier has not been trained. Exiting.')
-			raise ValueError('Classifier has not been trained. Exiting.')
+			raise UntrainedClassifierError('Classifier has not been trained. Exiting.')
 
 		# Assumes that if self.classifier.trained=True,
 		# ...then self.classifier.som is not None

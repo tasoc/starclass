@@ -18,6 +18,7 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCh
 from sklearn.metrics import classification_report
 from . import SLOSH_prepro as preprocessing
 from .. import BaseClassifier
+from ..exceptions import UntrainedClassifierError
 
 #--------------------------------------------------------------------------------------------------
 class SLOSHClassifier(BaseClassifier):
@@ -81,7 +82,7 @@ class SLOSHClassifier(BaseClassifier):
 		"""
 		logger = logging.getLogger(__name__)
 		if not self.predictable:
-			raise ValueError('No saved models provided. Predict functions are disabled.')
+			raise UntrainedClassifierError('No saved models provided. Predict functions are disabled.')
 
 		# Pre-calculated power density spectrum:
 		psd = features['powerspectrum'].standard

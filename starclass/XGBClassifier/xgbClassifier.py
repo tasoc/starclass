@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 General XGB Classification
@@ -11,6 +11,7 @@ import copy
 from xgboost import XGBClassifier as xgb
 from . import xgb_feature_calc as xgb_features
 from .. import BaseClassifier, io
+from ..exceptions import UntrainedClassifierError
 
 #--------------------------------------------------------------------------------------------------
 class XGBClassifier(BaseClassifier):
@@ -124,8 +125,7 @@ class XGBClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		if not self.trained:
-			logger.error('Please train classifer')
-			raise ValueError("Untrained Classifier")
+			raise UntrainedClassifierError("Untrained Classifier")
 
 		# If classifer has been trained, calculate features
 		logger.debug("Calculating features...")

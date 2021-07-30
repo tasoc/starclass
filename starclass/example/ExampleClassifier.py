@@ -7,8 +7,8 @@ An example classifier.
 """
 
 import logging
-import numpy as np
-from .. import BaseClassifier
+import os.path
+from .. import BaseClassifier, io
 from ..exceptions import UntrainedClassifierError
 
 #--------------------------------------------------------------------------------------------------
@@ -30,10 +30,18 @@ class ExampleClassifier(BaseClassifier):
 		# Here you could do other things that needs doing
 		# when the classifier is loaded in.
 
-		# Load stuff:
-		self.something = np.load('my_classifier.npy')
+		# Load stuff or create something new:
+		self.clfile = os.path.join(self.data_dir, 'my_classifier.npy')
+		if os.path.exists(self.clfile):
+			self.something = io.loadPickle(self.clfile)
+			self.trained = True
+		else:
+			self.something = create_classifier_object() # noqa: F821
+			self.trained = False
 
 		# Define names of features used:
+		# If using any of the common features (like here),
+		# make sure to use the same name for the feature.
 		self.features_names = ['rms', 'ptp']
 
 		# Optional: Remove if not applicable.
@@ -95,5 +103,6 @@ class ExampleClassifier(BaseClassifier):
 		"""
 		# Do all the stuff needed to train the classifier here
 
-		my_classifier = do_the_training(features, labels) # noqa: F821
-		np.save('my_classifier.npy', my_classifier)
+		self.something.do_the_training(features, labels)
+		self.trained = True
+		io.savePickle(self.clfile, self.something)

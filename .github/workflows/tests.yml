@@ -131,10 +131,10 @@ jobs:
         pip install mpi4py
 
     - name: Download cache
-      run: python run_download_cache.py -q
+      run: coverage run run_download_cache.py -q
 
     - name: Testing
-      run: pytest --cov
+      run: pytest --cov --cov-append
 
     - name: Upload coverage
       uses: codecov/codecov-action@v1

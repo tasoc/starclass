@@ -169,6 +169,10 @@ def main():
 						# make sure we don't run into an infinite loop:
 						raise RuntimeError(f"Master received an unknown tag: '{tag}'")
 
+				# Assign final classes:
+				if args.classifier is None or args.classifier == 'meta':
+					tm.assign_final_class(tset, data_dir=args.datadir)
+
 				tm.logger.info("Master finishing")
 
 		except: # noqa: E722, pragma: no cover

@@ -135,6 +135,10 @@ def main():
 			# Return to TaskManager to be saved:
 			tm.save_results(results)
 
+		# Assign final classes:
+		if args.classifier is None or args.classifier == 'meta':
+			tm.assign_final_class(tset, data_dir=args.datadir)
+
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	main()

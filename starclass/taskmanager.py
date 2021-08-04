@@ -11,7 +11,7 @@ import os
 import sqlite3
 import logging
 from astropy.table import Table
-from . import STATUS
+from . import STATUS, io, BaseClassifier
 from .constants import classifier_list
 from .version import get_version
 
@@ -599,6 +599,46 @@ class TaskManager(object):
 		try:
 			self.cursor.executemany(f"INSERT INTO starclass_diagnostics (priority,classifier,status) VALUES (?,?,{STATUS.STARTED.value:d});", params)
 			#self.summary['STARTED'] += self.cursor.rowcount
+			self.conn.commit()
+		except: # noqa: E722, pragma: no cover
+			self.conn.rollback()
+			raise
+
+	#----------------------------------------------------------------------------------------------
+	def assign_final_class(self, tset, data_dir=None):
+		"""
+
+		Parameters:
+			tset (:class:`TrainingSet`):
+			data_dir (str, optional):
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+
+		with BaseClassifier(tset=tset, data_dir=data_dir) as stcl:
+			diagnostics_file = os.path.join(stcl.data_dir, 'diagnostics_' + tset.key + '_' + tset.level + '_meta.json')
+
+		# Load diagnostics file and extract thresholds dict:
+		diagnostics = io.loadJSON(diagnostics_file)
+		thresholds = diagnostics['roc_best_threshold']
+
+		self.cursor.execute("BEGIN TRANSACTION;")
+		try:
+			# Create the column in the todolist for the final classification:
+			self.cursor.execute("PRAGMA table_info(todolist);")
+			if 'final_class' not in [col['name'] for col in self.cursor]:
+				self.logger.info("Creating FINAL_CLASS column in TODOLIST")
+				self.cursor.execute("ALTER TABLE todolist ADD COLUMN final_class TEXT;")
+			else:
+				self.cursor.execute("UPDATE todolist SET final_class=NULL;")
+
+			params = []
+			self.cursor.execute("SELECT priority,class,prob FROM starclass_results WHERE classifier='meta' GROUP BY priority HAVING prob=MAX(prob);")
+			for row in self.cursor:
+				final = row['class'] if (row['prob'] >= thresholds[row['class']]) else 'UNKNOWN'
+				params.append((final, row['priority']))
+
+			self.cursor.executemany("UPDATE todolist SET final_class=? WHERE priority=?;", params)
 			self.conn.commit()
 		except: # noqa: E722, pragma: no cover
 			self.conn.rollback()

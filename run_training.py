@@ -9,6 +9,7 @@ The default is to train the Meta Classifier, which includes training all other c
 """
 
 import argparse
+import os
 import logging
 import starclass
 

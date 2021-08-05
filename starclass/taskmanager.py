@@ -59,11 +59,12 @@ class TaskManager(object):
 		self.all_classifiers = set(self.all_classifiers)
 
 		# Setup logging:
-		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-		console = logging.StreamHandler()
-		console.setFormatter(formatter)
 		self.logger = logging.getLogger(__name__)
-		self.logger.addHandler(console)
+		if not self.logger.hasHandlers():
+			formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+			console = logging.StreamHandler()
+			console.setFormatter(formatter)
+			self.logger.addHandler(console)
 		self.logger.setLevel(logging.INFO)
 
 		# Load the SQLite file:
@@ -607,10 +608,13 @@ class TaskManager(object):
 	#----------------------------------------------------------------------------------------------
 	def assign_final_class(self, tset, data_dir=None):
 		"""
+		Assing final classes based on all starclass results.
+
+		This will create a new column in the todolist table named "final_class".
 
 		Parameters:
-			tset (:class:`TrainingSet`):
-			data_dir (str, optional):
+			tset (:class:`TrainingSet`): Training-set used.
+			data_dir (str, optional): Data directory to load models from.
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
@@ -632,8 +636,21 @@ class TaskManager(object):
 			else:
 				self.cursor.execute("UPDATE todolist SET final_class=NULL;")
 
+			# Build list of final classes:
 			params = []
-			self.cursor.execute("SELECT priority,class,prob FROM starclass_results WHERE classifier='meta' GROUP BY priority HAVING prob=MAX(prob);")
+			add_joins = ''
+			add_query = ''
+			if self.datavalidation_exists:
+				add_joins = "INNER JOIN datavalidation_corr dv ON dv.priority=r.priority"
+				add_query = " AND dv.approved=1"
+
+			self.cursor.execute(f"""SELECT r.priority,r.class,r.prob
+				FROM starclass_results r
+				INNER JOIN starclass_diagnostics dn ON dn.priority=r.priority
+				{add_joins:s}
+				WHERE dn.status IN ({STATUS.OK.value:d},{STATUS.WARNING.value:d}) AND r.classifier='meta'{add_query:s}
+				GROUP BY r.priority
+				HAVING r.prob=MAX(r.prob);""")
 			for row in self.cursor:
 				final = row['class'] if (row['prob'] >= thresholds[row['class']]) else 'UNKNOWN'
 				params.append((final, row['priority']))

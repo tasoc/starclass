@@ -91,6 +91,16 @@ def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 			# Run testing phase:
 			cl.test(tset)
 
+			# Check that diagnostics file was generated:
+			diag_file = os.path.join(cl.data_dir, 'diagnostics_' + tset.key + '_' + tset.level + '_' + classifier + '.json')
+			assert os.path.isfile(diag_file), "Diagnostics file not generated"
+
+			# Check loading of the diagnostics file:
+			diag = starclass.io.loadJSON(diag_file)
+			assert isinstance(diag, dict)
+			assert 'confusion_matrix' in diag
+			assert 'roc_best_threshold' in diag
+
 		# Close the classifier and start it again, it should now load the pre-trained classifier
 		# and be able to run tests without training first:
 		with stcl(tset=tset, features_cache=None, data_dir=tmpdir) as cl:
@@ -110,7 +120,6 @@ def test_run_training(PRIVATE_INPUT_DIR, classifier):
 
 	tsetclass = starclass.get_trainingset('testing')
 	tset = tsetclass(tf=0.2, random_seed=42)
-	print(tset.StellarClasses)
 
 	with tempfile.TemporaryDirectory(prefix='starclass-testing-') as tmpdir:
 		logfile = os.path.join(tmpdir, 'training.log')
@@ -130,6 +139,16 @@ def test_run_training(PRIVATE_INPUT_DIR, classifier):
 
 		# Check that a log-file was indeed generated:
 		assert os.path.isfile(logfile), "Log-file not generated"
+
+		# Check that diagnostics file was generated:
+		diag_file = os.path.join(tmpdir, tset.level, tset.key, 'diagnostics_' + tset.key + '_' + tset.level + '_' + classifier + '.json')
+		assert os.path.isfile(diag_file), "Diagnostics file not generated"
+
+		# Check loading of the diagnostics file:
+		diag = starclass.io.loadJSON(diag_file)
+		assert isinstance(diag, dict)
+		assert 'confusion_matrix' in diag
+		assert 'roc_best_threshold' in diag
 
 		# We now have a trained classifier, so we should be able to run the classification:
 		for mpi in ([False, True] if MPI_AVAILABLE else [False]):

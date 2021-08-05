@@ -92,7 +92,6 @@ def main():
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in parallel?
 		# TODO: Check if results are already present
-		tset.fake_metaclassifier = True
 		with starclass.TaskManager(tset.todo_file, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 			# Loop through all classifiers, excluding the MetaClassifier:
 			for cla_key in tm.all_classifiers:
@@ -116,6 +115,9 @@ def main():
 					logger.info("Training done.")
 					logger.info("Classifying holdout-set using %s...", stcl.classifier_key)
 					stcl.test(tset, save=tm.save_results, feature_importance=True)
+
+		# For the MetaClassifier, we should switch this on for the final training:
+		tset.fake_metaclassifier = True
 
 	# Initialize the classifier:
 	classifier = starclass.get_classifier(args.classifier)

@@ -431,15 +431,29 @@ def test_taskmanager_assign_final_class(SHARED_INPUT_DIR):
 
 		todo_file = os.path.join(tmpdir, 'todo.sqlite')
 		datadir = os.path.join(tmpdir, tset.level, tset.key)
+		diag_file = os.path.join(datadir, 'diagnostics_keplerq9v3_L1_meta.json')
 		shutil.copyfile(os.path.join(SHARED_INPUT_DIR, 'meta', 'todo_with_meta.sqlite'), todo_file)
 		os.makedirs(datadir)
-		shutil.copyfile(os.path.join(SHARED_INPUT_DIR, 'diagnostics', 'diagnostics_keplerq9v3_L1_meta.json'),
-			os.path.join(datadir, 'diagnostics_keplerq9v3_L1_meta.json'))
 
 		with TaskManager(todo_file, classes=tset.StellarClasses) as tm:
 			# Make sure the new column doesn't already exist:
 			tm.cursor.execute("PRAGMA table_info(todolist);")
 			assert 'final_class' not in [col['name'] for col in tm.cursor], "FINAL_CLASS column already exists"
+
+			# Running without diagnostics file, should result in custom error:
+			with pytest.raises(starclass.exceptions.DiagnosticsNotAvailableError):
+				tm.assign_final_class(tset, data_dir=tmpdir)
+
+			# Create dummy JSON file:
+			with open(diag_file, 'w') as fid:
+				fid.write('{"foo":1,"bar":2}')
+
+			# Running on a wrong diagnostics file, should result in custom error:
+			with pytest.raises(starclass.exceptions.DiagnosticsNotAvailableError):
+				tm.assign_final_class(tset, data_dir=tmpdir)
+
+			# Copy proper diagnostics file to data directory:
+			shutil.copyfile(os.path.join(SHARED_INPUT_DIR, 'diagnostics', 'diagnostics_keplerq9v3_L1_meta.json'), diag_file)
 
 			# Run the assignment of final classes:
 			tm.assign_final_class(tset, data_dir=tmpdir)

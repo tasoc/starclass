@@ -171,7 +171,10 @@ def main():
 
 				# Assign final classes:
 				if args.classifier is None or args.classifier == 'meta':
-					tm.assign_final_class(tset, data_dir=args.datadir)
+					try:
+						tm.assign_final_class(tset, data_dir=args.datadir)
+					except starclass.exceptions.DiagnosticsNotAvailableError:
+						tm.logger.error("Could not assign final classes due to missing diagnostics information.")
 
 				tm.logger.info("Master finishing")
 

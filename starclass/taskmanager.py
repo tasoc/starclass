@@ -14,6 +14,7 @@ from astropy.table import Table
 from . import STATUS, io, BaseClassifier
 from .constants import classifier_list
 from .version import get_version
+from .exceptions import DiagnosticsNotAvailableError
 
 #--------------------------------------------------------------------------------------------------
 class TaskManager(object):
@@ -623,8 +624,12 @@ class TaskManager(object):
 			diagnostics_file = os.path.join(stcl.data_dir, 'diagnostics_' + tset.key + '_' + tset.level + '_meta.json')
 
 		# Load diagnostics file and extract thresholds dict:
-		diagnostics = io.loadJSON(diagnostics_file)
-		thresholds = diagnostics['roc_best_threshold']
+		try:
+			diagnostics = io.loadJSON(diagnostics_file)
+			thresholds = diagnostics['roc_best_threshold']
+		except (FileNotFoundError, KeyError):
+			raise DiagnosticsNotAvailableError("Diagnostics information not available. \
+				MetaClassifier needs to be trained with test-fraction > 0 to generate diagnostics.")
 
 		self.cursor.execute("BEGIN TRANSACTION;")
 		try:

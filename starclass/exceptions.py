@@ -8,3 +8,6 @@ Custom exceptions used by starclass.
 
 class UntrainedClassifierError(Exception):
 	pass
+
+class DiagnosticsNotAvailableError(Exception):
+	pass

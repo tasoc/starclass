@@ -176,7 +176,7 @@ def test_trainingset_folds(tsetkey, linfit):
 	tsetclass = get_trainingset(tsetkey)
 	tset = tsetclass(linfit=linfit)
 
-	for k, fold in enumerate(tset.folds(n_splits=5, tf=0.2)):
+	for k, fold in enumerate(tset.folds(n_splits=5)):
 		assert isinstance(fold, tsetclass)
 		assert fold.key == tset.key
 		assert fold.crossval_folds == 5

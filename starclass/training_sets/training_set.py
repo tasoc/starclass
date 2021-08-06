@@ -140,7 +140,7 @@ class TrainingSet(object):
 		return len(self.train_idx)
 
 	#----------------------------------------------------------------------------------------------
-	def folds(self, n_splits=5, tf=0.2):
+	def folds(self, n_splits=5):
 		"""
 		Split training set object into stratified folds.
 
@@ -181,7 +181,7 @@ class TrainingSet(object):
 			newtset.fake_metaclassifier = self.fake_metaclassifier
 
 			# Set testfraction to value from CV i.e. 1/n_splits
-			newtset.testfraction = tf
+			newtset.testfraction = 1/n_splits
 			newtset.train_idx = self.train_idx[train_idx]
 			newtset.test_idx = self.train_idx[test_idx]
 			newtset.crossval_folds = n_splits

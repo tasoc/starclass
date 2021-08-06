@@ -196,16 +196,40 @@ class TaskManager(object):
 		return self
 
 	#----------------------------------------------------------------------------------------------
-	def get_number_tasks(self):
+	def get_number_tasks(self, classifier=None):
 		"""
-		Get number of tasks due to be processed.
+		Get number of tasks to be processed.
+
+		Parameters:
+			classifier (str, optional): Constrain to tasks missing from this classifier.
 
 		Returns:
 			int: Number of tasks due to be processed.
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-		raise NotImplementedError()
+		# If data-validation information is available, only include targets
+		# which passed the data validation:
+		if self.datavalidation_exists:
+			add_joins = "INNER JOIN datavalidation_corr ON datavalidation_corr.priority=todolist.priority"
+			add_query = "AND datavalidation_corr.approved=1"
+
+		# List of all classifiers to be processed, including the meta-classifier:
+		classifiers = [classifier] if classifier else (list(self.all_classifiers) + ['meta'])
+
+		# Loop through the classifiers and count up the number of missing tasks:
+		num = 0
+		for clfier in classifiers:
+			self.cursor.execute(f"""SELECT COUNT(*) FROM
+					todolist
+					{add_joins:s}
+					LEFT JOIN starclass_diagnostics ON starclass_diagnostics.priority=todolist.priority AND starclass_diagnostics.classifier=?
+				WHERE
+					todolist.corr_status IN ({STATUS.OK.value:d},{STATUS.WARNING.value:d})
+					{add_query:s}
+					AND starclass_diagnostics.status IS NULL;""", [clfier])
+			num += self.cursor.fetchone()[0]
+		return num
 
 	#----------------------------------------------------------------------------------------------
 	def _query_task(self, classifier=None, priority=None, chunk=1):

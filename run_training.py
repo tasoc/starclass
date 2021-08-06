@@ -9,6 +9,7 @@ The default is to train the Meta Classifier, which includes training all other c
 """
 
 import argparse
+import os
 import logging
 import starclass
 
@@ -65,7 +66,8 @@ def main():
 	logger_parent.addHandler(console)
 	# Add log-file if the user asked for it:
 	if args.log is not None:
-		filehandler = logging.FileHandler(args.log, mode='w', encoding='utf8')
+		os.makedirs(os.path.dirname(os.path.abspath(args.log)), exist_ok=True)
+		filehandler = logging.FileHandler(os.path.abspath(args.log), mode='w', encoding='utf8')
 		filehandler.setFormatter(formatter)
 		filehandler.setLevel(logging_level if args.log_level is None else args.log_level.upper())
 		logging_level = min(logging_level, filehandler.level)
@@ -90,7 +92,6 @@ def main():
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in parallel?
 		# TODO: Check if results are already present
-		tset.fake_metaclassifier = True
 		with starclass.TaskManager(tset.todo_file, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 			# Loop through all classifiers, excluding the MetaClassifier:
 			for cla_key in tm.all_classifiers:
@@ -98,7 +99,7 @@ def main():
 				# These are objects with exactly the same properties as the original one,
 				# except that they will run through different subsets of the training and test sets:
 				cla = starclass.get_classifier(cla_key)
-				for tset_fold in tset.folds(n_splits=5, tf=0.2):
+				for tset_fold in tset.folds(n_splits=5):
 					with cla(tset=tset_fold, features_cache=tset.features_cache, data_dir=args.output) as stcl:
 						logger.info('Training %s on Fold %d/%d...', stcl.classifier_key, tset_fold.fold, tset_fold.crossval_folds)
 						stcl.train(tset_fold)
@@ -114,6 +115,9 @@ def main():
 					logger.info("Training done.")
 					logger.info("Classifying holdout-set using %s...", stcl.classifier_key)
 					stcl.test(tset, save=tm.save_results, feature_importance=True)
+
+		# For the MetaClassifier, we should switch this on for the final training:
+		tset.fake_metaclassifier = True
 
 	# Initialize the classifier:
 	classifier = starclass.get_classifier(args.classifier)

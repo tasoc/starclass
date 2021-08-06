@@ -23,18 +23,66 @@ AVALIABLE_CLASSIFIERS = list(starclass.classifier_list)
 AVALIABLE_CLASSIFIERS.remove('meta')
 
 #--------------------------------------------------------------------------------------------------
+def test_taskmanager_get_number_tasks(PRIVATE_TODO_FILE):
+	"""Test of get_number_tasks"""
+	# Overwriting so no results are present before we start
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True) as tm:
+		# Pull in list of all classifiers:
+		all_classifiers = starclass.classifier_list
+		Nclassifiers = len(all_classifiers)
+
+		# Get the number of all target that can be processed by starclass:
+		tm.cursor.execute("SELECT COUNT(*) FROM todolist t INNER JOIN datavalidation_corr d ON t.priority=d.priority WHERE approved=1 AND corr_status IN (1,3);")
+		realnum = tm.cursor.fetchone()[0]
+		print(f"real num per classifier: {realnum:d}")
+
+		# Get the number of tasks:
+		numtasks = tm.get_number_tasks()
+		print(f"all classifiers: {numtasks:d}")
+		assert numtasks == realnum*Nclassifiers
+
+		# Get the number of tasks:
+		for clfier in all_classifiers:
+			numtasks = tm.get_number_tasks(classifier=clfier)
+			print(f"{clfier:s}: {numtasks:d}")
+			assert numtasks == realnum
+
+		# Insert fake results for all but one SLOSH target:
+		tm.cursor.execute("INSERT INTO starclass_diagnostics (priority,classifier,status) SELECT priority,'slosh',1 FROM todolist;")
+		tm.cursor.execute("DELETE FROM starclass_diagnostics WHERE priority=17;")
+		tm.conn.commit()
+
+		# Get the number of tasks:
+		assert tm.get_number_tasks(classifier='slosh') == 1
+
+		# Get the number of tasks:
+		numtasks = tm.get_number_tasks()
+		print(numtasks)
+		assert numtasks == realnum*(Nclassifiers-1) + 1
+
+		# Insert fake results for all but one SLOSH target:
+		tm.cursor.execute("DELETE FROM starclass_diagnostics;")
+		for clfier in all_classifiers:
+			tm.cursor.execute("INSERT INTO starclass_diagnostics (priority,classifier,status) SELECT priority,?,1 FROM todolist;", [clfier])
+		tm.conn.commit()
+
+		# Get the number of tasks:
+		assert tm.get_number_tasks() == 0
+
+		# Delete everything for a single target:
+		tm.cursor.execute("DELETE FROM starclass_diagnostics WHERE priority=17;")
+		tm.conn.commit()
+
+		# There should now be missing tasks for all classifiers, but only one target:
+		assert tm.get_number_tasks() == Nclassifiers
+
+#--------------------------------------------------------------------------------------------------
 def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
 	"""Test of TaskManager"""
 
 	input_dir = os.path.dirname(PRIVATE_TODO_FILE)
 
 	with TaskManager(PRIVATE_TODO_FILE, overwrite=True) as tm:
-		# Get the number of tasks:
-		with pytest.raises(NotImplementedError):
-			tm.get_number_tasks()
-		#print(numtasks)
-		#assert(numtasks == 168642)
-
 		# In STARCLASS, we have to ask with either a priority or a classifier as input:
 		with pytest.raises(ValueError):
 			tm.get_task()

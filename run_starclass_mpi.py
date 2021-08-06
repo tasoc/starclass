@@ -110,9 +110,9 @@ def main():
 				if args.overwrite and args.clear_cache:
 					tm.moat_clear()
 
-				# Get list of tasks:
-				#numtasks = tm.get_number_tasks()
-				#tm.logger.info("%d tasks to be run", numtasks)
+				# Get number of tasks:
+				numtasks = tm.get_number_tasks(classifier=args.classifier)
+				tm.logger.info("%d tasks to be run", numtasks)
 
 				# Number of available workers:
 				num_workers = size - 1

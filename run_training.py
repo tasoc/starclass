@@ -67,7 +67,7 @@ def main():
 	# Add log-file if the user asked for it:
 	if args.log is not None:
 		os.makedirs(os.path.dirname(os.path.abspath(args.log)), exist_ok=True)
-		filehandler = logging.FileHandler(args.log, mode='w', encoding='utf8')
+		filehandler = logging.FileHandler(os.path.abspath(args.log), mode='w', encoding='utf8')
 		filehandler.setFormatter(formatter)
 		filehandler.setLevel(logging_level if args.log_level is None else args.log_level.upper())
 		logging_level = min(logging_level, filehandler.level)

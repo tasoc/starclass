@@ -105,6 +105,10 @@ def main():
 		if args.overwrite and args.clear_cache:
 			tm.moat_clear()
 
+		# Get number of tasks:
+		numtasks = tm.get_number_tasks(classifier=args.classifier)
+		logger.info("%d tasks to be run", numtasks)
+
 		while True:
 			tasks = tm.get_task(classifier=current_classifier, change_classifier=change_classifier)
 			if tasks is None:

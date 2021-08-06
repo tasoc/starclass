@@ -99,7 +99,7 @@ def main():
 				# These are objects with exactly the same properties as the original one,
 				# except that they will run through different subsets of the training and test sets:
 				cla = starclass.get_classifier(cla_key)
-				for tset_fold in tset.folds(n_splits=5, tf=0.2):
+				for tset_fold in tset.folds(n_splits=5):
 					with cla(tset=tset_fold, features_cache=tset.features_cache, data_dir=args.output) as stcl:
 						logger.info('Training %s on Fold %d/%d...', stcl.classifier_key, tset_fold.fold, tset_fold.crossval_folds)
 						stcl.train(tset_fold)

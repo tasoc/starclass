@@ -139,6 +139,13 @@ def main():
 			# Return to TaskManager to be saved:
 			tm.save_results(results)
 
+		# Assign final classes:
+		if args.classifier is None or args.classifier == 'meta':
+			try:
+				tm.assign_final_class(tset, data_dir=args.datadir)
+			except starclass.exceptions.DiagnosticsNotAvailableError:
+				tm.logger.error("Could not assign final classes due to missing diagnostics information.")
+
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	main()

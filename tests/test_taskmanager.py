@@ -9,6 +9,8 @@ Tests of starclass.TaskManager.
 import pytest
 import os.path
 import sqlite3
+import tempfile
+import shutil
 from contextlib import closing
 import numpy as np
 from astropy.table import Table
@@ -466,6 +468,69 @@ def test_taskmanager_moat_create_wrong(PRIVATE_TODO_FILE):
 
 		with pytest.raises(ValueError) as e:
 			tm.moat_create('common', [])
+
+#--------------------------------------------------------------------------------------------------
+def test_taskmanager_assign_final_class(SHARED_INPUT_DIR):
+
+	tsetclass = starclass.get_trainingset('keplerq9v3')
+	tset = tsetclass()
+
+	with tempfile.TemporaryDirectory() as tmpdir:
+
+		todo_file = os.path.join(tmpdir, 'todo.sqlite')
+		datadir = os.path.join(tmpdir, tset.level, tset.key)
+		diag_file = os.path.join(datadir, 'diagnostics_keplerq9v3_L1_meta.json')
+		shutil.copyfile(os.path.join(SHARED_INPUT_DIR, 'meta', 'todo_with_meta.sqlite'), todo_file)
+		os.makedirs(datadir)
+
+		with TaskManager(todo_file, classes=tset.StellarClasses) as tm:
+			# Make sure the new column doesn't already exist:
+			tm.cursor.execute("PRAGMA table_info(todolist);")
+			assert 'final_class' not in [col['name'] for col in tm.cursor], "FINAL_CLASS column already exists"
+
+			# Running without diagnostics file, should result in custom error:
+			with pytest.raises(starclass.exceptions.DiagnosticsNotAvailableError):
+				tm.assign_final_class(tset, data_dir=tmpdir)
+
+			# Create dummy JSON file:
+			with open(diag_file, 'w') as fid:
+				fid.write('{"foo":1,"bar":2}')
+
+			# Running on a wrong diagnostics file, should result in custom error:
+			with pytest.raises(starclass.exceptions.DiagnosticsNotAvailableError):
+				tm.assign_final_class(tset, data_dir=tmpdir)
+
+			# Copy proper diagnostics file to data directory:
+			shutil.copyfile(os.path.join(SHARED_INPUT_DIR, 'diagnostics', 'diagnostics_keplerq9v3_L1_meta.json'), diag_file)
+
+			# Run the assignment of final classes:
+			tm.assign_final_class(tset, data_dir=tmpdir)
+
+			# Check that some of the classes are populated:
+			tm.cursor.execute("SELECT COUNT(*) FROM todolist WHERE final_class IS NOT NULL;")
+			assert tm.cursor.fetchone()[0] > 0
+
+			# Check that the contents of the final classes makes sense:
+			first_try = []
+			tm.cursor.execute("""SELECT t.priority,d.approved,final_class,s.status
+				FROM todolist t
+				INNER JOIN datavalidation_corr d ON t.priority=d.priority
+				LEFT JOIN starclass_diagnostics s ON t.priority=s.priority AND classifier='meta';""")
+			for row in tm.cursor:
+				first_try.append(row['final_class'])
+				if not row['approved'] or row['status'] not in (STATUS.OK.value, STATUS.WARNING.value):
+					assert row['final_class'] is None, "FINAL_CLASS defined for not approved target"
+				elif row['final_class'] != 'UNKNOWN':
+					# This will throw KeyError if an invalid value
+					tset.StellarClasses[row['final_class']]
+
+			# Run the asignment of final classes once again:
+			tm.assign_final_class(tset, data_dir=tmpdir)
+
+			# We should get the exact same result the second time:
+			tm.cursor.execute("SELECT final_class FROM todolist ORDER BY priority;")
+			second_try = [row[0] for row in tm.cursor]
+			np.testing.assert_array_equal(first_try, second_try)
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

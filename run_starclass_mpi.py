@@ -169,6 +169,13 @@ def main():
 						# make sure we don't run into an infinite loop:
 						raise RuntimeError(f"Master received an unknown tag: '{tag}'")
 
+				# Assign final classes:
+				if args.classifier is None or args.classifier == 'meta':
+					try:
+						tm.assign_final_class(tset, data_dir=args.datadir)
+					except starclass.exceptions.DiagnosticsNotAvailableError:
+						tm.logger.error("Could not assign final classes due to missing diagnostics information.")
+
 				tm.logger.info("Master finishing")
 
 		except: # noqa: E722, pragma: no cover

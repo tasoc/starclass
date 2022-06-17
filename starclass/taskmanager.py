@@ -308,7 +308,7 @@ class TaskManager(object):
 
 				# If the classifier that is running is the meta-classifier,
 				# add the results from all other classifiers to the task dict:
-				if classifier == 'meta' or classifier is None:
+				if classifier == 'meta':
 					if self.StellarClasses is None:
 						raise RuntimeError("classes not provided to TaskManager.")
 

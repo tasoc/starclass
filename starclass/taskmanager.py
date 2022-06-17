@@ -60,13 +60,7 @@ class TaskManager(object):
 		self.all_classifiers = set(self.all_classifiers)
 
 		# Setup logging:
-		self.logger = logging.getLogger(__name__)
-		if not self.logger.hasHandlers():
-			formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-			console = logging.StreamHandler()
-			console.setFormatter(formatter)
-			self.logger.addHandler(console)
-		self.logger.setLevel(logging.INFO)
+		self.logger = logging.getLogger('starclass')
 
 		# Load the SQLite file:
 		#if self.readonly:
@@ -101,6 +95,7 @@ class TaskManager(object):
 
 		# Reset the status of everything for a new run:
 		if overwrite:
+			self.logger.debug("Deleting any existing starclass tables...")
 			self.cursor.execute("BEGIN TRANSACTION;")
 			self.cursor.execute("DROP TABLE IF EXISTS starclass_settings;")
 			self.cursor.execute("DROP TABLE IF EXISTS starclass_diagnostics;")
@@ -644,6 +639,7 @@ class TaskManager(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
+		self.logger.info("Assigning final classes based on all results...")
 		with BaseClassifier(tset=tset, data_dir=data_dir) as stcl:
 			diagnostics_file = os.path.join(stcl.data_dir, 'diagnostics_' + tset.key + '_' + tset.level + '_meta.json')
 

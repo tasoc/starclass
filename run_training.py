@@ -11,6 +11,8 @@ The default is to train the Meta Classifier, which includes training all other c
 import argparse
 import os
 import logging
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+import tensorflow as tf
 import starclass
 
 #--------------------------------------------------------------------------------------------------
@@ -60,10 +62,9 @@ def main():
 	console = logging.StreamHandler()
 	console.setFormatter(formatter)
 	console.setLevel(logging_level)
-	logger = logging.getLogger(__name__)
+	logger = logging.getLogger('starclass')
 	logger.addHandler(console)
-	logger_parent = logging.getLogger('starclass')
-	logger_parent.addHandler(console)
+
 	# Add log-file if the user asked for it:
 	if args.log is not None:
 		os.makedirs(os.path.dirname(os.path.abspath(args.log)), exist_ok=True)
@@ -72,11 +73,10 @@ def main():
 		filehandler.setLevel(logging_level if args.log_level is None else args.log_level.upper())
 		logging_level = min(logging_level, filehandler.level)
 		logger.addHandler(filehandler)
-		logger_parent.addHandler(filehandler)
+
 	# The logging level of the logger objects needs to be the smallest
 	# logging level enabled in either of the handlers:
 	logger.setLevel(logging_level)
-	logger_parent.setLevel(logging_level)
 
 	# Pick the training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
@@ -91,10 +91,15 @@ def main():
 	if args.classifier == 'meta':
 		# Loop through all the other classifiers and initialize them:
 		# TODO: Run in parallel?
-		# TODO: Check if results are already present
 		with starclass.TaskManager(tset.todo_file, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 			# Loop through all classifiers, excluding the MetaClassifier:
 			for cla_key in tm.all_classifiers:
+				# Check if everything is already populated for this classifier, and if so skip it:
+				numtasks = tm.get_number_tasks(classifier=cla_key)
+				if numtasks == 0:
+					logger.info("Cross-validation results already populated for %s", cla_key)
+					continue
+
 				# Split the tset object into cross-validation folds.
 				# These are objects with exactly the same properties as the original one,
 				# except that they will run through different subsets of the training and test sets:
@@ -129,6 +134,8 @@ def main():
 			logger.info("Training done.")
 			logger.info("Classifying holdout-set using %s...", args.classifier)
 			stcl.test(tset, save=tm.save_results, feature_importance=True)
+
+	logger.info("Done.")
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

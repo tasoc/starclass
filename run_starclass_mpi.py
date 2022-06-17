@@ -29,6 +29,8 @@ import traceback
 import os
 import enum
 import itertools
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+import tensorflow as tf
 import starclass
 from timeit import default_timer
 
@@ -76,6 +78,18 @@ def main():
 	if args.chunks < 1:
 		parser.error("--chunks should be an integer larger than 0.")
 
+	# Set logging level:
+	logging_level = logging.INFO
+	if args.quiet:
+		logging_level = logging.WARNING
+	elif args.debug:
+		logging_level = logging.DEBUG
+
+	# Configure logging within starclass:
+	formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+	console = logging.StreamHandler()
+	console.setFormatter(formatter)
+
 	# Get input and output folder from environment variables:
 	input_folder = args.input_folder
 	if input_folder is None:
@@ -104,6 +118,10 @@ def main():
 	status = MPI.Status()   # get MPI status object
 
 	if rank == 0:
+		logger = logging.getLogger('starclass')
+		logger.addHandler(console)
+		logger.setLevel(logging_level)
+
 		try:
 			with starclass.TaskManager(todo_file, cleanup=True, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
 				# If we were asked to do so, start by clearing the existing MOAT tables:
@@ -112,7 +130,7 @@ def main():
 
 				# Get number of tasks:
 				numtasks = tm.get_number_tasks(classifier=args.classifier)
-				tm.logger.info("%d tasks to be run", numtasks)
+				logger.info("%d tasks to be run", numtasks)
 
 				# Number of available workers:
 				num_workers = size - 1
@@ -130,21 +148,22 @@ def main():
 					initial_classifiers = [args.classifier]*num_workers
 					change_classifier = False
 
-				tm.logger.info("Initial classifiers: %s", initial_classifiers)
+				logger.info("Initial classifiers: %s", initial_classifiers)
 
 				# Start the master loop that will assign tasks
 				# to the workers:
 				closed_workers = 0
-				tm.logger.info("Master starting with %d workers", num_workers)
+				logger.info("Master starting with %d workers", num_workers)
 				while closed_workers < num_workers:
 					# Ask workers for information:
 					data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
 					source = status.Get_source()
 					tag = status.Get_tag()
+					logger.debug("Signal from %s: %s", source, tags(tag))
 
 					if tag == tags.DONE:
 						# The worker is done with a task
-						tm.logger.debug("Got data from worker %d: %s", source, data)
+						logger.debug("Got data from worker %d: %s", source, data)
 						tm.save_results(data)
 
 					if tag in (tags.DONE, tags.READY):
@@ -154,14 +173,17 @@ def main():
 						tasks = tm.get_task(classifier=cl, change_classifier=change_classifier, chunk=args.chunks)
 						if tasks:
 							tm.start_task(tasks)
-							tm.logger.debug("Sending %d tasks to worker %d", len(tasks), source)
+							logger.debug("Sending %d tasks to worker %d", len(tasks), source)
 							comm.send(tasks, dest=source, tag=tags.START)
 						else:
 							comm.send(None, dest=source, tag=tags.EXIT)
 
 					elif tag == tags.EXIT:
 						# The worker has exited
-						tm.logger.info("Worker %d exited.", source)
+						if data is None:
+							logger.info("Worker %d exited.", source)
+						else:
+							logger.error("Worker %d exited with error: %s", source, data)
 						closed_workers += 1
 
 					else: # pragma: no cover
@@ -174,28 +196,22 @@ def main():
 					try:
 						tm.assign_final_class(tset, data_dir=args.datadir)
 					except starclass.exceptions.DiagnosticsNotAvailableError:
-						tm.logger.error("Could not assign final classes due to missing diagnostics information.")
+						logger.error("Could not assign final classes due to missing diagnostics information.")
 
-				tm.logger.info("Master finishing")
+				logger.info("Master finishing")
 
 		except: # noqa: E722, pragma: no cover
 			# If something fails in the master
-			print(traceback.format_exc().strip())
+			print(traceback.format_exc().strip()) # noqa: T001
 			comm.Abort(1)
 
 	else:
 		# Worker processes execute code below
-		# Configure logging within starclass:
-		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-		console = logging.StreamHandler()
-		console.setFormatter(formatter)
-		logger = logging.getLogger('starclass')
-		logger.addHandler(console)
-		logger.setLevel(logging.WARNING)
 
 		# Get the class for the selected method:
 		current_classifier = None
 		stcl = None
+		errmsg = None
 
 		try:
 			# Send signal that we are ready for task:
@@ -248,10 +264,10 @@ def main():
 					raise RuntimeError(f"Worker received an unknown tag: '{tag}'")
 
 		except: # noqa: E722, pragma: no cover
-			logger.exception("Something failed in worker")
+			errmsg = traceback.format_exc().strip()
 
 		finally:
-			comm.send(None, dest=0, tag=tags.EXIT)
+			comm.send(errmsg, dest=0, tag=tags.EXIT)
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

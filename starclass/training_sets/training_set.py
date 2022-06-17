@@ -91,7 +91,7 @@ class TrainingSet(object):
 			}[self.level]
 
 		# Define cache location where we will save common features:
-		features_cache_name = 'features_cache_%s' % self.datalevel
+		features_cache_name = 'features_cache_' + self.datalevel
 		if self.linfit:
 			self.key += '-linfit'
 			self._todo_name += '-linfit'
@@ -104,12 +104,15 @@ class TrainingSet(object):
 		if not os.path.isfile(self.todo_file):
 			self.generate_todolist()
 
+		#with closing(sqlite3.connect(self.todo_file)) as conn:
+		#	conn.row_factory = sqlite3.Row
+		#	cursor = conn.cursor()
+		#	cursor.execute("SELECT COUNT(*) FROM todolist;")
+		#	self.nobjects = int(cursor.fetchone()[0])
+
 		# Generate training/test indices
 		# Define here because it is needed by self.labels() used below
-		if hasattr(self, '_valid_indicies'):
-			self.train_idx = self._valid_indicies
-		else:
-			self.train_idx = np.arange(self.nobjects, dtype=int)
+		self.train_idx = np.arange(self.nobjects, dtype=int)
 		self.test_idx = np.array([], dtype=int)
 		if self.testfraction > 0:
 			self.train_idx, self.test_idx = train_test_split(
@@ -127,13 +130,8 @@ class TrainingSet(object):
 
 	#----------------------------------------------------------------------------------------------
 	def __str__(self):
-		str_fold = '' if self.fold == 0 else ', fold={0:d}/{1:d}'.format(self.fold, self.crossval_folds)
-		return "<TrainingSet({key:s}, {datalevel:s}, tf={tf:.2f}{fold:s})>".format(
-			key=self.key,
-			datalevel=self.datalevel,
-			tf=self.testfraction,
-			fold=str_fold
-		)
+		str_fold = '' if self.fold == 0 else f', fold={self.fold:d}/{self.crossval_folds:d}'
+		return f"<TrainingSet({self.key:s}, {self.datalevel:s}, tf={self.testfraction:.2f}{str_fold:s})>"
 
 	#----------------------------------------------------------------------------------------------
 	def __len__(self):
@@ -146,7 +144,6 @@ class TrainingSet(object):
 
 		Parameters:
 			n_splits (int, optional): Number of folds to split training set into. Default=5.
-			tf (float, optional): Test-fraction, between 0 and 1, to split from each fold.
 
 		Returns:
 			Iterator of :class:`TrainingSet` objects: Iterator of folds, which are also
@@ -155,6 +152,7 @@ class TrainingSet(object):
 
 		logger = logging.getLogger(__name__)
 
+		# FIXME: Use BaseClassifier.parse_labels
 		labels_test = [lbl[0].value for lbl in self.labels()]
 
 		# If keyword is true then split according to KFold cross-validation
@@ -231,7 +229,7 @@ class TrainingSet(object):
 			'unit': 'B',
 			'unit_scale': True,
 			'unit_divisor': 1024,
-			'disable': not logger.isEnabledFor(logging.INFO)
+			'disable': None if logger.isEnabledFor(logging.INFO) else True
 		}
 
 		# Find folder where training set is stored:

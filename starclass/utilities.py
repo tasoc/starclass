@@ -6,12 +6,14 @@ Utility functions.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
+import logging
 import numpy as np
 from bottleneck import nanmedian, nanmean, allnan
 from scipy.stats import binned_statistic
 import astropy.units as u
 from sklearn import metrics
 from sklearn.preprocessing import label_binarize
+import tqdm
 
 # Constants:
 mad_to_sigma = 1.482602218505602 #: Conversion constant from MAD to Sigma. Constant is 1/norm.ppf(3/4)
@@ -178,3 +180,18 @@ def roc_curve(labels_test, y_prob, sclasses):
 		'roc_threshold_index': idx,
 		'roc_best_threshold': best_thresholds
 	}
+
+#--------------------------------------------------------------------------------------------------
+class TqdmLoggingHandler(logging.Handler):
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+
+	def emit(self, record):
+		try:
+			msg = self.format(record)
+			tqdm.tqdm.write(msg)
+			self.flush()
+		except (KeyboardInterrupt, SystemExit): # pragma: no cover
+			raise
+		except: # noqa: E722, pragma: no cover
+			self.handleError(record)

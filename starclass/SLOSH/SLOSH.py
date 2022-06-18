@@ -59,7 +59,7 @@ class SLOSHClassifier(BaseClassifier):
 			self.model_file = None
 
 		if self.model_file is not None and os.path.exists(self.model_file):
-			logger.info("Loading pre-trained model...")
+			logger.debug("Loading pre-trained model...")
 			# load pre-trained classifier
 			self.predictable = True
 			self.classifier_list.append(tensorflow.keras.models.load_model(self.model_file))

@@ -37,12 +37,11 @@ class keplerq9v3(TrainingSet):
 			encoding='utf-8')
 
 		# Remove the instrumental class from this trainingset:
-		self._valid_indicies = np.arange(self.starlist.shape[0], dtype=int)
 		indx = [star[1] != 'INSTRUMENT' for star in self.starlist]
-		self._valid_indicies = self._valid_indicies[indx]
+		self.starlist = self.starlist[indx, :]
 
 		# Count the number of objects in trainingset:
-		self.nobjects = len(self._valid_indicies)
+		self.nobjects = self.starlist.shape[0]
 
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:

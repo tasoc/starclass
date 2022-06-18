@@ -6,9 +6,12 @@ Command-line interface for running classifications.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-import os.path
+import os
 import argparse
 import logging
+from tqdm import tqdm
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+import tensorflow as tf
 import starclass
 
 #--------------------------------------------------------------------------------------------------
@@ -54,21 +57,24 @@ def main():
 
 	# Set logging level:
 	logging_level = logging.INFO
+	fmtstr = '%(asctime)s - %(levelname)s - %(message)s'
 	if args.quiet:
 		logging_level = logging.WARNING
 	elif args.debug:
 		logging_level = logging.DEBUG
+		fmtstr = '%(asctime)s - %(levelname)s - %(filename)s:%(lineno)s - %(message)s'
 
 	# Setup logging:
-	formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-	console = logging.StreamHandler()
-	console.setFormatter(formatter)
-	logger = logging.getLogger(__name__)
-	logger.addHandler(console)
+	formatter = logging.Formatter(fmtstr)
+	logger = logging.getLogger('starclass')
+	if not logger.hasHandlers():
+		console = starclass.utilities.TqdmLoggingHandler()
+		console.setFormatter(formatter)
+		logger.addHandler(console)
 	logger.setLevel(logging_level)
-	logger_parent = logging.getLogger('starclass')
-	logger_parent.addHandler(console)
-	logger_parent.setLevel(logging_level)
+
+	# Settings for tqdm:
+	tqdm_settings = {'disable': None if logger.isEnabledFor(logging.INFO) else True}
 
 	# Get input and output folder from environment variables:
 	input_folder = args.input_folder
@@ -109,42 +115,49 @@ def main():
 		numtasks = tm.get_number_tasks(classifier=args.classifier)
 		logger.info("%d tasks to be run", numtasks)
 
-		while True:
-			tasks = tm.get_task(classifier=current_classifier, change_classifier=change_classifier)
-			if tasks is None:
-				break
-			tm.start_task(tasks)
+		with tqdm(total=numtasks, **tqdm_settings) as pbar:
+			while True:
+				tasks = tm.get_task(classifier=current_classifier, change_classifier=change_classifier)
+				logger.debug(tasks)
+				if tasks is None:
+					break
+				tm.start_task(tasks)
 
-			# ----------------- This code would run on each worker ------------------------
+				# ----------------- This code would run on each worker ------------------------
 
-			# Make sure we can loop through tasks,
-			# even in the case we have only gotten one:
-			results = []
-			if isinstance(tasks, dict):
-				tasks = [tasks]
+				# Make sure we can loop through tasks,
+				# even in the case we have only gotten one:
+				results = []
+				if isinstance(tasks, dict):
+					tasks = [tasks]
 
-			if tasks[0]['classifier'] != current_classifier or stcl is None:
-				current_classifier = tasks[0]['classifier']
-				if stcl:
-					stcl.close()
-				stcl = starclass.get_classifier(current_classifier)
-				stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate, data_dir=args.datadir)
+				if tasks[0]['classifier'] != current_classifier or stcl is None:
+					current_classifier = tasks[0]['classifier']
+					if stcl:
+						stcl.close()
+					stcl = starclass.get_classifier(current_classifier)
+					stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate, data_dir=args.datadir)
 
-			for task in tasks:
-				res = stcl.classify(task)
-				results.append(res)
+				for task in tasks:
+					res = stcl.classify(task)
+					results.append(res)
 
-			# ----------------- This code would run on each worker ------------------------
+				# ----------------- This code would run on each worker ------------------------
 
-			# Return to TaskManager to be saved:
-			tm.save_results(results)
+				# Return to TaskManager to be saved:
+				tm.save_results(results)
+
+				# Update progressbar:
+				pbar.update(1)
 
 		# Assign final classes:
 		if args.classifier is None or args.classifier == 'meta':
 			try:
 				tm.assign_final_class(tset, data_dir=args.datadir)
 			except starclass.exceptions.DiagnosticsNotAvailableError:
-				tm.logger.error("Could not assign final classes due to missing diagnostics information.")
+				logger.error("Could not assign final classes due to missing diagnostics information.")
+
+	logger.info("Done.")
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

@@ -26,7 +26,7 @@ AVAILABLE_CLASSIFIERS = list(starclass.classifier_list)
 AVAILABLE_CLASSIFIERS.remove('meta')
 
 #--------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS + ['meta'])
+@pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS) # FIXME:  + ['meta']
 def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 
 	stcl = starclass.get_classifier(classifier)

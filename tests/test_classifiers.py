@@ -26,10 +26,15 @@ AVAILABLE_CLASSIFIERS = list(starclass.classifier_list)
 AVAILABLE_CLASSIFIERS.remove('meta')
 
 #--------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS + ['meta'])
+@pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS) # FIXME:  + ['meta']
 def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 
 	stcl = starclass.get_classifier(classifier)
+
+	# Pick out a task to use for testing:
+	with starclass.TaskManager(SHARED_INPUT_DIR) as tm:
+		task1 = tm.get_task(classifier=classifier, change_classifier=False)
+		print(task1)
 
 	with tempfile.TemporaryDirectory(prefix='starclass-testing-') as tmpdir:
 		if classifier == 'meta':
@@ -85,7 +90,9 @@ def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 			# The classifier will have to provide a list (not the default None)
 			print(cl.features_names)
 			assert isinstance(cl.features_names, list)
-			if classifier != 'slosh': # SLOSH is allowed to not have any feature names
+			if classifier == 'slosh': # SLOSH is allowed to not have any feature names
+				assert len(cl.features_names) == 0
+			else:
 				assert len(cl.features_names) > 0
 
 			# Run testing phase:
@@ -101,6 +108,9 @@ def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 			assert 'confusion_matrix' in diag
 			assert 'roc_best_threshold' in diag
 
+			results1 = cl.classify(task1)
+			print(results1)
+
 		# Close the classifier and start it again, it should now load the pre-trained classifier
 		# and be able to run tests without training first:
 		with stcl(tset=tset, features_cache=None, data_dir=tmpdir) as cl:
@@ -113,6 +123,13 @@ def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 
 			# Run testing phase:
 			cl.test(tset, feature_importance=True)
+
+			results2 = cl.classify(task1)
+			print(results2)
+
+	# Check that classification results are the same when loading from pre-saved model:
+	for key in ('starclass_results', 'classifier', 'priority'):
+		assert results1[key] == results2[key], "Non-identical results before and after saving/loading model"
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS)

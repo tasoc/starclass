@@ -361,7 +361,6 @@ class TaskManager(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		task = None
 		task = self._query_task(classifier=classifier, priority=priority, chunk=chunk)
 
 		# If no task is returned for the given classifier, find another

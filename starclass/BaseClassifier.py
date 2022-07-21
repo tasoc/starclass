@@ -372,7 +372,8 @@ class BaseClassifier(object):
 			y_pred,
 			labels=all_classes,
 			target_names=[lbl.name for lbl in self.StellarClasses],
-			output_dict=True)
+			output_dict=True,
+			zero_division=0)
 		diagnostics.update(report)
 		if logger.isEnabledFor(logging.INFO):
 			logger.info("Classification report:\n%s", metrics.classification_report(
@@ -381,7 +382,8 @@ class BaseClassifier(object):
 				labels=all_classes,
 				target_names=[lbl.name for lbl in self.StellarClasses],
 				digits=4,
-				output_dict=False))
+				output_dict=False,
+				zero_division=0))
 
 		# Confusion Matrix:
 		logger.info('Calculating confusion matrix...')

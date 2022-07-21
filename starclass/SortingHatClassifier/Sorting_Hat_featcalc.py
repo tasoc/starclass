@@ -34,8 +34,6 @@ def prepLCs(lc, linflatten=False, detrending_coeff=1):
 #--------------------------------------------------------------------------------------------------
 def EBperiod(time, flux, per, cut_outliers=0, linflatten=True):
 	"""
-	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
-
 	Tests for phase variation at double the current prime period,
 	to correct EB periods.
 
@@ -53,6 +51,8 @@ def EBperiod(time, flux, per, cut_outliers=0, linflatten=True):
 	-----------------
 	corrected period: float
 		Either initial period or double
+
+	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 	"""
 	if per < 0:
 		return per
@@ -93,8 +93,6 @@ def phasefold(time,per,t0=0):
 #--------------------------------------------------------------------------------------------------
 def binPhaseLC(phase, flux, nbins, cut_outliers=0):
 	"""
-	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
-
 	Bins a lightcurve, typically phase-folded.
 
 	Inputs
@@ -112,30 +110,30 @@ def binPhaseLC(phase, flux, nbins, cut_outliers=0):
 	-----------------
 	binnedlc:		ndarray, (nbins, 2)
 		Array of (bin phases, binned fluxes)
+
+	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 	"""
 	bin_edges = np.arange(nbins)/float(nbins)
 	bin_indices = np.digitize(phase, bin_edges) - 1
 	binnedlc = np.zeros([nbins,2])
 	#fixes phase of all bins - means ignoring locations of points in bin
 	binnedlc[:,0] = 1./nbins * 0.5 + bin_edges
-	for bin in range(nbins):
-		if np.sum(bin_indices == bin) > 0:
-			inbin = np.where(bin_indices == bin)[0]
-			if cut_outliers and np.sum(bin_indices == bin) > 2:
+	for b in range(nbins):
+		if np.sum(bin_indices == b) > 0:
+			inbin = np.where(bin_indices == b)[0]
+			if cut_outliers and np.sum(bin_indices == b) > 2:
 				mad = np.median(np.abs(flux[inbin]-np.median(flux[inbin])))
 				outliers = np.abs((flux[inbin] - np.median(flux[inbin])))/mad <= cut_outliers
 				inbin = inbin[outliers]
-			binnedlc[bin,1] = np.mean(flux[inbin])
+			binnedlc[b,1] = np.mean(flux[inbin])
 		else:
 			#bit awkward this, but only alternative is to interpolate?
-			binnedlc[bin,1] = np.mean(flux)
+			binnedlc[b,1] = np.mean(flux)
 	return binnedlc
 
 #--------------------------------------------------------------------------------------------------
 def prepFilePhasefold(time, flux, period, cardinality):
 	"""
-	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
-
 	Prepares a lightcurve for using with the SOM.
 
 	Inputs
@@ -153,6 +151,8 @@ def prepFilePhasefold(time, flux, period, cardinality):
 		Array of (bin phases, binned fluxes)
 	range:			float
 		Max - Min if binned lightcurve
+
+	.. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 	"""
 	phase = phasefold(time,period)
 	idx = np.argsort(phase)

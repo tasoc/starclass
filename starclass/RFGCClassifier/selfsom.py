@@ -217,24 +217,24 @@ class SimpleSOMMapper(object):
 				self._K += unit_deltas
 
 	#----------------------------------------------------------------------------------------------
-	def _compute_influence_kernel(self, iter, dqd):
+	def _compute_influence_kernel(self, it, dqd):
 		"""Compute the neighborhood kernel for some iteration.
 
 		Parameters
 		----------
-		iter : int
+		it : int
 			The iteration for which to compute the kernel.
 		dqd : array (nrows x ncolumns)
 			This is one quadrant of Euclidean distances between Kohonen unit
 			locations.
 		"""
 		# compute radius decay for this iteration
-		curr_max_radius = self.radius * np.exp(-1.0 * iter / self.iter_scale)
-		#curr_max_radius = self.radius * (0.01 + 0.99* (1 - float(iter)/self.niter))  #linear decay to 1% (stops zeros)
+		curr_max_radius = self.radius * np.exp(-1.0 * it / self.iter_scale)
+		#curr_max_radius = self.radius * (0.01 + 0.99* (1 - float(it)/self.niter))  #linear decay to 1% (stops zeros)
 
 		# same for learning rate
-		#curr_lrate = self.lrate * np.exp(-1.0 * iter / self.iter_scale)
-		curr_lrate = self.lrate * (1 - float(iter)/self.niter) # linear decay
+		#curr_lrate = self.lrate * np.exp(-1.0 * it / self.iter_scale)
+		curr_lrate = self.lrate * (1 - float(it)/self.niter) # linear decay
 
 		# compute Gaussian influence kernel
 		infl = np.exp((-1.0 * np.power(dqd,2) ) / (2 * curr_max_radius**2))

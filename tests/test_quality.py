@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Tests of photometry.quality.
+Tests of starclass.quality.
 
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """

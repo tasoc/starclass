@@ -10,6 +10,8 @@ import numpy as np
 import os
 import sqlite3
 import logging
+import contextlib
+import tempfile
 from astropy.table import Table
 from . import STATUS, io, BaseClassifier
 from .constants import classifier_list
@@ -24,7 +26,7 @@ class TaskManager(object):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	def __init__(self, todo_file, cleanup=False, readonly=False, overwrite=False, classes=None):
+	def __init__(self, todo_file, cleanup=False, readonly=False, overwrite=False, classes=None, load_in_memory=False):
 		"""
 		Initialize the TaskManager which keeps track of which targets to process.
 
@@ -48,6 +50,8 @@ class TaskManager(object):
 		if not os.path.exists(todo_file):
 			raise FileNotFoundError('Could not find TODO-file')
 
+		self.run_from_memory = load_in_memory
+		self.todo_file = os.path.abspath(todo_file)
 		self.StellarClasses = classes
 		self.readonly = readonly
 		self.tset = None
@@ -63,15 +67,19 @@ class TaskManager(object):
 		self.logger = logging.getLogger('starclass')
 
 		# Load the SQLite file:
-		#if self.readonly:
-		#	self.conn = sqlite3.connect('file:' + todo_file + '?mode=ro', uri=True)
-		#else:
-		self.conn = sqlite3.connect(todo_file)
+		if self.run_from_memory:
+			self.conn = sqlite3.connect(':memory:')
+			with contextlib.closing(sqlite3.connect('file:' + todo_file + '?mode=ro', uri=True)) as source:
+				source.backup(self.conn)
+		else:
+			self.conn = sqlite3.connect(todo_file)
+
 		self.conn.row_factory = sqlite3.Row
 		self.cursor = self.conn.cursor()
 		self.cursor.execute("PRAGMA foreign_keys=ON;")
 		self.cursor.execute("PRAGMA locking_mode=EXCLUSIVE;")
 		self.cursor.execute("PRAGMA journal_mode=TRUNCATE;")
+		self.conn.commit()
 
 		# Find out if corrections have been run:
 		self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='diagnostics_corr';")
@@ -163,20 +171,47 @@ class TaskManager(object):
 				self.conn.isolation_level = tmp_isolevel
 
 	#----------------------------------------------------------------------------------------------
+	def backup(self):
+		"""
+		Save backup of todo-file to disk.
+
+		This only has an effect when `load_in_memory` is enabled.
+
+		Returns:
+			str: Path to backup file, which will be in the same directory as the original
+				todo-file. ``None`` is returned if no backup was needed.
+		"""
+		if self.run_from_memory:
+			dest_todo_file = tempfile.NamedTemporaryFile(
+				dir=self.input_folder,
+				prefix='backup-',
+				suffix=os.path.basename(self.todo_file),
+				delete=False).name
+			with contextlib.closing(sqlite3.connect(dest_todo_file)) as dest:
+				self.conn.backup(dest)
+			return dest_todo_file
+		return None
+
+	#----------------------------------------------------------------------------------------------
 	def close(self):
 		"""Close TaskManager and all associated objects."""
+		backupfile = None
 		if hasattr(self, 'cursor') and hasattr(self, 'conn') and self.conn:
 			try:
 				self.conn.rollback()
 				self.cursor.execute("PRAGMA journal_mode=DELETE;")
 				self.conn.commit()
 				self.cursor.close()
+				backupfile = self.backup()
 			except sqlite3.ProgrammingError: # pragma: no cover
 				pass
 
 		if hasattr(self, 'conn') and self.conn:
 			self.conn.close()
 			self.conn = None
+
+		if backupfile is not None:
+			os.replace(backupfile, self.todo_file)
 
 	#----------------------------------------------------------------------------------------------
 	def __del__(self):
@@ -599,6 +634,10 @@ class TaskManager(object):
 			except: # noqa: E722, pragma: no cover
 				self.conn.rollback()
 				raise
+
+		# FIXME: Backup every X results:
+		#if self.results_saved % 5000 == 0:
+		#	self.backup()
 
 	#----------------------------------------------------------------------------------------------
 	def start_task(self, tasks):

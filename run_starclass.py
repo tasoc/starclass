@@ -106,7 +106,7 @@ def main():
 	# Running:
 	# When simply running the classifier on new stars:
 	stcl = None
-	with starclass.TaskManager(todo_file, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
+	with starclass.TaskManager(todo_file, overwrite=args.overwrite, classes=tset.StellarClasses, load_in_memory=True) as tm:
 		# If we were asked to do so, start by clearing the existing MOAT tables:
 		if args.overwrite and args.clear_cache:
 			tm.moat_clear()

@@ -18,4 +18,4 @@ tqdm
 pyentrp == 0.7.1
 h5py >= 3.7
 numba == 0.55.2 # Needed by shap
-shap == 0.40.0
+shap == 0.41.0

@@ -415,8 +415,13 @@ class BaseClassifier(object):
 		if feature_importance:
 			logger.info('Calculating feature importances...')
 			if self.classifier_model is not None:
-				explainer = shap.TreeExplainer(self.classifier_model)
-				shap_values = explainer.shap_values(features)
+				with warnings.catch_warnings():
+					# Ignore:
+					#  - DeprecationWarning: `np.bool` is a deprecated alias for the builtin `bool`.
+					#  - DeprecationWarning: `np.int` is a deprecated alias for the builtin `int`.
+					warnings.filterwarnings('ignore', category=DeprecationWarning)
+					explainer = shap.TreeExplainer(self.classifier_model)
+					shap_values = explainer.shap_values(features)
 
 				fig = plots.plot_feature_importance(shap_values, features, self.features_names, all_classes)
 				fig.savefig(os.path.join(self.data_dir, 'feature_importance_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')

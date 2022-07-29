@@ -406,7 +406,7 @@ def freq_ampratios(featdictrow, n_usedfreqs, usedfreqs):
 		amp31 = tab[(tab['num'] == usedfreqs[2]['num']) & (tab['harmonic'] == usedfreqs[2]['harmonic'])]['amplitude'] / peak1['amplitude']
 	else:
 		amp31 = 0
-	return amp21,amp31
+	return float(amp21), float(amp31)
 
 #--------------------------------------------------------------------------------------------------
 def freq_phasediffs(featdictrow, n_usedfreqs, usedfreqs):
@@ -434,7 +434,7 @@ def freq_phasediffs(featdictrow, n_usedfreqs, usedfreqs):
 		phi31 = tab[(tab['num'] == usedfreqs[2]['num']) & (tab['harmonic'] == usedfreqs[2]['harmonic'])]['phase'] - 3*peak1['phase']
 	else:
 		phi31 = 0
-	return phi21,phi31
+	return float(phi21), float(phi31)
 
 #--------------------------------------------------------------------------------------------------
 def phase_features(time, flux, per):

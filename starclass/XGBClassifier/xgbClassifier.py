@@ -62,7 +62,8 @@ class XGBClassifier(BaseClassifier):
 				max_depth=6,
 				min_child_weight=1,
 				n_estimators=500,
-				objective='multi:softprob',
+				objective='multi:softmax',
+				num_class=len(self.StellarClasses),
 				random_state=self.random_seed, # XGBoost uses misleading names
 				reg_alpha=1e-5,
 				subsample=0.8,

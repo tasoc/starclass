@@ -474,7 +474,7 @@ class TaskManager(object):
 			FOREIGN KEY (priority) REFERENCES diagnostics_corr(priority) ON DELETE CASCADE ON UPDATE CASCADE
 		);"""
 		self.cursor.execute(query_create)
-		self.cursor.execute("ANALYZE;")
+		self.cursor.execute(f"ANALYZE {table_name:s};")
 
 		# Generate SQL statement which will be used to insert extracted features
 		# into this table:

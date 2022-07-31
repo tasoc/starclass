@@ -180,31 +180,28 @@ class TaskManager(object):
 	def backup(self):
 		"""
 		Save backup of todo-file to disk.
-
 		This only has an effect when `load_in_memory` is enabled.
-
-		Returns:
-			str: Path to backup file, which will be in the same directory as the original
-				todo-file. ``None`` is returned if no backup was needed.
 		"""
 		if self.run_from_memory:
-			dest_todo_file = tempfile.NamedTemporaryFile(
+			backupfile = tempfile.NamedTemporaryFile(
 				dir=self.input_folder,
 				prefix='backup-',
 				suffix='-' + os.path.basename(self.todo_file),
 				delete=False).name
-			with contextlib.closing(sqlite3.connect(dest_todo_file)) as dest:
+			with contextlib.closing(sqlite3.connect(backupfile)) as dest:
 				self.conn.backup(dest)
 				dest.execute("PRAGMA journal_mode=DELETE;")
 				dest.execute('PRAGMA synchronous=NORMAL;')
 				dest.commit()
-			return dest_todo_file
-		return None
+
+			# Since we are running from memory, the original file
+			# is not opened by any process, so we are free to
+			# replace it:
+			os.replace(backupfile, self.todo_file)
 
 	#----------------------------------------------------------------------------------------------
 	def close(self):
 		"""Close TaskManager and all associated objects."""
-		backupfile = None
 		if hasattr(self, 'cursor') and hasattr(self, 'conn') and self.conn:
 			try:
 				self.conn.rollback()
@@ -212,16 +209,13 @@ class TaskManager(object):
 				self.cursor.execute('PRAGMA synchronous=NORMAL;')
 				self.conn.commit()
 				self.cursor.close()
-				backupfile = self.backup()
+				self.backup()
 			except sqlite3.ProgrammingError: # pragma: no cover
 				pass
 
 		if hasattr(self, 'conn') and self.conn:
 			self.conn.close()
 			self.conn = None
-
-		if backupfile is not None:
-			os.replace(backupfile, self.todo_file)
 
 	#----------------------------------------------------------------------------------------------
 	def __del__(self):

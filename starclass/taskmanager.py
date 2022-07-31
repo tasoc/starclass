@@ -68,17 +68,23 @@ class TaskManager(object):
 
 		# Load the SQLite file:
 		if self.run_from_memory:
+			self.logger.debug('Creating in-memory copy of database...')
 			self.conn = sqlite3.connect(':memory:')
+			journal_mode = 'MEMORY'
+			syncronous = 'OFF'
 			with contextlib.closing(sqlite3.connect('file:' + todo_file + '?mode=ro', uri=True)) as source:
 				source.backup(self.conn)
 		else:
 			self.conn = sqlite3.connect(todo_file)
+			journal_mode = 'TRUNCATE'
+			syncronous = 'NORMAL'
 
 		self.conn.row_factory = sqlite3.Row
 		self.cursor = self.conn.cursor()
 		self.cursor.execute("PRAGMA foreign_keys=ON;")
 		self.cursor.execute("PRAGMA locking_mode=EXCLUSIVE;")
-		self.cursor.execute("PRAGMA journal_mode=TRUNCATE;")
+		self.cursor.execute(f"PRAGMA journal_mode={journal_mode:s};")
+		self.cursor.execute(f"PRAGMA synchronous={syncronous:s};")
 		self.conn.commit()
 
 		# Find out if corrections have been run:
@@ -185,10 +191,13 @@ class TaskManager(object):
 			dest_todo_file = tempfile.NamedTemporaryFile(
 				dir=self.input_folder,
 				prefix='backup-',
-				suffix=os.path.basename(self.todo_file),
+				suffix='-' + os.path.basename(self.todo_file),
 				delete=False).name
 			with contextlib.closing(sqlite3.connect(dest_todo_file)) as dest:
 				self.conn.backup(dest)
+				dest.execute("PRAGMA journal_mode=DELETE;")
+				dest.execute('PRAGMA synchronous=NORMAL;')
+				dest.commit()
 			return dest_todo_file
 		return None
 
@@ -200,6 +209,7 @@ class TaskManager(object):
 			try:
 				self.conn.rollback()
 				self.cursor.execute("PRAGMA journal_mode=DELETE;")
+				self.cursor.execute('PRAGMA synchronous=NORMAL;')
 				self.conn.commit()
 				self.cursor.close()
 				backupfile = self.backup()

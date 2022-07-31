@@ -162,6 +162,44 @@ class TaskManager(object):
 		if not self.datavalidation_exists:
 			self.logger.warning("DATA-VALIDATION information is not available in this TODO-file. Assuming all targets are good.")
 
+		# Create tempoary table which will replace the "todolist" table
+		# in subsequent queries. This is to avoid doing joins in each query
+		# performed in the "query_task" method. This filters out anything
+		# that didn't pass data-validation and joins with the diagnostics information.
+		self.cursor.execute("DROP TABLE IF EXISTS temp.starclass_todolist;")
+		self.cursor.execute("""CREATE TEMP TABLE starclass_todolist (
+			priority INTEGER NOT NULL,
+			starid INTEGER NOT NULL,
+			tmag REAL NOT NULL,
+			lightcurve TEXT NOT NULL,
+			variance REAL,
+			rms_hour REAL,
+			ptp REAL,
+			PRIMARY KEY (priority)
+		);""")
+
+		# If data-validation information is available, only include targets
+		# which passed the data validation:
+		if self.datavalidation_exists:
+			search_joins = "INNER JOIN datavalidation_corr ON datavalidation_corr.priority=todolist.priority"
+			search_query = "AND datavalidation_corr.approved=1"
+		self.cursor.execute(f"""INSERT INTO temp.starclass_todolist SELECT
+			todolist.priority,
+			todolist.starid,
+			todolist.tmag,
+			diagnostics_corr.lightcurve,
+			diagnostics_corr.variance,
+			diagnostics_corr.rms_hour,
+			diagnostics_corr.ptp
+		FROM
+			todolist
+			INNER JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority
+			{search_joins:s}
+		WHERE
+			todolist.corr_status IN ({STATUS.OK.value:d},{STATUS.WARNING.value:d})
+			{search_query:s}
+		ORDER BY todolist.priority;""")
+
 		# Analyze the tables for better query planning:
 		self.cursor.execute("ANALYZE;")
 		self.conn.commit()
@@ -242,11 +280,6 @@ class TaskManager(object):
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-		# If data-validation information is available, only include targets
-		# which passed the data validation:
-		if self.datavalidation_exists:
-			add_joins = "INNER JOIN datavalidation_corr ON datavalidation_corr.priority=todolist.priority"
-			add_query = "AND datavalidation_corr.approved=1"
 
 		# List of all classifiers to be processed, including the meta-classifier:
 		classifiers = [classifier] if classifier else (list(self.all_classifiers) + ['meta'])
@@ -254,14 +287,11 @@ class TaskManager(object):
 		# Loop through the classifiers and count up the number of missing tasks:
 		num = 0
 		for clfier in classifiers:
-			self.cursor.execute(f"""SELECT COUNT(*) FROM
-					todolist
-					{add_joins:s}
-					LEFT JOIN starclass_diagnostics ON starclass_diagnostics.priority=todolist.priority AND starclass_diagnostics.classifier=?
+			self.cursor.execute("""SELECT COUNT(*) FROM
+					temp.starclass_todolist
+					LEFT JOIN starclass_diagnostics ON starclass_diagnostics.priority=temp.starclass_todolist.priority AND starclass_diagnostics.classifier=?
 				WHERE
-					todolist.corr_status IN ({STATUS.OK.value:d},{STATUS.WARNING.value:d})
-					{add_query:s}
-					AND starclass_diagnostics.status IS NULL;""", [clfier])
+					starclass_diagnostics.status IS NULL;""", [clfier])
 			num += self.cursor.fetchone()[0]
 		return num
 
@@ -277,47 +307,31 @@ class TaskManager(object):
 
 		# Build list of constraints:
 		if priority is not None:
-			search_query.append(f'todolist.priority={priority:d}')
-
-		# If data-validation information is available, only include targets
-		# which passed the data validation:
-		if self.datavalidation_exists:
-			search_joins.append("INNER JOIN datavalidation_corr ON datavalidation_corr.priority=todolist.priority")
-			search_query.append("datavalidation_corr.approved=1")
+			search_query.append(f'temp.starclass_todolist.priority={priority:d}')
 
 		# If a classifier is specified, constrain to only that classifier:
 		if classifier is not None:
-			search_joins.append(f"LEFT JOIN starclass_diagnostics ON starclass_diagnostics.priority=todolist.priority AND starclass_diagnostics.classifier='{classifier:s}'")
+			search_joins.append(f"LEFT JOIN starclass_diagnostics ON starclass_diagnostics.priority=temp.starclass_todolist.priority AND starclass_diagnostics.classifier='{classifier:s}'")
 			search_query.append("starclass_diagnostics.status IS NULL")
 
 		# If the requested classifier is the MetaClassifier,
 		# we should only pick out the tasks where all other classifiers have returned
 		# something:
 		if classifier == 'meta':
-			search_query.append(f"(SELECT COUNT(*) FROM starclass_diagnostics d2 WHERE d2.priority=todolist.priority AND d2.classifier!='meta' AND d2.status!={STATUS.STARTED.value}) = {len(self.all_classifiers):d}")
+			search_query.append(f"(SELECT COUNT(*) FROM starclass_diagnostics d2 WHERE d2.priority=temp.starclass_todolist.priority AND d2.classifier!='meta' AND d2.status!={STATUS.STARTED.value}) = {len(self.all_classifiers):d}")
 
 		# Build query string:
 		# Note: It is not possible for search_query to be empty!
 		search_joins = "\n".join(search_joins)
-		search_query = "AND " + " AND ".join(search_query)
+		search_query = " AND ".join(search_query)
 
 		self.cursor.execute(f"""
-			SELECT
-				todolist.priority,
-				todolist.starid,
-				todolist.tmag,
-				diagnostics_corr.lightcurve AS lightcurve,
-				diagnostics_corr.variance,
-				diagnostics_corr.rms_hour,
-				diagnostics_corr.ptp
-			FROM
-				todolist
-				INNER JOIN diagnostics_corr ON todolist.priority=diagnostics_corr.priority
+			SELECT starclass_todolist.* FROM
+				temp.starclass_todolist
 				{search_joins:s}
-			WHERE
-				todolist.corr_status IN ({STATUS.OK.value:d},{STATUS.WARNING.value:d})
-				{search_query:s}
-			ORDER BY todolist.priority LIMIT {chunk:d};""")
+			WHERE {search_query:s}
+			ORDER BY temp.starclass_todolist.priority LIMIT {chunk:d};""")
+
 		tasks = [dict(task) for task in self.cursor.fetchall()]
 		if tasks:
 			for task in tasks:
@@ -579,34 +593,33 @@ class TaskManager(object):
 		if isinstance(results, dict):
 			results = [results]
 
-		for result in results:
-			# If the training set has not already been set for this TODO-file,
-			# update the settings, and if it has check that we are not
-			# mixing results from different correctors in one TODO-file.
-			tset = result.get('tset')
-			if self.tset is None and tset:
-				self.tset = tset
-				self.save_settings()
-			elif tset != self.tset:
-				raise ValueError(f"Attempting to mix results from multiple training sets. Previous='{self.tset}', New='{tset}'.")
+		# If the training set has not already been set for this TODO-file,
+		# update the settings:
+		if self.tset is None and results[0].get('tset'):
+			self.tset = results[0].get('tset')
+			self.save_settings()
 
-			priority = result.get('priority')
-			classifier = result.get('classifier')
-			status = result.get('status')
-			details = result.get('details', {})
-			starclass_results = result.get('starclass_results', {})
-			common = result.get('features_common', None)
-			features = result.get('features', None)
+		self.cursor.execute("BEGIN TRANSACTION;")
+		try:
+			for result in results:
+				# Check that we are not mixing results
+				# from different correctors in one TODO-file.
+				tset = result.get('tset')
+				if tset != self.tset:
+					raise ValueError(f"Attempting to mix results from multiple training sets. Previous='{self.tset}', New='{tset}'.")
 
-			# Save additional diagnostics:
-			error_msg = details.get('errors', None)
-			if error_msg:
-				error_msg = '\n'.join(error_msg)
-				#self.summary['last_error'] = error_msg
+				priority = result.get('priority')
+				classifier = result.get('classifier')
+				status = result.get('status')
+				details = result.get('details', {})
+				starclass_results = result.get('starclass_results', {})
+				common = result.get('features_common', None)
+				features = result.get('features', None)
+				error_msg = details.get('errors', None)
+				if error_msg:
+					error_msg = '\n'.join(error_msg)
+					#self.summary['last_error'] = error_msg
 
-			# Store the results in database:
-			self.cursor.execute("BEGIN TRANSACTION;")
-			try:
 				# Save additional diagnostics:
 				self.cursor.execute("INSERT OR REPLACE INTO starclass_diagnostics (priority,classifier,status,errors,elaptime,worker_wait_time) VALUES (:priority,:classifier,:status,:errors,:elaptime,:worker_wait_time);", {
 					'priority': priority,
@@ -617,14 +630,15 @@ class TaskManager(object):
 					'errors': error_msg
 				})
 
+				# Store the results in database:
 				self.cursor.execute("DELETE FROM starclass_results WHERE priority=? AND classifier=?;", (priority, classifier))
-				for key, value in starclass_results.items():
-					self.cursor.execute("INSERT INTO starclass_results (priority,classifier,class,prob) VALUES (:priority,:classifier,:class,:prob);", {
+				self.cursor.executemany("INSERT INTO starclass_results (priority,classifier,class,prob) VALUES (:priority,:classifier,:class,:prob);", (
+					{
 						'priority': priority,
 						'classifier': classifier,
 						'class': key.name,
 						'prob': value
-					})
+					} for key, value in starclass_results.items()))
 
 				# Save common features if they are provided:
 				if common:
@@ -634,14 +648,16 @@ class TaskManager(object):
 				if features and classifier != 'meta':
 					self._moat_insert(classifier, priority, features)
 
-				self.conn.commit()
-			except: # noqa: E722, pragma: no cover
-				self.conn.rollback()
-				raise
+			self.conn.commit()
+		except: # noqa: E722, pragma: no cover
+			self.conn.rollback()
+			raise
 
 		# FIXME: Backup every X results:
-		#if self.results_saved % 5000 == 0:
+		#self.results_saved += len(results)
+		#if self.results_saved >= 5000:
 		#	self.backup()
+		#	self.results_saved = 0
 
 	#----------------------------------------------------------------------------------------------
 	def start_task(self, tasks):

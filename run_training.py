@@ -92,7 +92,7 @@ def main():
 	if args.classifier == 'meta':
 		# Loop through all the other classifiers and initialize them:
 		with starclass.TaskManager(tset.todo_file, overwrite=args.overwrite,
-			classes=tset.StellarClasses, load_in_memory=args.no_in_memory) as tm:
+			classes=tset.StellarClasses, load_into_memory=args.no_in_memory) as tm:
 			# Loop through all classifiers, excluding the MetaClassifier:
 			# TODO: Run in parallel?
 			for cla_key in tm.all_classifiers:
@@ -132,7 +132,7 @@ def main():
 	# Initialize the classifier:
 	classifier = starclass.get_classifier(args.classifier)
 	with starclass.TaskManager(tset.todo_file, overwrite=False, classes=tset.StellarClasses,
-		load_in_memory=args.no_in_memory) as tm:
+		load_into_memory=args.no_in_memory) as tm:
 		with classifier(tset=tset, features_cache=tset.features_cache, data_dir=args.output) as stcl:
 			# Run the training of the classifier:
 			logger.info("Training %s on full training-set...", args.classifier)

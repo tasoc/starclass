@@ -27,7 +27,7 @@ class TaskManager(object):
 	"""
 
 	def __init__(self, todo_file, cleanup=False, readonly=False, overwrite=False, classes=None,
-		load_in_memory=False, backup_interval=10000):
+		load_into_memory=False, backup_interval=10000):
 		"""
 		Initialize the TaskManager which keeps track of which targets to process.
 
@@ -38,8 +38,11 @@ class TaskManager(object):
 			overwrite (bool): Overwrite any previously calculated results. Default=False.
 			classes (Enum): Possible stellar classes. This is only used for for translating
 				saved stellar classes in the ``other_classifiers`` table into proper enums.
-			load_in_memory (bool):
-			backup_interval (int):
+			load_into_memory (bool): Create a in-memory copy of the entire TODO-file, and
+				work of this copy to speed up queries. Will result in larger memory use.
+				Default=True.
+			backup_interval (int): Save in-memory copy of database to disk after this number of
+				results saved by :func:`save_results`. Default=10000.
 
 		Raises:
 			FileNotFoundError: If TODO-file could not be found.
@@ -55,7 +58,7 @@ class TaskManager(object):
 		if backup_interval is not None and int(backup_interval) <= 0:
 			raise ValueError("Invalid backup_interval")
 
-		self.run_from_memory = load_in_memory
+		self.run_from_memory = load_into_memory
 		self.todo_file = os.path.abspath(todo_file)
 		self.StellarClasses = classes
 		self.readonly = readonly
@@ -229,6 +232,8 @@ class TaskManager(object):
 		"""
 		Save backup of todo-file to disk.
 		This only has an effect when `load_in_memory` is enabled.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 		if self.run_from_memory:
 			backupfile = tempfile.NamedTemporaryFile(

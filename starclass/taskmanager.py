@@ -26,7 +26,8 @@ class TaskManager(object):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	def __init__(self, todo_file, cleanup=False, readonly=False, overwrite=False, classes=None, load_in_memory=False):
+	def __init__(self, todo_file, cleanup=False, readonly=False, overwrite=False, classes=None,
+		load_in_memory=False, backup_interval=10000):
 		"""
 		Initialize the TaskManager which keeps track of which targets to process.
 
@@ -37,6 +38,8 @@ class TaskManager(object):
 			overwrite (bool): Overwrite any previously calculated results. Default=False.
 			classes (Enum): Possible stellar classes. This is only used for for translating
 				saved stellar classes in the ``other_classifiers`` table into proper enums.
+			load_in_memory (bool):
+			backup_interval (int):
 
 		Raises:
 			FileNotFoundError: If TODO-file could not be found.
@@ -49,6 +52,8 @@ class TaskManager(object):
 
 		if not os.path.exists(todo_file):
 			raise FileNotFoundError('Could not find TODO-file')
+		if backup_interval is not None and int(backup_interval) <= 0:
+			raise ValueError("Invalid backup_interval")
 
 		self.run_from_memory = load_in_memory
 		self.todo_file = os.path.abspath(todo_file)
@@ -57,6 +62,8 @@ class TaskManager(object):
 		self.tset = None
 		self.input_folder = os.path.abspath(os.path.dirname(todo_file))
 		self._moat_tables = {}
+		self.backup_interval = None if backup_interval is None else int(backup_interval)
+		self._results_saved_counter = 0
 
 		# Keep a list of all the possible classifiers here:
 		self.all_classifiers = list(classifier_list)
@@ -85,6 +92,7 @@ class TaskManager(object):
 		self.cursor.execute("PRAGMA locking_mode=EXCLUSIVE;")
 		self.cursor.execute(f"PRAGMA journal_mode={journal_mode:s};")
 		self.cursor.execute(f"PRAGMA synchronous={syncronous:s};")
+		self.cursor.execute("PRAGMA temp_store=MEMORY;")
 		self.conn.commit()
 
 		# Find out if corrections have been run:
@@ -166,6 +174,7 @@ class TaskManager(object):
 		# in subsequent queries. This is to avoid doing joins in each query
 		# performed in the "query_task" method. This filters out anything
 		# that didn't pass data-validation and joins with the diagnostics information.
+		self.cursor.execute("BEGIN TRANSACTION;")
 		self.cursor.execute("DROP TABLE IF EXISTS temp.starclass_todolist;")
 		self.cursor.execute("""CREATE TEMP TABLE starclass_todolist (
 			priority INTEGER NOT NULL,
@@ -199,6 +208,7 @@ class TaskManager(object):
 			todolist.corr_status IN ({STATUS.OK.value:d},{STATUS.WARNING.value:d})
 			{search_query:s}
 		ORDER BY todolist.priority;""")
+		self.conn.commit()
 
 		# Analyze the tables for better query planning:
 		self.cursor.execute("ANALYZE;")
@@ -223,8 +233,7 @@ class TaskManager(object):
 		if self.run_from_memory:
 			backupfile = tempfile.NamedTemporaryFile(
 				dir=self.input_folder,
-				prefix='backup-',
-				suffix='-' + os.path.basename(self.todo_file),
+				prefix=os.path.basename(self.todo_file) + '-backup-',
 				delete=False).name
 			with contextlib.closing(sqlite3.connect(backupfile)) as dest:
 				self.conn.backup(dest)
@@ -356,7 +365,7 @@ class TaskManager(object):
 
 				# If the classifier that is running is the meta-classifier,
 				# add the results from all other classifiers to the task dict:
-				if classifier == 'meta':
+				else:
 					if self.StellarClasses is None:
 						raise RuntimeError("classes not provided to TaskManager.")
 
@@ -653,11 +662,11 @@ class TaskManager(object):
 			self.conn.rollback()
 			raise
 
-		# FIXME: Backup every X results:
-		#self.results_saved += len(results)
-		#if self.results_saved >= 5000:
-		#	self.backup()
-		#	self.results_saved = 0
+		# Backup every X results:
+		self._results_saved_counter += len(results)
+		if self.backup_interval is not None and self._results_saved_counter >= self.backup_interval:
+			self.backup()
+			self._results_saved_counter = 0
 
 	#----------------------------------------------------------------------------------------------
 	def start_task(self, tasks):

@@ -42,6 +42,7 @@ def main():
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
 	parser.add_argument('--chunks', type=int, default=10, help="Number of tasks sent to each worker at a time.")
+	parser.add_argument('--no-in-memory', action='store_false', help="Do not run TaskManager completely in-memory.")
 	parser.add_argument('--clear-cache', help='Clear existing features cache tables before running. Can only be used together with --overwrite.', action='store_true')
 	# Option to select which classifier to run:
 	parser.add_argument('-c', '--classifier',
@@ -123,7 +124,8 @@ def main():
 		logger.setLevel(logging_level)
 
 		try:
-			with starclass.TaskManager(todo_file, cleanup=True, overwrite=args.overwrite, classes=tset.StellarClasses, load_in_memory=True) as tm:
+			with starclass.TaskManager(todo_file, cleanup=True, overwrite=args.overwrite,
+				classes=tset.StellarClasses, load_in_memory=args.no_in_memory) as tm:
 				# If we were asked to do so, start by clearing the existing MOAT tables:
 				if args.overwrite and args.clear_cache:
 					tm.moat_clear()

@@ -524,5 +524,23 @@ def test_taskmanager_assign_final_class(SHARED_INPUT_DIR):
 			np.testing.assert_array_equal(first_try, second_try)
 
 #--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('interval', [
+	pytest.param(-1, marks=pytest.mark.xfail(raises=ValueError)),
+	pytest.param(-1.0, marks=pytest.mark.xfail(raises=ValueError)),
+	pytest.param(0, marks=pytest.mark.xfail(raises=ValueError)),
+	pytest.param(0.0, marks=pytest.mark.xfail(raises=ValueError)),
+	pytest.param(np.nan, marks=pytest.mark.xfail(raises=ValueError)),
+	pytest.param('nonsense', marks=pytest.mark.xfail(raises=ValueError)),
+	1,
+	1.0,
+	10000,
+	None
+])
+def test_taskmanager_backupinterval(PRIVATE_TODO_FILE, interval):
+	"""Test TaskManager with invalid backup interval"""
+	TaskManager(PRIVATE_TODO_FILE, overwrite=False, cleanup=False, classes=StellarClassesLevel1,
+		backup_interval=interval)
+
+#--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	pytest.main([__file__])

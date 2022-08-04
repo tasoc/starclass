@@ -231,7 +231,7 @@ class TaskManager(object):
 	def backup(self):
 		"""
 		Save backup of todo-file to disk.
-		This only has an effect when `load_in_memory` is enabled.
+		This only has an effect when `load_into_memory` is enabled.
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
@@ -589,6 +589,8 @@ class TaskManager(object):
 			self.cursor.execute("VACUUM;")
 		finally:
 			self.conn.isolation_level = tmp_isolevel
+
+		self.backup()
 
 	#----------------------------------------------------------------------------------------------
 	def save_results(self, results):

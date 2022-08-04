@@ -401,8 +401,6 @@ class TaskManager(object):
 						names=('classifier', 'class', 'prob'),
 					)
 
-			if chunk == 1:
-				return tasks[0]
 			return tasks
 		return None
 
@@ -422,8 +420,8 @@ class TaskManager(object):
 			chunk (int, optional): Chunk of tasks to return. Default is to not chunk (=1).
 
 		Returns:
-			dict, list or None: Dictionary of settings for task.
-				If ``chunk`` is larger than one, a list of dicts is retuned instead.
+			list or None: List of dictionaries of settings for tasks.
+				If no tasks are found ``None`` is returned.
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
@@ -443,13 +441,9 @@ class TaskManager(object):
 
 			# Pick the classifier that has reached the lowest priority:
 			if all_tasks:
-				# We have to go a little deeper depending if we have chunk=1 (dict returned)
-				# or chunk>1 (list of dicts returned). We can get away with just taking the
-				# first priority in the latter case, since they are already sorted by priority:
-				if chunk == 1:
-					indx = np.argmin([t['priority'] for t in all_tasks])
-				else:
-					indx = np.argmin([t[0]['priority'] for t in all_tasks])
+				# We can get away with just taking the first priority,
+				# since they are already sorted by priority:
+				indx = np.argmin([t[0]['priority'] for t in all_tasks])
 				return all_tasks[indx]
 
 			# If this is reached, all classifiers are done, and we can

@@ -227,12 +227,6 @@ def main():
 				toc_wait = default_timer()
 
 				if tag == tags.START:
-					# Make sure we can loop through tasks,
-					# even in the case we have only gotten one:
-					results = []
-					if isinstance(tasks, dict):
-						tasks = [tasks]
-
 					# Run the classification prediction:
 					if tasks[0]['classifier'] != current_classifier or stcl is None:
 						current_classifier = tasks[0]['classifier']
@@ -242,6 +236,7 @@ def main():
 						stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate, data_dir=args.datadir)
 
 					# Loop through the tasks given to us:
+					results = []
 					for task in tasks:
 						result = stcl.classify(task)
 

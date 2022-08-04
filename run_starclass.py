@@ -122,8 +122,6 @@ def main():
 			while True:
 				tasks = tm.get_task(classifier=current_classifier, change_classifier=change_classifier, chunk=args.chunks)
 				logger.debug(tasks)
-				if tasks is None:
-					break
 				tm.start_task(tasks)
 
 				# ----------------- This code would run on each worker ------------------------

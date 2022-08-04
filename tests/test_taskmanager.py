@@ -88,7 +88,7 @@ def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
 			tm.get_task()
 
 		# Get the first task in the TODO file:
-		task1 = tm.get_task(classifier='slosh')
+		task1 = tm.get_task(classifier='slosh', chunk=1)[0]
 		print(task1)
 
 		# Check that it contains what we know it should:
@@ -102,7 +102,7 @@ def test_taskmanager_get_tasks(PRIVATE_TODO_FILE):
 		tm.start_task(task1)
 
 		# Get the next task, which should be the one with priority=2:
-		task2 = tm.get_task(classifier='slosh')
+		task2 = tm.get_task(classifier='slosh', chunk=1)[0]
 		print(task2)
 
 		assert task2['priority'] == 26
@@ -124,7 +124,9 @@ def test_taskmanager_chunks(PRIVATE_TODO_FILE):
 	# Reset the TODO-file completely, and mark the first task as STARTED:
 	with TaskManager(PRIVATE_TODO_FILE) as tm:
 		task1 = tm.get_task(classifier='rfgc')
-		assert isinstance(task1, dict)
+		assert isinstance(task1, list)
+		assert len(task1) == 1
+		assert isinstance(task1[0], dict)
 
 		task10 = tm.get_task(classifier='rfgc', chunk=10)
 		assert isinstance(task10, list)
@@ -142,7 +144,7 @@ def test_taskmanager_get_tasks_priority(PRIVATE_TODO_FILE):
 
 	with TaskManager(PRIVATE_TODO_FILE, overwrite=True) as tm:
 		task = tm.get_task(priority=17)
-		assert task['priority'] == 17
+		assert task[0]['priority'] == 17
 
 		# Call with non-existing starid:
 		task = tm.get_task(priority=-1234567890)
@@ -206,9 +208,8 @@ def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE, chunk):
 		print(task1)
 
 		# It should be the only missing task with SLOSH:
-		if chunk > 1:
-			assert len(task1) == 1
-			task1 = task1[0]
+		assert len(task1) == 1
+		task1 = task1[0]
 		assert task1['priority'] == 17
 		assert task1['classifier'] == 'slosh'
 
@@ -218,9 +219,8 @@ def test_taskmanager_switch_classifier(PRIVATE_TODO_FILE, chunk):
 		# Get the next task, which should be the one with priority=2:
 		task2 = tm.get_task(classifier='slosh', chunk=chunk)
 		print(task2)
-		if chunk > 1:
-			assert len(task2) == chunk
-			task2 = task2[0]
+		assert len(task2) == chunk
+		task2 = task2[0]
 
 		# We should now get the highest priority target, but not with SLOSH:
 		assert task2['priority'] == 17
@@ -243,9 +243,8 @@ def test_taskmanager_switch_classifier_meta(PRIVATE_TODO_FILE, chunk):
 		print(task1)
 
 		# It should be the only missing task with SLOSH:
-		if chunk > 1:
-			assert len(task1) == 1
-			task1 = task1[0]
+		assert len(task1) == 1
+		task1 = task1[0]
 		assert task1['priority'] == 17
 		assert task1['classifier'] == 'slosh'
 
@@ -257,13 +256,9 @@ def test_taskmanager_switch_classifier_meta(PRIVATE_TODO_FILE, chunk):
 		# it is not yet complete.
 		task2 = tm.get_task(classifier='meta', chunk=chunk)
 		print(task2)
-		if chunk > 1:
-			assert len(task2) == chunk
-			priorities = [t['priority'] for t in task2]
-			classifiers = [t['classifier'] for t in task2]
-		else:
-			priorities = [task2['priority']]
-			classifiers = [task2['classifier']]
+		assert len(task2) == chunk
+		priorities = [t['priority'] for t in task2]
+		classifiers = [t['classifier'] for t in task2]
 
 		assert 17 not in priorities
 		assert np.all(np.array(classifiers) == 'meta')
@@ -276,13 +271,9 @@ def test_taskmanager_switch_classifier_meta(PRIVATE_TODO_FILE, chunk):
 		# the task should now be avialble:
 		task3 = tm.get_task(classifier='meta', chunk=chunk)
 		print(task3)
-		if chunk > 1:
-			assert len(task3) == chunk
-			priorities = [t['priority'] for t in task3]
-			classifiers = [t['classifier'] for t in task3]
-		else:
-			priorities = [task3['priority']]
-			classifiers = [task3['classifier']]
+		assert len(task3) == chunk
+		priorities = [t['priority'] for t in task3]
+		classifiers = [t['classifier'] for t in task3]
 
 		assert 17 in priorities
 		assert np.all(np.array(classifiers) == 'meta')
@@ -302,7 +293,7 @@ def test_taskmanager_meta_classifier(PRIVATE_TODO_FILE):
 			}})
 
 		# Get the first task in the TODO file for the MetaClassifier:
-		task1 = tm.get_task(classifier='meta')
+		task1 = tm.get_task(classifier='meta', chunk=1)[0]
 		print(task1)
 
 		# It should be the only missing task with SLOSH:
@@ -332,7 +323,7 @@ def test_taskmanager_save_and_settings(PRIVATE_TODO_FILE):
 		assert settings is None
 
 		# Start a random task:
-		task = tm.get_task(classifier='meta')
+		task = tm.get_task(classifier='meta')[0]
 		print(task)
 		tm.start_task(task)
 
@@ -386,7 +377,7 @@ def test_taskmanager_moat(PRIVATE_TODO_FILE, classifier):
 
 	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
 		# Start a random task:
-		task = tm.get_task(classifier=classifier)
+		task = tm.get_task(classifier=classifier)[0]
 		print(task)
 
 		# Create dummy features which we will save and restore:
@@ -429,7 +420,7 @@ def test_taskmanager_moat(PRIVATE_TODO_FILE, classifier):
 
 		# If we ask for the exact same target, we should get another classifier,
 		# but the common features should now be provided to us:
-		task2 = tm.get_task(priority=task['priority'], classifier=classifier)
+		task2 = tm.get_task(priority=task['priority'], classifier=classifier)[0]
 		print('TASK2: %s' % task2)
 		assert task2['classifier'] != classifier
 		assert task2['features_common'] == features_common
@@ -440,7 +431,7 @@ def test_taskmanager_moat(PRIVATE_TODO_FILE, classifier):
 
 		# If we ask for the exact same target, we should get THE SAME classifier,
 		# but the common features should now be provided to us:
-		task3 = tm.get_task(priority=task['priority'], classifier=classifier)
+		task3 = tm.get_task(priority=task['priority'], classifier=classifier)[0]
 		print('TASK3: %s' % task3)
 		assert task3['classifier'] == classifier
 		assert task3['features_common'] == features_common

@@ -34,7 +34,6 @@ class keplerq9(TrainingSet):
 			delimiter=',',
 			comments='#',
 			encoding='utf-8')
-		self.nobjects = self.starlist.shape[0]
 
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:

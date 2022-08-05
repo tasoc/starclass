@@ -50,9 +50,6 @@ class testing_tset(TrainingSet):
 		)
 		self.starlist = self.starlist[idx]
 
-		# Count the number of objects in trainingset:
-		self.nobjects = len(self.starlist)
-
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
 		super().__init__(*args, **kwargs)

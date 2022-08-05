@@ -13,7 +13,6 @@ import requests
 import zipfile
 import shutil
 import logging
-import tempfile
 import sqlite3
 from contextlib import closing
 from tqdm import tqdm
@@ -104,11 +103,18 @@ class TrainingSet(object):
 		if not os.path.isfile(self.todo_file):
 			self.generate_todolist()
 
-		#with closing(sqlite3.connect(self.todo_file)) as conn:
-		#	conn.row_factory = sqlite3.Row
-		#	cursor = conn.cursor()
-		#	cursor.execute("SELECT COUNT(*) FROM todolist;")
-		#	self.nobjects = int(cursor.fetchone()[0])
+		# Create in-memory TaskManager connected to this todo-file:
+		# Make sure overwrite=False, or else previous results will be deleted,
+		# meaning there would be no results for the MetaClassifier to work with
+		self.tm = TaskManager(self.todo_file,
+			classes=self.StellarClasses,
+			load_into_memory=True,
+			overwrite=False,
+			cleanup=False)
+
+		# Count the number of objects in trainingset:
+		self.tm.cursor.execute("SELECT COUNT(*) FROM starclass_todolist;")
+		self.nobjects = int(self.tm.cursor.fetchone()[0])
 
 		# Generate training/test indices
 		# Define here because it is needed by self.labels() used below
@@ -127,6 +133,22 @@ class TrainingSet(object):
 		self.crossval_folds = 0
 
 		self.fake_metaclassifier = False
+
+	#----------------------------------------------------------------------------------------------
+	def close(self):
+		self.tm.close()
+
+	#----------------------------------------------------------------------------------------------
+	def __del__(self):
+		self.close()
+
+	#----------------------------------------------------------------------------------------------
+	def __exit__(self, *args):
+		self.close()
+
+	#----------------------------------------------------------------------------------------------
+	def __enter__(self):
+		return self
 
 	#----------------------------------------------------------------------------------------------
 	def __str__(self):
@@ -368,36 +390,18 @@ class TrainingSet(object):
 
 		cl = 'meta' if self.fake_metaclassifier else None
 
-		# Create a temporary copy of the TODO-file that we are going to read from.
-		# This is due to errors we have detected, where the database is unexpectively locked
-		# when opened several times in parallel.
-		try:
-			with tempfile.NamedTemporaryFile(dir=self.input_folder, suffix='.sqlite', delete=False) as tmpdir:
-				# Copy the original TODO-file to the new temp file:
-				with open(self.todo_file, 'rb') as fid:
-					shutil.copyfileobj(fid, tmpdir)
-				tmpdir.flush()
+		# NOTE: This does not propergate the 'data_dir' keyword to the BaseClassifier,
+		#       But since we are not doing anything other than loading data,
+		#       this should not cause any problems.
+		with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
+			for rowidx in self.train_idx:
+				task = self.tm.get_task(priority=rowidx+1, classifier=cl,
+					change_classifier=False, chunk=1)
 
-				# Make sure overwrite=False, or else previous results will be deleted,
-				# meaning there would be no results for the MetaClassifier to work with
-				with TaskManager(tmpdir.name, overwrite=False, cleanup=False, classes=self.StellarClasses) as tm:
-					# NOTE: This does not propergate the 'data_dir' keyword to the BaseClassifier,
-					#       But since we are not doing anything other than loading data,
-					#       this should not cause any problems.
-					with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
-						for rowidx in self.train_idx:
-							task = tm.get_task(priority=rowidx+1, classifier=cl, change_classifier=False)
-
-							# Lightcurve file to load:
-							# We do not use the one from the database because in the simulations the
-							# raw and corrected light curves are stored in different files.
-							yield stcl.load_star(task)
-
-		finally:
-			if os.path.exists(tmpdir.name):
-				os.remove(tmpdir.name)
-			if os.path.exists(tmpdir.name + '-journal'):
-				os.remove(tmpdir.name + '-journal')
+				# Lightcurve file to load:
+				# We do not use the one from the database because in the simulations the
+				# raw and corrected light curves are stored in different files.
+				yield stcl.load_star(task[0])
 
 	#----------------------------------------------------------------------------------------------
 	def features_test(self):
@@ -418,29 +422,14 @@ class TrainingSet(object):
 		# Create a temporary copy of the TODO-file that we are going to read from.
 		# This is due to errors we have detected, where the database is unexpectively locked
 		# when opened several times in parallel.
-		try:
-			with tempfile.NamedTemporaryFile(dir=self.input_folder, suffix='.sqlite', delete=False) as tmpdir:
-				# Copy the original TODO-file to the new temp file:
-				with open(self.todo_file, 'rb') as fid:
-					shutil.copyfileobj(fid, tmpdir)
-				tmpdir.flush()
+		for rowidx in self.test_idx:
+			task = self.tm.get_task(priority=rowidx+1, classifier=cl,
+				change_classifier=False, chunk=1)
 
-				# Make sure overwrite=False, or else previous results will be deleted,
-				# meaning there would be no results for the MetaClassifier to work with
-				with TaskManager(tmpdir.name, overwrite=False, cleanup=False, classes=self.StellarClasses) as tm:
-					for rowidx in self.test_idx:
-						task = tm.get_task(priority=rowidx+1, classifier=cl, change_classifier=False)
-
-						# Lightcurve file to load:
-						# We do not use the one from the database because in the simulations the
-						# raw and corrected light curves are stored in different files.
-						yield task
-
-		finally:
-			if os.path.exists(tmpdir.name):
-				os.remove(tmpdir.name)
-			if os.path.exists(tmpdir.name + '-journal'):
-				os.remove(tmpdir.name + '-journal')
+			# Lightcurve file to load:
+			# We do not use the one from the database because in the simulations the
+			# raw and corrected light curves are stored in different files.
+			yield task[0]
 
 	#----------------------------------------------------------------------------------------------
 	def labels(self):
@@ -499,5 +488,4 @@ class TrainingSet(object):
 			shutil.rmtree(self.features_cache)
 
 		# Delete the MOAT tables from the training-set todo-file:
-		with TaskManager(self.todo_file, overwrite=False, classes=self.StellarClasses) as tm:
-			tm.moat_clear()
+		self.tm.moat_clear()

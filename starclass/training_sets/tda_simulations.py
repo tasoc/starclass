@@ -304,7 +304,6 @@ class tdasim(TrainingSet):
 
 		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),
 			dtype=None, delimiter=',', usecols=(0,10), encoding='utf-8')
-		self.nobjects = data.shape[0]
 
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
@@ -330,7 +329,6 @@ class tdasim_raw(TrainingSet):
 
 		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),
 			dtype=None, delimiter=',', usecols=(0,10), encoding='utf-8')
-		self.nobjects = data.shape[0]
 
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
@@ -357,7 +355,6 @@ class tdasim_clean(TrainingSet):
 
 		data = np.genfromtxt(os.path.join(self.input_folder, 'Data_Batch_TDA4_r1.txt'),
 			dtype=None, delimiter=',', usecols=(0,10), encoding='utf-8')
-		self.nobjects = data.shape[0]
 
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:

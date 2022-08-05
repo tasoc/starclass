@@ -40,9 +40,6 @@ class keplerq9v3(TrainingSet):
 		indx = [star[1] != 'INSTRUMENT' for star in self.starlist]
 		self.starlist = self.starlist[indx, :]
 
-		# Count the number of objects in trainingset:
-		self.nobjects = self.starlist.shape[0]
-
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
 		super().__init__(*args, **kwargs)

@@ -35,9 +35,6 @@ class keplerq9v2(TrainingSet):
 			comments='#',
 			encoding='utf-8')
 
-		# Count the number of objects in trainingset:
-		self.nobjects = self.starlist.shape[0]
-
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
 		super().__init__(*args, **kwargs)

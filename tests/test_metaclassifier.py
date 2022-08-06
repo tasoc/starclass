@@ -34,18 +34,27 @@ def test_metaclassifier_load_star(PRIVATE_INPUT_DIR):
 	with TaskManager(PRIVATE_INPUT_DIR, classes=tset.StellarClasses) as tm:
 
 		for classifier in tm.all_classifiers:
-			tm.save_results({'priority': 17, 'classifier': classifier, 'status': STATUS.OK, 'starclass_results': {
-				StellarClassesLevel1.SOLARLIKE: 0.2,
-				StellarClassesLevel1.DSCT_BCEP: 0.1,
-				StellarClassesLevel1.ECLIPSE: 0.7
-			}})
+			tm.save_results({
+				'priority': 17,
+				'classifier': classifier,
+				'status': STATUS.OK,
+				'starclass_results': {
+					StellarClassesLevel1.SOLARLIKE: 0.2,
+					StellarClassesLevel1.DSCT_BCEP: 0.1,
+					StellarClassesLevel1.ECLIPSE: 0.7
+				}
+			})
 
 		for k in range(2): # Try loading twice - second time we should load from cache
 			with MetaClassifier(tset=tset, features_cache=features_cache) as cl:
 				# Check that the second time there should still be nothing in the cache:
 				assert len(os.listdir(features_cache)) == 0
 
-				task = tm.get_task(priority=17, classifier='meta', change_classifier=False)
+				task = tm.get_task(
+					priority=17,
+					classifier='meta',
+					change_classifier=False,
+					chunk=1)[0]
 				assert task is not None, "task not found"
 				feat = cl.load_star(task)
 				print(feat)

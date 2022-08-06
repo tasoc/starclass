@@ -33,7 +33,7 @@ def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 
 	# Pick out a task to use for testing:
 	with starclass.TaskManager(SHARED_INPUT_DIR) as tm:
-		task1 = tm.get_task(classifier=classifier, change_classifier=False)
+		task1 = tm.get_task(classifier=classifier, change_classifier=False, chunk=1)[0]
 		print(task1)
 
 	with tempfile.TemporaryDirectory(prefix='starclass-testing-') as tmpdir:

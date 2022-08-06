@@ -192,6 +192,8 @@ class TaskManager(object):
 
 		# If data-validation information is available, only include targets
 		# which passed the data validation:
+		search_joins = ''
+		search_query = ''
 		if self.datavalidation_exists:
 			search_joins = "INNER JOIN datavalidation_corr ON datavalidation_corr.priority=todolist.priority"
 			search_query = "AND datavalidation_corr.approved=1"

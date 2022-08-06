@@ -11,6 +11,7 @@ import os.path
 import sqlite3
 import tempfile
 import shutil
+import logging
 from contextlib import closing
 import numpy as np
 from astropy.table import Table
@@ -161,6 +162,21 @@ def test_taskmanager_invalid():
 		TaskManager(os.path.join(INPUT_DIR, 'does-not-exists'))
 
 #--------------------------------------------------------------------------------------------------
+def test_taskmanager_no_classes(PRIVATE_TODO_FILE):
+
+	with TaskManager(PRIVATE_TODO_FILE) as tm:
+		# Fill fake results needed for the MetaClassifier:
+		for classifier in tm.all_classifiers:
+			tm.cursor.execute("INSERT INTO starclass_diagnostics (priority,classifier,status) SELECT priority,?,1 FROM todolist;", [classifier])
+		tm.conn.commit()
+
+		# The TaskManager should now throw an error when asking for classifier=meta:
+		with pytest.raises(RuntimeError) as err:
+			tm.get_task(classifier='meta', change_classifier=False)
+
+	assert str(err.value) == "classes not provided to TaskManager."
+
+#--------------------------------------------------------------------------------------------------
 def test_taskmanager_no_diagnostics(PRIVATE_TODO_FILE):
 	"""Test of TaskManager with invalid TODO-file, missing diagnostics_corr table."""
 
@@ -173,6 +189,24 @@ def test_taskmanager_no_diagnostics(PRIVATE_TODO_FILE):
 	with pytest.raises(ValueError) as err:
 		TaskManager(PRIVATE_TODO_FILE)
 	assert str(err.value) == "The TODO-file does not contain diagnostics_corr. Are you sure corrections have been run?"
+
+#--------------------------------------------------------------------------------------------------
+def test_taskmanager_no_datavalidation(PRIVATE_TODO_FILE, caplog):
+	"""Test to make sure we log a warning if run on a todo-file without data-validation."""
+
+	# Remove data-valudation table from db:
+	with closing(sqlite3.connect(PRIVATE_TODO_FILE)) as conn:
+		conn.execute("DROP TABLE datavalidation_corr;")
+		conn.commit()
+
+	with caplog.at_level(logging.WARNING):
+		TaskManager(PRIVATE_TODO_FILE, classes=StellarClassesLevel1)
+
+	recs = caplog.records
+	print(recs)
+	assert len(recs) == 1
+	assert recs[0].levelname == 'WARNING'
+	assert recs[0].getMessage() == "DATA-VALIDATION information is not available in this TODO-file. Assuming all targets are good."
 
 #--------------------------------------------------------------------------------------------------
 def test_taskmanager_moat_wrong_existing_table(PRIVATE_TODO_FILE):
@@ -234,7 +268,7 @@ def test_taskmanager_switch_classifier_meta(PRIVATE_TODO_FILE, chunk):
 	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
 
 		for classifier in tm.all_classifiers:
-			tm.cursor.execute(f"INSERT INTO starclass_diagnostics (priority,classifier,status) SELECT priority,'{classifier:s}',1 FROM todolist;")
+			tm.cursor.execute("INSERT INTO starclass_diagnostics (priority,classifier,status) SELECT priority,?,1 FROM todolist;", [classifier])
 		tm.cursor.execute("DELETE FROM starclass_diagnostics WHERE priority=17 AND classifier='slosh';")
 		tm.conn.commit()
 

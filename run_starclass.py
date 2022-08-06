@@ -120,17 +120,16 @@ def main():
 
 		with tqdm(total=numtasks, **tqdm_settings) as pbar:
 			while True:
-				tasks = tm.get_task(classifier=current_classifier, change_classifier=change_classifier, chunk=args.chunks)
+				tasks = tm.get_task(
+					classifier=current_classifier,
+					change_classifier=change_classifier,
+					chunk=args.chunks)
+				if tasks is None:
+					break
 				logger.debug(tasks)
 				tm.start_task(tasks)
 
 				# ----------------- This code would run on each worker ------------------------
-
-				# Make sure we can loop through tasks,
-				# even in the case we have only gotten one:
-				results = []
-				if isinstance(tasks, dict):
-					tasks = [tasks]
 
 				if tasks[0]['classifier'] != current_classifier or stcl is None:
 					current_classifier = tasks[0]['classifier']
@@ -139,6 +138,7 @@ def main():
 					stcl = starclass.get_classifier(current_classifier)
 					stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate, data_dir=args.datadir)
 
+				results = []
 				for task in tasks:
 					res = stcl.classify(task)
 					results.append(res)

@@ -237,6 +237,7 @@ class TaskManager(object):
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
+		self._results_saved_counter = 0
 		if self.run_from_memory:
 			backupfile = tempfile.NamedTemporaryFile(
 				dir=self.input_folder,
@@ -251,7 +252,10 @@ class TaskManager(object):
 			# Since we are running from memory, the original file
 			# is not opened by any process, so we are free to
 			# replace it:
-			os.replace(backupfile, self.todo_file)
+			try:
+				os.replace(backupfile, self.todo_file)
+			except PermissionError: # pragma: no cover
+				self.logger.exception('Could not overwrite original file. Backup saved as: %s', backupfile)
 
 	#----------------------------------------------------------------------------------------------
 	def close(self):
@@ -669,7 +673,6 @@ class TaskManager(object):
 		self._results_saved_counter += len(results)
 		if self.backup_interval is not None and self._results_saved_counter >= self.backup_interval:
 			self.backup()
-			self._results_saved_counter = 0
 
 	#----------------------------------------------------------------------------------------------
 	def start_task(self, tasks):

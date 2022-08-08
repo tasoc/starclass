@@ -24,6 +24,44 @@ AVALIABLE_CLASSIFIERS = list(starclass.classifier_list)
 AVALIABLE_CLASSIFIERS.remove('meta')
 
 #--------------------------------------------------------------------------------------------------
+def _make_fake_result(tasks):
+	single_result = isinstance(tasks, dict)
+	if single_result:
+		tasks = [tasks]
+	results = []
+	for task in tasks:
+		results.append({
+			'priority': task['priority'],
+			'classifier': task['classifier'],
+			'status': STATUS.OK,
+			'elaptime': 3.14,
+			'worker_wait_time': 1.0,
+			'tset': 'keplerq9v3',
+			'details': {'errors': ['There was actually no error']},
+			'starclass_results': {
+				StellarClassesLevel1.SOLARLIKE: 0.2,
+				StellarClassesLevel1.DSCT_BCEP: 0.1,
+				StellarClassesLevel1.ECLIPSE: 0.7
+			}
+		})
+	if single_result:
+		return results[0]
+	else:
+		return results
+
+#--------------------------------------------------------------------------------------------------
+def _num_saved(todo_file):
+	with closing(sqlite3.connect('file:' + todo_file + '?mode=ro', uri=True)) as conn:
+		cursor = conn.cursor()
+		try:
+			cursor.execute("SELECT COUNT(*) FROM starclass_diagnostics;")
+			return cursor.fetchone()[0]
+		except sqlite3.OperationalError as e:
+			if str(e) == 'no such table: starclass_diagnostics':
+				return 0
+			raise
+
+#--------------------------------------------------------------------------------------------------
 def test_taskmanager_get_number_tasks(PRIVATE_TODO_FILE):
 	"""Test of get_number_tasks"""
 	# Overwriting so no results are present before we start
@@ -318,13 +356,9 @@ def test_taskmanager_meta_classifier(PRIVATE_TODO_FILE):
 
 	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, classes=StellarClassesLevel1) as tm:
 
-		# Create fake results from SLOSH:
+		# Create fake results from SLOSH
 		for classifier in tm.all_classifiers:
-			tm.save_results({'priority': 17, 'classifier': classifier, 'status': STATUS.OK, 'starclass_results': {
-				StellarClassesLevel1.SOLARLIKE: 0.2,
-				StellarClassesLevel1.DSCT_BCEP: 0.1,
-				StellarClassesLevel1.ECLIPSE: 0.7
-			}})
+			tm.save_results(_make_fake_result({'priority': 17, 'classifier': classifier}))
 
 		# Get the first task in the TODO file for the MetaClassifier:
 		task1 = tm.get_task(classifier='meta', chunk=1)[0]
@@ -357,7 +391,7 @@ def test_taskmanager_save_and_settings(PRIVATE_TODO_FILE):
 		assert settings is None
 
 		# Start a random task:
-		task = tm.get_task(classifier='meta')[0]
+		task = tm.get_task(classifier=AVALIABLE_CLASSIFIERS[0], chunk=1)[0]
 		print(task)
 		tm.start_task(task)
 
@@ -366,13 +400,7 @@ def test_taskmanager_save_and_settings(PRIVATE_TODO_FILE):
 			StellarClassesLevel1.SOLARLIKE: 0.8,
 			StellarClassesLevel1.APERIODIC: 0.2
 		}
-		result = task.copy()
-		result['tset'] = 'keplerq9v3'
-		result['classifier'] = 'meta'
-		result['status'] = STATUS.OK
-		result['elaptime'] = 3.14
-		result['worker_wait_time'] = 1.0
-		result['details'] = {'errors': ['There was actually no error']}
+		result = _make_fake_result(task)
 		result['starclass_results'] = starclass_results
 
 		# Save the result:
@@ -389,9 +417,9 @@ def test_taskmanager_save_and_settings(PRIVATE_TODO_FILE):
 		row = tm.cursor.fetchone()
 		print(dict(row))
 		assert row['status'] == STATUS.OK.value
-		assert row['classifier'] == 'meta'
-		assert row['elaptime'] == 3.14
-		assert row['worker_wait_time'] == 1.0
+		assert row['classifier'] == task['classifier']
+		assert row['elaptime'] == result['elaptime']
+		assert row['worker_wait_time'] == result['worker_wait_time']
 		assert row['errors'] == 'There was actually no error'
 
 		# Check that the results were saved correctly:
@@ -419,15 +447,8 @@ def test_taskmanager_moat(PRIVATE_TODO_FILE, classifier):
 		features = {'unique_feature': 2187.0, 'special_feature': 1234.0}
 
 		# Make a fake result we can save;
-		result = task.copy()
-		result['tset'] = 'keplerq9v3'
-		result['classifier'] = classifier
-		result['status'] = STATUS.OK
-		result['elaptime'] = 3.14
-		result['starclass_results'] = {
-			StellarClassesLevel1.SOLARLIKE: 0.8,
-			StellarClassesLevel1.APERIODIC: 0.2
-		}
+		result = _make_fake_result(task)
+
 		# This is the important part in this test:
 		result['features'] = features
 		result['features_common'] = features_common
@@ -574,6 +595,74 @@ def test_taskmanager_backupinterval(PRIVATE_TODO_FILE, interval):
 	"""Test TaskManager with invalid backup interval"""
 	TaskManager(PRIVATE_TODO_FILE, overwrite=False, cleanup=False, classes=StellarClassesLevel1,
 		backup_interval=interval)
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('in_memory', [True, False])
+@pytest.mark.parametrize('chunk', [1, 10])
+def test_taskmanager_backup_manual(PRIVATE_TODO_FILE, in_memory, chunk):
+
+	# Manual backup:
+	with TaskManager(PRIVATE_TODO_FILE, load_into_memory=in_memory, backup_interval=None) as tm:
+		# In order to be able to read the database while it is still open,
+		# change the locking_mode here:
+		if not in_memory:
+			tm.cursor.execute("PRAGMA locking_mode=NORMAL;")
+			tm.conn.commit()
+
+		for _ in range(3):
+			task = tm.get_task(classifier=AVALIABLE_CLASSIFIERS[0], chunk=chunk)
+			res = _make_fake_result(task)
+			tm.save_results(res)
+
+		assert _num_saved(PRIVATE_TODO_FILE) == (0 if in_memory else 3*chunk)
+
+		tm.backup()
+
+		assert _num_saved(PRIVATE_TODO_FILE) == 3*chunk
+
+	# Because we have closed the TaskManager, the on-disk file should be fully up-to-date:
+	assert _num_saved(PRIVATE_TODO_FILE) == 3*chunk
+
+#--------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize('in_memory', [True, False])
+@pytest.mark.parametrize('chunk', [1, 10])
+def test_taskmanager_backup_automatic(PRIVATE_TODO_FILE, in_memory, chunk):
+
+	# Automatic backup on interval:
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=True, load_into_memory=in_memory, backup_interval=2*chunk) as tm:
+		# In order to be able to read the database while it is still open,
+		# change the locking_mode here:
+		if not in_memory:
+			tm.cursor.execute("PRAGMA locking_mode=NORMAL;")
+			tm.conn.commit()
+
+		# Do a single chunk of tasks, save them and check if anything has been saved to
+		# on-disk file yet:
+		task = tm.get_task(classifier=AVALIABLE_CLASSIFIERS[0], chunk=chunk)
+		res = _make_fake_result(task)
+		tm.save_results(res)
+
+		assert _num_saved(PRIVATE_TODO_FILE) == (0 if in_memory else chunk)
+
+	# Because we have closed the TaskManager, the on-disk file should be fully up-to-date:
+	assert _num_saved(PRIVATE_TODO_FILE) == chunk
+
+	with TaskManager(PRIVATE_TODO_FILE, overwrite=False, load_into_memory=in_memory, backup_interval=2*chunk) as tm:
+		# In order to be able to read the database while it is still open,
+		# change the locking_mode here:
+		if not in_memory:
+			tm.cursor.execute("PRAGMA locking_mode=NORMAL;")
+			tm.conn.commit()
+
+		for _ in range(3):
+			task = tm.get_task(classifier=AVALIABLE_CLASSIFIERS[0], chunk=chunk)
+			res = _make_fake_result(task)
+			tm.save_results(res)
+
+		assert _num_saved(PRIVATE_TODO_FILE) == (3*chunk if in_memory else 4*chunk)
+
+	# Because we have closed the TaskManager, the on-disk file should be fully up-to-date:
+	assert _num_saved(PRIVATE_TODO_FILE) == 4*chunk
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

@@ -78,6 +78,9 @@ def main():
 	# logging level enabled in either of the handlers:
 	logger.setLevel(logging_level)
 
+	# Make sure we have turned plotting to non-interactive:
+	starclass.plots.plots_noninteractive()
+
 	# Pick the training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
 	tset = tsetclass(level=args.level, tf=args.testfraction, linfit=args.linfit)

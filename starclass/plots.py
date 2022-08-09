@@ -18,10 +18,6 @@ with warnings.catch_warnings():
 	warnings.filterwarnings('ignore', module='shap', message="IPython could not be loaded!")
 	from shap import summary_plot
 
-# Change to a non-GUI backend since this
-# should be able to run on a cluster:
-plt.switch_backend('Agg')
-
 #--------------------------------------------------------------------------------------------------
 def plots_interactive(backend=('QtAgg', 'Qt5Agg', 'MacOSX', 'Qt4Agg', 'Qt5Cairo', 'TkAgg', 'GTK4Agg')):
 	"""

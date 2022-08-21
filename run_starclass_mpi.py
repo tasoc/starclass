@@ -105,6 +105,9 @@ def main():
 		todo_file = os.path.abspath(input_folder)
 		input_folder = os.path.dirname(input_folder)
 
+	# Make sure we have turned plotting to non-interactive:
+	starclass.plots.plots_noninteractive()
+
 	# Initialize the training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
 	tset = tsetclass(level=args.level, linfit=args.linfit)

@@ -37,6 +37,9 @@ def main():
 	logger_parent.addHandler(console)
 	logger_parent.setLevel(logging_level)
 
+	# Make sure we have turned plotting to non-interactive:
+	starclass.plots.plots_noninteractive()
+
 	# Download all data:
 	starclass.download_cache(all_trainingsets=args.all)
 

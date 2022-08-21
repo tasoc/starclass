@@ -7,11 +7,13 @@ Utility functions.
 """
 
 import logging
+import warnings
 import numpy as np
 from bottleneck import nanmedian, nanmean, allnan
 from scipy.stats import binned_statistic
 import astropy.units as u
 from sklearn import metrics
+from sklearn.exceptions import UndefinedMetricWarning
 from sklearn.preprocessing import label_binarize
 import tqdm
 
@@ -158,20 +160,23 @@ def roc_curve(labels_test, y_prob, sclasses):
 	y_true_bin = label_binarize(labels_test, classes=class_names)
 
 	# Compute ROC curve and ROC area for each class
-	fpr = {}
-	tpr = {}
-	idx = {}
-	roc_auc = {}
-	best_thresholds = {}
-	for i, cname in enumerate(class_keys):
-		fpr[cname], tpr[cname], thresholds = metrics.roc_curve(y_true_bin[:, i], y_prob[:, i])
-		roc_auc[cname] = metrics.auc(fpr[cname], tpr[cname])
+	with warnings.catch_warnings():
+		warnings.filterwarnings('ignore', category=UndefinedMetricWarning)
 
-		idx[cname] = np.argmax(tpr[cname] - fpr[cname])
-		best_thresholds[cname] = thresholds[idx[cname]]
+		fpr = {}
+		tpr = {}
+		idx = {}
+		roc_auc = {}
+		best_thresholds = {}
+		for i, cname in enumerate(class_keys):
+			fpr[cname], tpr[cname], thresholds = metrics.roc_curve(y_true_bin[:, i], y_prob[:, i])
+			roc_auc[cname] = metrics.auc(fpr[cname], tpr[cname])
 
-	fpr["micro"], tpr["micro"], _ = metrics.roc_curve(y_true_bin.ravel(), y_prob.ravel())
-	roc_auc["micro"] = metrics.auc(fpr["micro"], tpr["micro"])
+			idx[cname] = np.argmax(tpr[cname] - fpr[cname])
+			best_thresholds[cname] = thresholds[idx[cname]]
+
+		fpr["micro"], tpr["micro"], _ = metrics.roc_curve(y_true_bin.ravel(), y_prob.ravel())
+		roc_auc["micro"] = metrics.auc(fpr["micro"], tpr["micro"])
 
 	return {
 		'false_positive_rate': fpr,

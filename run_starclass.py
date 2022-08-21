@@ -101,6 +101,9 @@ def main():
 		current_classifier = args.classifier
 		change_classifier = False
 
+	# Make sure we have turned plotting to non-interactive:
+	starclass.plots.plots_noninteractive()
+
 	# Initialize training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
 	tset = tsetclass(level=args.level, linfit=args.linfit)

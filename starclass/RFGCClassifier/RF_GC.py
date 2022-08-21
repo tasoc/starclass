@@ -174,9 +174,13 @@ class RFGCClassifier(BaseClassifier):
 				EBper = fc.EBperiod(lc.time, lc.flux, periods[0], linflatten=True)
 				featout[k, 0] = EBper # overwrites top period
 
-				featout[k, NFREQUENCIES:NFREQUENCIES+2] = fc.freq_ampratios(obj, n_usedfreqs, usedfreqs)
+				amp21, amp31 = fc.freq_ampratios(obj, n_usedfreqs, usedfreqs)
+				featout[k, NFREQUENCIES] = amp21
+				featout[k, NFREQUENCIES+1] = amp31
 
-				featout[k, NFREQUENCIES+2:NFREQUENCIES+4] = fc.freq_phasediffs(obj, n_usedfreqs, usedfreqs)
+				phi21, phi31 = fc.freq_phasediffs(obj, n_usedfreqs, usedfreqs)
+				featout[k, NFREQUENCIES+2] = phi21
+				featout[k, NFREQUENCIES+3] = phi31
 
 				# Self Organising Map
 				featout[k, NFREQUENCIES+4:NFREQUENCIES+6] = fc.SOMloc(self.classifier.som, lc.time, lc.flux, EBper, cardinality)

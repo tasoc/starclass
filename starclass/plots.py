@@ -19,7 +19,7 @@ with warnings.catch_warnings():
 	from shap import summary_plot
 
 #--------------------------------------------------------------------------------------------------
-def plots_interactive(backend=('Qt5Agg', 'MacOSX', 'Qt4Agg', 'Qt5Cairo', 'TkAgg')):
+def plots_interactive(backend=('QtAgg', 'Qt5Agg', 'MacOSX', 'Qt4Agg', 'Qt5Cairo', 'TkAgg', 'GTK4Agg')):
 	"""
 	Change plotting to using an interactive backend.
 
@@ -38,16 +38,16 @@ def plots_interactive(backend=('Qt5Agg', 'MacOSX', 'Qt4Agg', 'Qt5Cairo', 'TkAgg'
 
 	for bckend in backend:
 		if bckend not in matplotlib.rcsetup.interactive_bk:
-			logger.warning("Interactive backend '%s' is not found", bckend)
+			logger.debug("Interactive backend '%s' is not found", bckend)
 			continue
 
-		# Try to change the backend, and catch errors
-		# it it didn't work:
+		# Try to change the backend, and catch errors if it didn't work:
 		try:
 			plt.switch_backend(bckend)
 		except (ModuleNotFoundError, ImportError):
 			pass
 		else:
+			logger.debug("Interactive backend selected: %s", bckend)
 			break
 
 #--------------------------------------------------------------------------------------------------
@@ -213,16 +213,18 @@ def plot_feature_importance(shap_values, features, features_names, class_names, 
 		style = os.path.abspath(os.path.join(os.path.dirname(__file__), 'starclass.mplstyle'))
 
 	with plt.style.context(style):
+		with warnings.catch_warnings():
+			warnings.filterwarnings('ignore', message='Attempted to set non-positive bottom ylim on a log-scaled axis')
 
-		summary_plot(shap_values,
-			features=features,
-			feature_names=features_names,
-			class_names=class_names,
-			max_display=len(features_names),
-			plot_type='bar',
-			show=False)
+			summary_plot(shap_values,
+				features=features,
+				feature_names=features_names,
+				class_names=class_names,
+				max_display=len(features_names),
+				plot_type='bar',
+				show=False)
 
-		# SHAP creates it's own figures, but doesn't return then,
+		# SHAP creates it's own figures, but doesn't return them,
 		# so ask matplotlib what the latest figure is:
 		fig = plt.gcf()
 		ax = fig.axes[0]
@@ -247,7 +249,7 @@ def plot_feature_scatter_density(shap_values, features, features_names, class_na
 			plot_type='dot',
 			show=False)
 
-		# SHAP creates it's own figures, but doesn't return then,
+		# SHAP creates it's own figures, but doesn't return them,
 		# so ask matplotlib what the latest figure is:
 		fig = plt.gcf()
 		ax = fig.axes[0]

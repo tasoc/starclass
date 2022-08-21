@@ -7,10 +7,9 @@ General XGB Classification
 """
 import logging
 import os
-import copy
-from xgboost import XGBClassifier as xgb
+import xgboost as xgb
 from . import xgb_feature_calc as xgb_features
-from .. import BaseClassifier, io
+from .. import BaseClassifier
 from ..exceptions import UntrainedClassifierError
 
 #--------------------------------------------------------------------------------------------------
@@ -21,7 +20,7 @@ class XGBClassifier(BaseClassifier):
 	.. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
 	"""
 
-	def __init__(self, clfile='xgb_classifier_1.pickle', *args, **kwargs):
+	def __init__(self, clfile='xgb_classifier.json', *args, **kwargs):
 		"""
 		Initialize the classifier object with optimised parameters.
 
@@ -53,7 +52,7 @@ class XGBClassifier(BaseClassifier):
 			self.load(self.classifier_file)
 		else:
 			# Create new untrained classifier:
-			self.classifier = xgb(
+			self.classifier = xgb.XGBClassifier(
 				booster='gbtree',
 				colsample_bytree=0.7,
 				eval_metric='mlogloss',
@@ -95,19 +94,20 @@ class XGBClassifier(BaseClassifier):
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):
 		"""
-		Save xgb classifier object with pickle
+		Save xgb classifier object.
 		"""
-		#self.classifier = None
-		temp_classifier = copy.deepcopy(self.classifier)
-		io.savePickle(outfile, self.classifier)
-		self.classifier = temp_classifier
+		self.classifier.save_model(outfile)
 
 	#----------------------------------------------------------------------------------------------
 	def load(self, infile):
 		"""
-		Loading the xgb clasifier
+		Load the xgb clasifier.
+
+		Parameters:
+			infile (str): Path to file from which to load the trained XGB classifier model.
 		"""
-		self.classifier = io.loadPickle(infile)
+		self.classifier = xgb.XGBClassifier()
+		self.classifier.load_model(infile)
 		self.trained = True # Assume any classifier loaded is already trained
 
 	#----------------------------------------------------------------------------------------------
@@ -170,5 +170,5 @@ class XGBClassifier(BaseClassifier):
 
 		if savecl and self.classifier_file is not None:
 			if not os.path.exists(self.classifier_file) or overwrite:
-				logger.info('Saving pickled xgb classifier to %s', self.classifier_file)
+				logger.info('Saving xgb classifier to %s', self.classifier_file)
 				self.save(self.classifier_file)

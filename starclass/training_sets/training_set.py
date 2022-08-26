@@ -333,7 +333,7 @@ class TrainingSet(object):
 				# Create the basic file structure of a TODO-list:
 				todolist_structure(conn)
 
-				cursor.execute("ALTER TABLE todolist ADD COLUMN starclass TEXT NOT NULL;")
+				cursor.execute("ALTER TABLE todolist ADD COLUMN starclass TEXT;")
 				conn.commit()
 
 				for k, star in tqdm(enumerate(starlist), total=len(starlist)):
@@ -397,8 +397,12 @@ class TrainingSet(object):
 						rms_hour=rms_hour,
 						ptp=ptp,
 						elaptime=elaptime,
-						tmag=tmag,
-						starclass=starclass)
+						tmag=tmag)
+
+					cursor.execute("UPDATE todolist SET starclass=? WHERE priority=?;", [
+						starclass,
+						k+1
+					])
 
 				conn.commit()
 				todolist_cleanup(conn, cursor)

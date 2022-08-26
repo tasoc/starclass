@@ -170,8 +170,7 @@ def todolist_structure(conn):
 
 #--------------------------------------------------------------------------------------------------
 def todolist_insert(cursor, priority=None, lightcurve=None, starid=None,
-	tmag=None, datasource='ffi', variance=None, rms_hour=None, ptp=None, elaptime=None,
-	starclass=None):
+	tmag=None, datasource='ffi', variance=None, rms_hour=None, ptp=None, elaptime=None):
 	"""
 	Insert an entry in the todo.sqlite file.
 
@@ -186,7 +185,6 @@ def todolist_insert(cursor, priority=None, lightcurve=None, starid=None,
 		rms_hour (float): RMS/hour of ligthcurve.
 		ptp (float): Point-to-point scatter of lightcurve.
 		elaptime (float): Processing time.
-		starclass (str): Known class of lightcurve. This is only used in building training-sets.
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
@@ -201,18 +199,13 @@ def todolist_insert(cursor, priority=None, lightcurve=None, starid=None,
 		raise ValueError("DATASOURCE should be FFI of TPF.")
 	if tmag is None:
 		tmag = -99
-	extra_data = {}
-	if starclass is not None:
-		extra_data['starclass'] = starclass
 
-	extra_name = (',' + ','.join(extra_data.keys())) if extra_data else ''
-	extra_placeholder = (',' + ','.join(['?']*len(extra_data))) if extra_data else ''
-	cursor.execute(f"INSERT INTO todolist (priority,starid,tmag,datasource,status,corr_status,camera,ccd,cbv_area{extra_name:s}) VALUES (?,?,?,?,1,1,1,1,111{extra_placeholder:s});", [
+	cursor.execute("INSERT INTO todolist (priority,starid,tmag,datasource,status,corr_status,camera,ccd,cbv_area) VALUES (?,?,?,?,1,1,1,1,111);", [
 		int(priority),
 		int(starid),
 		float(tmag),
 		datasource
-	] + list(extra_data.values()))
+	])
 	cursor.execute("INSERT INTO diagnostics_corr (priority,lightcurve,elaptime,variance,rms_hour,ptp) VALUES (?,?,?,?,?,?);", [
 		int(priority),
 		lightcurve.replace('\\', '/'),

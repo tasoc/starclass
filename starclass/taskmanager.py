@@ -256,6 +256,8 @@ class TaskManager(object):
 				os.replace(backupfile, self.todo_file)
 			except PermissionError: # pragma: no cover
 				self.logger.exception('Could not overwrite original file. Backup saved as: %s', backupfile)
+			except FileNotFoundError: # pragma: no cover
+				self.logger.exception('Could not create backup.')
 
 	#----------------------------------------------------------------------------------------------
 	def close(self):

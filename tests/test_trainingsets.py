@@ -50,7 +50,7 @@ def test_trainingset(tsetkey, linfit):
 	with pytest.raises(ValueError):
 		tsetclass(level='nonsense')
 
-	# Test-fractions which should all return in a ValueError:
+	# Test-fractions which should all result in a ValueError:
 	with pytest.raises(ValueError):
 		tset = tsetclass(tf=1.2)
 	with pytest.raises(ValueError):
@@ -192,27 +192,25 @@ def test_trainingset_folds(tsetkey, linfit):
 	assert k == 4, "Not the correct number of folds"
 
 #--------------------------------------------------------------------------------------------------
-#@pytest.mark.skipif(not trainingset_available('keplerq9'), reason='TrainingSet not available')
-def test_keplerq9():
+@pytest.mark.parametrize('tsetkey', [
+	'keplerq9v3',
+	'keplerq9v3-instr',
+	pytest.param('keplerq9v2', marks=pytest.mark.skipif(not trainingset_available('keplerq9v2'), reason='TrainingSet not available')),
+	pytest.param('keplerq9', marks=pytest.mark.skipif(not trainingset_available('keplerq9'), reason='TrainingSet not available')),
+])
+def test_only_corr(tsetkey):
+	# Get training set class using conv. function:
+	tsetclass = get_trainingset(tsetkey)
 
 	# KeplerQ9 does not support anything other than datalevel=corr
 	with pytest.raises(ValueError):
-		tsets.keplerq9(datalevel='raw')
+		tsetclass(datalevel='raw')
 	with pytest.raises(ValueError):
-		tsets.keplerq9(datalevel='clean')
-
-#--------------------------------------------------------------------------------------------------
-#@pytest.mark.skipif(not trainingset_available('keplerq9v2'), reason='TrainingSet not available')
-def test_keplerq9v2():
-
-	# KeplerQ9 does not support anything other than datalevel=corr
-	with pytest.raises(ValueError):
-		tsets.keplerq9v2(datalevel='raw')
-	with pytest.raises(ValueError):
-		tsets.keplerq9v2(datalevel='clean')
+		tsetclass(datalevel='clean')
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.skip()
+@pytest.mark.skipif(not trainingset_available('tdasim'), reason='TrainingSet not available')
 @pytest.mark.parametrize('datalevel', ['corr', 'raw', 'clean'])
 def test_tdasim(datalevel):
 

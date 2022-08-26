@@ -15,6 +15,7 @@ import shutil
 import logging
 import sqlite3
 from contextlib import closing
+from astropy.table import Table
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from .. import BaseClassifier, TaskManager, utilities, io
@@ -116,6 +117,17 @@ class TrainingSet(object):
 		self.tm.cursor.execute("SELECT COUNT(*) FROM starclass_todolist;")
 		self.nobjects = int(self.tm.cursor.fetchone()[0])
 
+		# Pull in the full list of known labels to be used in training:
+		self.tm.cursor.execute("SELECT starclass FROM todolist ORDER BY priority;")
+		self._lookup = []
+		for row in self.tm.cursor.fetchall():
+			lbls = [self.StellarClasses[lbl.strip()] for lbl in row['starclass'].split(';')]
+			self._lookup.append(tuple(set(lbls)))
+
+		# Basic sanity check:
+		if len(self._lookup) != self.nobjects:
+			raise RuntimeError("Inconsistency detected in number of labels.") # pragma: no cover
+
 		# Generate training/test indices
 		# Define here because it is needed by self.labels() used below
 		self.train_idx = np.arange(self.nobjects, dtype=int)
@@ -125,7 +137,7 @@ class TrainingSet(object):
 				self.train_idx,
 				test_size=self.testfraction,
 				random_state=self.random_seed,
-				stratify=self.labels()
+				stratify=self.labels() # [lbl[0].name for lbl in self.labels()]
 			)
 
 		# Cross Validation
@@ -277,7 +289,7 @@ class TrainingSet(object):
 				# Extract ZIP file:
 				logger.info("Step 2: Unpacking %s training set...", self.key)
 				with zipfile.ZipFile(zip_tmp, 'r') as myzip:
-					for fileName in tqdm(myzip.namelist(), disable=not logger.isEnabledFor(logging.INFO)):
+					for fileName in tqdm(myzip.namelist(), disable=None if logger.isEnabledFor(logging.INFO) else True):
 						myzip.extract(fileName, input_folder)
 
 			except: # noqa: E722, pragma: no cover
@@ -292,6 +304,12 @@ class TrainingSet(object):
 		return input_folder
 
 	#----------------------------------------------------------------------------------------------
+	def load_targets(self):
+		starlist_file = os.path.join(self.input_folder, 'targets.ecsv')
+		starlist = Table.read(starlist_file, format='ascii.ecsv')
+		return starlist
+
+	#----------------------------------------------------------------------------------------------
 	def generate_todolist(self):
 		"""
 		Generate todo.sqlite file in training set directory.
@@ -299,6 +317,13 @@ class TrainingSet(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 		logger = logging.getLogger(__name__)
+
+		logger.info("Step 3: Reading file and extracting information...")
+		starlist = self.load_targets()
+
+		# Set of names of stellar classes to perform checks:
+		classnames = set(item.name for item in self.StellarClasses)
+		colnames = set(starlist.colnames)
 
 		try:
 			with closing(sqlite3.connect(self.todo_file)) as conn:
@@ -308,20 +333,16 @@ class TrainingSet(object):
 				# Create the basic file structure of a TODO-list:
 				todolist_structure(conn)
 
-				logger.info("Step 3: Reading file and extracting information...")
-				pri = 0
+				cursor.execute("ALTER TABLE todolist ADD COLUMN starclass TEXT NOT NULL;")
+				conn.commit()
 
-				diagnostics_file = os.path.join(self.input_folder, 'diagnostics.txt')
-				diagnostics = None
-				if os.path.isfile(diagnostics_file):
-					diagnostics = np.genfromtxt(diagnostics_file,
-						delimiter=',', comments='#', dtype=None, encoding='utf-8')
-
-				for k, star in tqdm(enumerate(self.starlist), total=len(self.starlist)):
+				for k, star in tqdm(enumerate(starlist), total=len(starlist)):
 					# Get starid:
-					starname = star[0]
-					starclass = star[1]
-					if starname.startswith('constant_'):
+					starname = star['starname']
+					starclass = star['starclass']
+					if 'starid' in colnames:
+						starid = star['starid']
+					elif starname.startswith('constant_'):
 						starid = -10000 - int(starname[9:])
 					elif starname.startswith('fakerrlyr_'):
 						starid = -20000 - int(starname[10:])
@@ -329,17 +350,28 @@ class TrainingSet(object):
 						starid = int(starname)
 						starname = '{0:09d}'.format(starid)
 
+					# Make sure that the provided class names are valid:
+					for cl in starclass.split(';'):
+						if cl not in classnames:
+							raise RuntimeError(f"'{starclass:s}' is not a valid classification class")
+
 					# Path to lightcurve:
-					lightcurve = starclass + '/' + starname + '.txt'
+					if 'lightcurve' in colnames:
+						lightcurve = star['lightcurve']
+					else:
+						lightcurve = starclass + '/' + starname + '.txt'
 
 					# Check that the file actually exists:
 					if not os.path.exists(os.path.join(self.input_folder, lightcurve)):
 						raise FileNotFoundError(lightcurve)
 
 					# Load diagnostics from file, to speed up the process:
-					if diagnostics is not None:
-						variance, rms_hour, ptp = diagnostics[k]
-					else:
+					variance = star['variance'] if 'variance' in colnames else None
+					rms_hour = star['rms_hour'] if 'rms_hour' in colnames else None
+					ptp = star['ptp'] if 'ptp' in colnames else None
+					tmag = star['tmag'] if 'tmag' in colnames else None
+
+					if variance is None or rms_hour is None or ptp is None:
 						# Load the lightcurve using the load_lightcurve method.
 						# This will ensure that the lightcurve can actually be read by the system.
 						lc = io.load_lightcurve(os.path.join(self.input_folder, lightcurve))
@@ -356,16 +388,17 @@ class TrainingSet(object):
 
 					elaptime = np.random.normal(3.14, 0.5)
 
-					pri += 1
 					todolist_insert(cursor,
-						priority=pri,
+						priority=k+1,
 						starid=starid,
 						lightcurve=lightcurve,
 						datasource='ffi',
 						variance=variance,
 						rms_hour=rms_hour,
 						ptp=ptp,
-						elaptime=elaptime)
+						elaptime=elaptime,
+						tmag=tmag,
+						starclass=starclass)
 
 				conn.commit()
 				todolist_cleanup(conn, cursor)
@@ -443,15 +476,7 @@ class TrainingSet(object):
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-		# Create list of all the classes for each star:
-		lookup = []
-		for rowidx in self.train_idx:
-			row = self.starlist[rowidx, :]
-			labels = row[1].strip().split(';')
-			lbls = [self.StellarClasses[lbl.strip()] for lbl in labels]
-			lookup.append(tuple(set(lbls)))
-
-		return tuple(lookup)
+		return tuple([self._lookup[k] for k in self.train_idx])
 
 	#----------------------------------------------------------------------------------------------
 	def labels_test(self):
@@ -464,15 +489,7 @@ class TrainingSet(object):
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-		# Create list of all the classes for each star:
-		lookup = []
-		for rowidx in self.test_idx:
-			row = self.starlist[rowidx, :]
-			labels = row[1].strip().split(';')
-			lbls = [self.StellarClasses[lbl.strip()] for lbl in labels]
-			lookup.append(tuple(set(lbls)))
-
-		return tuple(lookup)
+		return tuple([self._lookup[k] for k in self.test_idx])
 
 	#----------------------------------------------------------------------------------------------
 	def clear_cache(self):

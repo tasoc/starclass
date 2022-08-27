@@ -113,6 +113,13 @@ class TrainingSet(object):
 			overwrite=False,
 			cleanup=False)
 
+		# Make sure we have a "modern" version of the trainingset built:
+		self.tm.cursor.execute("PRAGMA table_info(todolist);")
+		columns = [col['name'] for col in self.tm.cursor.fetchall()]
+		if 'starclass' not in columns: # pragma: no cover
+			self.close()
+			raise RuntimeError("Please re-download the training-set using 'run_download_cache'.")
+
 		# Count the number of objects in trainingset:
 		self.tm.cursor.execute("SELECT COUNT(*) FROM starclass_todolist;")
 		self.nobjects = int(self.tm.cursor.fetchone()[0])
@@ -125,7 +132,8 @@ class TrainingSet(object):
 			self._lookup.append(tuple(set(lbls)))
 
 		# Basic sanity check:
-		if len(self._lookup) != self.nobjects:
+		if len(self._lookup) != self.nobjects: # pragma: no cover
+			self.close()
 			raise RuntimeError("Inconsistency detected in number of labels.") # pragma: no cover
 
 		# Generate training/test indices

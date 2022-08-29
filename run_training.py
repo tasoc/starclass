@@ -95,7 +95,8 @@ def main():
 	if args.classifier == 'meta':
 		# Loop through all the other classifiers and initialize them:
 		with starclass.TaskManager(tset.todo_file, overwrite=args.overwrite,
-			classes=tset.StellarClasses, load_into_memory=args.no_in_memory) as tm:
+			classes=tset.StellarClasses, load_into_memory=args.no_in_memory,
+			backup_interval=500) as tm:
 			# Loop through all classifiers, excluding the MetaClassifier:
 			# TODO: Run in parallel?
 			for cla_key in tm.all_classifiers:

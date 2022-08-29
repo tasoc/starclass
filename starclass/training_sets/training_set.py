@@ -63,7 +63,7 @@ class TrainingSet(object):
 		"""
 
 		if not hasattr(self, 'key'):
-			raise RuntimeError("Training set class does not have 'key' definied.")
+			raise RuntimeError("Training set class does not have 'key' definied.") # pragma: no cover
 
 		# Basic checks of input:
 		if level not in ('L1', 'L2'):
@@ -238,7 +238,7 @@ class TrainingSet(object):
 		This is a class method, so it can be called without having to initialize the training set.
 		"""
 		if not hasattr(cls, 'key'):
-			raise RuntimeError("Training set class does not have 'key' definied.")
+			raise RuntimeError("Training set class does not have 'key' definied.") # pragma: no cover
 
 		# Point this to the directory where the training set data are stored
 		INPUT_DIR = os.environ.get('STARCLASS_TSETS')
@@ -265,7 +265,7 @@ class TrainingSet(object):
 		"""
 
 		if not hasattr(self, 'key'):
-			raise RuntimeError("Training set class does not have 'key' definied.")
+			raise RuntimeError("Training set class does not have 'key' definied.") # pragma: no cover
 
 		logger = logging.getLogger(__name__)
 		tqdm_settings = {
@@ -361,7 +361,7 @@ class TrainingSet(object):
 					# Make sure that the provided class names are valid:
 					for cl in starclass.split(';'):
 						if cl not in classnames:
-							raise RuntimeError(f"'{starclass:s}' is not a valid classification class")
+							raise RuntimeError(f"'{starclass:s}' is not a valid classification class") # pragma: no cover
 
 					# Path to lightcurve:
 					if 'lightcurve' in colnames:
@@ -371,7 +371,7 @@ class TrainingSet(object):
 
 					# Check that the file actually exists:
 					if not os.path.exists(os.path.join(self.input_folder, lightcurve)):
-						raise FileNotFoundError(lightcurve)
+						raise FileNotFoundError(lightcurve) # pragma: no cover
 
 					# Load diagnostics from file, to speed up the process:
 					variance = star['variance'] if 'variance' in colnames else None

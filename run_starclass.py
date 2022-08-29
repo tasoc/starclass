@@ -161,6 +161,7 @@ def main():
 			except starclass.exceptions.DiagnosticsNotAvailableError:
 				logger.error("Could not assign final classes due to missing diagnostics information.")
 
+	tset.close()
 	logger.info("Done.")
 
 #--------------------------------------------------------------------------------------------------

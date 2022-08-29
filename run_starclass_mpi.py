@@ -269,6 +269,8 @@ def main():
 		finally:
 			comm.send(errmsg, dest=0, tag=tags.EXIT)
 
+	tset.close()
+
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	main()

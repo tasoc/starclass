@@ -145,6 +145,7 @@ def main():
 			logger.info("Classifying holdout-set using %s...", args.classifier)
 			stcl.test(tset, save=tm.save_results, feature_importance=True)
 
+	tset.close()
 	logger.info("Done.")
 
 #--------------------------------------------------------------------------------------------------

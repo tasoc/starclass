@@ -141,7 +141,6 @@ class tdasim(TrainingSet):
 	def __init__(self, *args, **kwargs):
 
 		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/tdasim.zip')
-		print(self.input_folder)
 
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:

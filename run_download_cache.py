@@ -17,6 +17,12 @@ def main():
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('--all', help='Download all training sets.', action='store_true')
+	parser.add_argument('-t', '--trainingset',
+		default=None,
+		choices=starclass.trainingset_list,
+		action='append',
+		metavar='{TSET}',
+		help='Download this training-set. Choises are ' + ", ".join(starclass.trainingset_list) + '.')
 	args = parser.parse_args()
 
 	# Set logging level:
@@ -40,8 +46,11 @@ def main():
 	# Make sure we have turned plotting to non-interactive:
 	starclass.plots.plots_noninteractive()
 
+	# Select wich training-sets to download:
+	trainingsets = 'all' if args.all else args.trainingset
+
 	# Download all data:
-	starclass.download_cache(all_trainingsets=args.all)
+	starclass.download_cache(trainingsets=trainingsets)
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

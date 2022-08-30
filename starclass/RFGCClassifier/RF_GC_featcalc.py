@@ -145,8 +145,10 @@ def SOM_alldataprep(features, outfile=None, cardinality=64):
 		Array of phase-folded, binned lightcurves
 	"""
 	logger = logging.getLogger(__name__)
+	tqdm_settings = {'disable': None if logger.isEnabledFor(logging.INFO) else True}
+
 	SOMarray = np.ones(cardinality)
-	for obj in tqdm(features, disable=not logger.isEnabledFor(logging.INFO)):
+	for obj in tqdm(features, **tqdm_settings):
 		lc = obj['lightcurve']
 		lc = prepLCs(lc, linflatten=True)
 

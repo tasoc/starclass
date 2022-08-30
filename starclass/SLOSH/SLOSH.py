@@ -8,7 +8,7 @@ The SLOSH method for detecting solar-like oscillations (2D deep learning methods
 """
 
 import numpy as np
-import os.path
+import os
 import logging
 from tqdm import tqdm
 import h5py
@@ -130,7 +130,7 @@ class SLOSHClassifier(BaseClassifier):
 
 		# Settings for progress bar used below:
 		tqdm_settings = {
-			'disable': not logger.isEnabledFor(logging.INFO)
+			'disable': None if logger.isEnabledFor(logging.INFO) else True
 		}
 		dset_settings = {
 			'compression': 'lzf',
@@ -170,10 +170,8 @@ class SLOSHClassifier(BaseClassifier):
 					hdf.flush()
 
 		# Find the level of verbosity to add to tensorflow calls:
-		if logger.isEnabledFor(logging.DEBUG):
+		if logger.isEnabledFor(logging.INFO):
 			verbose = 2
-		elif logger.isEnabledFor(logging.INFO):
-			verbose = 1
 		else:
 			verbose = 0
 
@@ -225,9 +223,9 @@ class SLOSHClassifier(BaseClassifier):
 		'''
 		if not self.predictable:
 			raise ValueError('No saved models in memory.')
-		else:
-			for i in range(len(self.classifier_list)):
-				self.classifier_list[i].save(outfile + '-%s.h5' % i)
+
+		for i in range(len(self.classifier_list)):
+			self.classifier_list[i].save(outfile + '-%s.h5' % i)
 
 	#----------------------------------------------------------------------------------------------
 	def load(self, infile):

@@ -128,7 +128,11 @@ def main():
 					stcl.test(tset, save=tm.save_results, feature_importance=True)
 
 				# Make sure to persistently store results when a classifier is done:
+				# First call backup to force a write to disk of the todo-file,
+				# and then force a reload of the todo-file in the TrainingSet
+				# to make the changes (i.e. MOAT) available for the next training/testing.
 				tm.backup()
+				tset.reload()
 
 		# For the MetaClassifier, we should switch this on for the final training:
 		tset.fake_metaclassifier = True

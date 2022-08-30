@@ -105,13 +105,8 @@ class TrainingSet(object):
 			self.generate_todolist()
 
 		# Create in-memory TaskManager connected to this todo-file:
-		# Make sure overwrite=False, or else previous results will be deleted,
-		# meaning there would be no results for the MetaClassifier to work with
-		self.tm = TaskManager(self.todo_file,
-			classes=self.StellarClasses,
-			load_into_memory=True,
-			overwrite=False,
-			cleanup=False)
+		self.tm = None
+		self.reload()
 
 		# Make sure we have a "modern" version of the trainingset built:
 		self.tm.cursor.execute("PRAGMA table_info(todolist);")
@@ -155,8 +150,30 @@ class TrainingSet(object):
 		self.fake_metaclassifier = False
 
 	#----------------------------------------------------------------------------------------------
+	def reload(self):
+		"""Reload in-memory TaskManager connected to TrainingSet todo-file."""
+		# First make sure we properly close any previously loaded TaskManager:
+		if self.tm is not None:
+			self.tm.close()
+
+		# Create a new in-memory TaskManager:
+		# Make sure overwrite=False, or else previous results will be deleted,
+		# meaning there would be no results for the MetaClassifier to work with
+		self.tm = TaskManager(self.todo_file,
+			classes=self.StellarClasses,
+			load_into_memory=True,
+			overwrite=False,
+			cleanup=False,
+			backup_interval=None)
+
+		# This is a hack to make sure the todo-file is not overwritten
+		# when the TrainingSet is closed, because the TaskManager will
+		# otherwise try to overwrite it:
+		self.tm.run_from_memory = False
+
+	#----------------------------------------------------------------------------------------------
 	def close(self):
-		if hasattr(self, 'tm'):
+		if hasattr(self, 'tm') and self.tm is not None:
 			self.tm.close()
 
 	#----------------------------------------------------------------------------------------------

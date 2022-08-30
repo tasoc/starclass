@@ -252,12 +252,7 @@ class TaskManager(object):
 			# Since we are running from memory, the original file
 			# is not opened by any process, so we are free to
 			# replace it:
-			try:
-				os.replace(backupfile, self.todo_file)
-			except PermissionError: # pragma: no cover
-				self.logger.exception('Could not overwrite original file. Backup saved as: %s', backupfile)
-			except FileNotFoundError: # pragma: no cover
-				self.logger.exception('Could not create backup.')
+			os.replace(backupfile, self.todo_file)
 
 	#----------------------------------------------------------------------------------------------
 	def close(self):
@@ -270,6 +265,9 @@ class TaskManager(object):
 				self.conn.commit()
 				self.cursor.close()
 				self.backup()
+				# A little hacky, but it stops backup() from doing a second overwrite
+				# during __del__ if it has already been closed:
+				self.run_from_memory = False
 			except sqlite3.ProgrammingError: # pragma: no cover
 				pass
 

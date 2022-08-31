@@ -26,15 +26,10 @@ AVAILABLE_CLASSIFIERS = list(starclass.classifier_list)
 AVAILABLE_CLASSIFIERS.remove('meta')
 
 #--------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS) # FIXME:  + ['meta']
+@pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS + ['meta'])
 def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 
 	stcl = starclass.get_classifier(classifier)
-
-	# Pick out a task to use for testing:
-	with starclass.TaskManager(SHARED_INPUT_DIR) as tm:
-		task1 = tm.get_task(classifier=classifier, change_classifier=False, chunk=1)[0]
-		print(task1)
 
 	with tempfile.TemporaryDirectory(prefix='starclass-testing-') as tmpdir:
 		if classifier == 'meta':
@@ -43,25 +38,15 @@ def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 			# all the other classifiers have already been trained and cross-validated
 			# in order to fill up the training-set todo-file with probabilities
 			# which the MetaClassifier uses for training.
-			tsetclass = starclass.get_trainingset('keplerq9v3')
-			input_folder = tsetclass.find_input_folder()
-
-			# Create a copy of the root files of the trainings set (ignore that actual data)
-			# in the temp. directory:
-			tsetdir = os.path.join(tmpdir, os.path.basename(input_folder))
-			print("New dummy input folder: %s" % tsetdir)
-			os.makedirs(tsetdir)
-			for f in os.listdir(input_folder):
-				fpath = os.path.join(input_folder, f)
-				if os.path.isfile(fpath) and not f.endswith(('.sqlite', '.sqlite-journal')):
-					shutil.copy(fpath, tsetdir)
 
 			# Change the environment variable to the temp. dir:
 			monkeypatch.setenv("STARCLASS_TSETS", tmpdir)
 
 			# Copy the pre-prepared todo-file to the training-set directory:
-			prepared_todo = os.path.join(SHARED_INPUT_DIR, 'meta', 'todo.sqlite')
+			tsetclass = starclass.get_trainingset('keplerq9v3')
+			prepared_todo = os.path.join(SHARED_INPUT_DIR, 'meta', 'keplerq9v3-tset.sqlite')
 			new_todo = os.path.join(tsetclass.find_input_folder(), tsetclass._todo_name + '.sqlite')
+			os.makedirs(os.path.dirname(new_todo), exist_ok=True)
 			shutil.copyfile(prepared_todo, new_todo)
 
 			# Initialize the training-set in the temp folder,
@@ -71,6 +56,14 @@ def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 		else:
 			tsetclass = starclass.get_trainingset('testing')
 			tset = tsetclass(tf=0.2, random_seed=42)
+
+		print(tset)
+		print(tset.fake_metaclassifier)
+
+		# Pick out a task to use for testing:
+		with starclass.TaskManager(tset.todo_file, load_into_memory=False, classes=tset.StellarClasses) as tm:
+			task1 = tm.get_task(classifier=classifier, change_classifier=False, chunk=1)[0]
+			print(task1)
 
 		# Initialize the classifier and run training and testing:
 		with stcl(tset=tset, features_cache=None, data_dir=tmpdir) as cl:
@@ -132,20 +125,39 @@ def test_classifiers_train_test(monkeypatch, SHARED_INPUT_DIR, classifier):
 		assert results1[key] == results2[key], "Non-identical results before and after saving/loading model"
 
 #--------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS)
-def test_run_training(PRIVATE_INPUT_DIR, classifier):
-
-	tsetclass = starclass.get_trainingset('testing')
-	tset = tsetclass(tf=0.2, random_seed=42)
-
+@pytest.mark.parametrize('classifier', AVAILABLE_CLASSIFIERS) # FIXME: + ['meta']
+def test_run_training_and_starclass(monkeypatch, PRIVATE_INPUT_DIR, classifier):
 	with tempfile.TemporaryDirectory(prefix='starclass-testing-') as tmpdir:
+		if classifier == 'meta':
+			# For the MetaClassifier, we need to manipulate the training-set
+			# a little bit before we can train. We have to mimic that
+			# all the other classifiers have already been trained and cross-validated
+			# in order to fill up the training-set todo-file with probabilities
+			# which the MetaClassifier uses for training.
+
+			# Change the environment variable to the temp. dir:
+			monkeypatch.setenv("STARCLASS_TSETS", tmpdir)
+
+			# Copy the pre-prepared todo-file to the training-set directory:
+			tsetclass = starclass.get_trainingset('keplerq9v3')
+			prepared_todo = os.path.join(PRIVATE_INPUT_DIR, 'meta', 'keplerq9v3-tset.sqlite')
+			new_todo = os.path.join(tsetclass.find_input_folder(), tsetclass._todo_name + '.sqlite')
+			os.makedirs(os.path.dirname(new_todo), exist_ok=True)
+			shutil.copyfile(prepared_todo, new_todo)
+
+			tset = tsetclass(tf=0.2, random_seed=42)
+			tset.fake_metaclassifier = True
+		else:
+			tsetclass = starclass.get_trainingset('testing')
+			tset = tsetclass(tf=0.2, random_seed=42)
+
 		logfile = os.path.join(tmpdir, 'training.log')
 		todo_file = os.path.join(PRIVATE_INPUT_DIR, 'todo_run.sqlite')
 
 		# Train the classifier:
 		out, err, exitcode = capture_run_cli('run_training.py', [
 			'--classifier=' + classifier,
-			'--trainingset=testing',
+			'--trainingset=' + tset.key,
 			'--level=L1',
 			'--testfraction=0.2',
 			'--log=' + logfile,
@@ -153,6 +165,7 @@ def test_run_training(PRIVATE_INPUT_DIR, classifier):
 			'--output=' + tmpdir
 		])
 		assert exitcode == 0
+		assert ' - INFO - Done.' in out
 
 		# Check that a log-file was indeed generated:
 		assert os.path.isfile(logfile), "Log-file not generated"
@@ -174,7 +187,7 @@ def test_run_training(PRIVATE_INPUT_DIR, classifier):
 				'--debug',
 				'--overwrite',
 				'--classifier=' + classifier,
-				'--trainingset=testing',
+				'--trainingset=' + tset.key,
 				'--level=L1',
 				'--datadir=' + tmpdir,
 				todo_file
@@ -188,10 +201,10 @@ def test_run_training(PRIVATE_INPUT_DIR, classifier):
 
 				cursor.execute("SELECT * FROM starclass_settings;")
 				row = cursor.fetchall()
-				assert len(row) == 1, "Only one settings row should exist"
+				assert len(row) == 1, "Exactly one settings row should exist"
 				settings = row[0]
 				print(dict(settings))
-				assert settings['tset'] == 'testtset'
+				assert settings['tset'] == tset.key
 
 				cursor.execute("SELECT * FROM starclass_diagnostics WHERE priority=17;")
 				row = cursor.fetchone()
@@ -208,12 +221,12 @@ def test_run_training(PRIVATE_INPUT_DIR, classifier):
 					print(dict(row))
 					assert row['priority'] == 17
 					assert row['classifier'] == classifier
-					tset.StellarClasses[row['class']] # Will result in KeyError of not correct
+					tset.StellarClasses[row['class']] # Will result in KeyError if not correct
 					assert 0 <= row['prob'] <= 1, "Invalid probability"
 
 				cursor.execute("SELECT * FROM starclass_features_common;")
 				results = cursor.fetchall()
-				assert len(results) == 1
+				assert len(results) == 1, "Exactly one features_common row should exist"
 				row = dict(results[0])
 				print(row)
 				assert row['priority'] == 17
@@ -222,7 +235,7 @@ def test_run_training(PRIVATE_INPUT_DIR, classifier):
 				if classifier != 'slosh':
 					cursor.execute(f"SELECT * FROM starclass_features_{classifier:s};")
 					results = cursor.fetchall()
-					assert len(results) == 1
+					assert len(results) == 1, f"Exactly one features_{classifier:s} row should exist"
 					row = dict(results[0])
 					print(row)
 					assert row['priority'] == 17

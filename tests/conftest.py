@@ -41,6 +41,7 @@ def capture_run_cli(cli, params=[], mpiexec=False):
 	if mpiexec:
 		cmd = ['mpiexec', '-n', '2'] + cmd
 
+	print("Running command: " + ' '.join(cmd))
 	proc = subprocess.Popen(cmd,
 		cwd=os.path.join(os.path.dirname(__file__), '..'),
 		stdout=subprocess.PIPE,

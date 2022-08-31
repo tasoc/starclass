@@ -459,7 +459,7 @@ class TrainingSet(object):
 		with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
 			for rowidx in self.train_idx:
 				task = self.tm.get_task(priority=rowidx+1, classifier=cl,
-					change_classifier=False, chunk=1)
+					change_classifier=False, chunk=1, ignore_existing=True)
 
 				# Lightcurve file to load:
 				# We do not use the one from the database because in the simulations the
@@ -487,7 +487,7 @@ class TrainingSet(object):
 		# when opened several times in parallel.
 		for rowidx in self.test_idx:
 			task = self.tm.get_task(priority=rowidx+1, classifier=cl,
-				change_classifier=False, chunk=1)
+				change_classifier=False, chunk=1, ignore_existing=True)
 
 			# Lightcurve file to load:
 			# We do not use the one from the database because in the simulations the

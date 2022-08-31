@@ -316,7 +316,7 @@ class TaskManager(object):
 		return num
 
 	#----------------------------------------------------------------------------------------------
-	def _query_task(self, classifier=None, priority=None, chunk=1):
+	def _query_task(self, classifier=None, priority=None, chunk=1, ignore_existing=False):
 
 		search_joins = []
 		search_query = []
@@ -330,7 +330,7 @@ class TaskManager(object):
 			search_query.append(f'temp.starclass_todolist.priority={priority:d}')
 
 		# If a classifier is specified, constrain to only that classifier:
-		if classifier is not None:
+		if classifier is not None and not ignore_existing:
 			search_joins.append(f"LEFT JOIN starclass_diagnostics ON starclass_diagnostics.priority=temp.starclass_todolist.priority AND starclass_diagnostics.classifier='{classifier:s}'")
 			search_query.append("starclass_diagnostics.status IS NULL")
 
@@ -411,7 +411,7 @@ class TaskManager(object):
 		return None
 
 	#----------------------------------------------------------------------------------------------
-	def get_task(self, priority=None, classifier=None, change_classifier=True, chunk=1):
+	def get_task(self, priority=None, classifier=None, change_classifier=True, chunk=1, ignore_existing=False):
 		"""
 		Get next task to be processed.
 
@@ -432,7 +432,7 @@ class TaskManager(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		task = self._query_task(classifier=classifier, priority=priority, chunk=chunk)
+		task = self._query_task(classifier=classifier, priority=priority, chunk=chunk, ignore_existing=ignore_existing)
 
 		# If no task is returned for the given classifier, find another
 		# classifier where tasks are available:
@@ -441,7 +441,7 @@ class TaskManager(object):
 			# task for all of them:
 			all_tasks = []
 			for cl in self.all_classifiers.difference([classifier]):
-				task = self._query_task(classifier=cl, priority=priority, chunk=chunk)
+				task = self._query_task(classifier=cl, priority=priority, chunk=chunk, ignore_existing=ignore_existing)
 				if task is not None:
 					all_tasks.append(task)
 
@@ -454,7 +454,7 @@ class TaskManager(object):
 
 			# If this is reached, all classifiers are done, and we can
 			# start running the MetaClassifier:
-			task = self._query_task(classifier='meta', priority=priority, chunk=chunk)
+			task = self._query_task(classifier='meta', priority=priority, chunk=chunk, ignore_existing=ignore_existing)
 
 		return task
 

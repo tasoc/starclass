@@ -10,6 +10,7 @@ The default is to train the Meta Classifier, which includes training all other c
 
 import argparse
 import os
+import sys
 import logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
@@ -60,7 +61,7 @@ def main():
 
 	# Setup logging:
 	formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-	console = logging.StreamHandler()
+	console = logging.StreamHandler(sys.stdout)
 	console.setFormatter(formatter)
 	console.setLevel(logging_level)
 	logger = logging.getLogger('starclass')

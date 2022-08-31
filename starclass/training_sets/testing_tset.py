@@ -21,7 +21,7 @@ class testing_tset(TrainingSet):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 	# Class constants:
-	key = 'testtset'
+	key = 'testing'
 	datadir = 'keplerq9v3'
 	_todo_name = 'todo-testing'
 

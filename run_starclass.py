@@ -21,6 +21,8 @@ def main():
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
+	parser.add_argument('--chunks', type=int, default=10, help="Number of tasks sent to each worker at a time.")
+	parser.add_argument('--no-in-memory', action='store_false', help="Do not run TaskManager completely in-memory.")
 	parser.add_argument('--clear-cache', help='Clear existing features cache tables before running. Can only be used together with --overwrite.', action='store_true')
 	# Option to select which classifier to run:
 	parser.add_argument('-c', '--classifier',
@@ -109,7 +111,8 @@ def main():
 	# Running:
 	# When simply running the classifier on new stars:
 	stcl = None
-	with starclass.TaskManager(todo_file, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
+	with starclass.TaskManager(todo_file, overwrite=args.overwrite, classes=tset.StellarClasses,
+		load_into_memory=args.no_in_memory) as tm:
 		# If we were asked to do so, start by clearing the existing MOAT tables:
 		if args.overwrite and args.clear_cache:
 			tm.moat_clear()
@@ -120,19 +123,16 @@ def main():
 
 		with tqdm(total=numtasks, **tqdm_settings) as pbar:
 			while True:
-				tasks = tm.get_task(classifier=current_classifier, change_classifier=change_classifier)
-				logger.debug(tasks)
+				tasks = tm.get_task(
+					classifier=current_classifier,
+					change_classifier=change_classifier,
+					chunk=args.chunks)
 				if tasks is None:
 					break
+				logger.debug(tasks)
 				tm.start_task(tasks)
 
 				# ----------------- This code would run on each worker ------------------------
-
-				# Make sure we can loop through tasks,
-				# even in the case we have only gotten one:
-				results = []
-				if isinstance(tasks, dict):
-					tasks = [tasks]
 
 				if tasks[0]['classifier'] != current_classifier or stcl is None:
 					current_classifier = tasks[0]['classifier']
@@ -141,6 +141,7 @@ def main():
 					stcl = starclass.get_classifier(current_classifier)
 					stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate, data_dir=args.datadir)
 
+				results = []
 				for task in tasks:
 					res = stcl.classify(task)
 					results.append(res)
@@ -160,6 +161,7 @@ def main():
 			except starclass.exceptions.DiagnosticsNotAvailableError:
 				logger.error("Could not assign final classes due to missing diagnostics information.")
 
+	tset.close()
 	logger.info("Done.")
 
 #--------------------------------------------------------------------------------------------------

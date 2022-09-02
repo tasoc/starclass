@@ -42,6 +42,7 @@ def main():
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
 	parser.add_argument('--chunks', type=int, default=10, help="Number of tasks sent to each worker at a time.")
+	parser.add_argument('--no-in-memory', action='store_false', help="Do not run TaskManager completely in-memory.")
 	parser.add_argument('--clear-cache', help='Clear existing features cache tables before running. Can only be used together with --overwrite.', action='store_true')
 	# Option to select which classifier to run:
 	parser.add_argument('-c', '--classifier',
@@ -126,7 +127,8 @@ def main():
 		logger.setLevel(logging_level)
 
 		try:
-			with starclass.TaskManager(todo_file, cleanup=True, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
+			with starclass.TaskManager(todo_file, cleanup=True, overwrite=args.overwrite,
+				classes=tset.StellarClasses, load_into_memory=args.no_in_memory) as tm:
 				# If we were asked to do so, start by clearing the existing MOAT tables:
 				if args.overwrite and args.clear_cache:
 					tm.moat_clear()
@@ -228,12 +230,6 @@ def main():
 				toc_wait = default_timer()
 
 				if tag == tags.START:
-					# Make sure we can loop through tasks,
-					# even in the case we have only gotten one:
-					results = []
-					if isinstance(tasks, dict):
-						tasks = [tasks]
-
 					# Run the classification prediction:
 					if tasks[0]['classifier'] != current_classifier or stcl is None:
 						current_classifier = tasks[0]['classifier']
@@ -243,6 +239,7 @@ def main():
 						stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate, data_dir=args.datadir)
 
 					# Loop through the tasks given to us:
+					results = []
 					for task in tasks:
 						result = stcl.classify(task)
 
@@ -271,6 +268,8 @@ def main():
 
 		finally:
 			comm.send(errmsg, dest=0, tag=tags.EXIT)
+
+	tset.close()
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

@@ -56,11 +56,16 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit, fake_metaclassifier
 		# This is needed for the meta-classifier results to be returned
 		if fake_metaclassifier:
 			for classifier in tm.all_classifiers:
-				tm.save_results({'priority': 17, 'classifier': classifier, 'status': STATUS.OK, 'starclass_results': {
-					StellarClassesLevel1.SOLARLIKE: 0.2,
-					StellarClassesLevel1.DSCT_BCEP: 0.1,
-					StellarClassesLevel1.ECLIPSE: 0.7
-				}})
+				tm.save_results({
+					'priority': 17,
+					'classifier': classifier,
+					'status': STATUS.OK,
+					'starclass_results': {
+						StellarClassesLevel1.SOLARLIKE: 0.2,
+						StellarClassesLevel1.DSCT_BCEP: 0.1,
+						StellarClassesLevel1.ECLIPSE: 0.7
+					}
+				})
 
 		for k in range(2): # Try loading twice - second time we should load from cache
 			with BaseClassifier(tset=tset, features_cache=features_cache) as cl:
@@ -72,7 +77,11 @@ def test_baseclassifier_load_star(PRIVATE_INPUT_DIR, linfit, fake_metaclassifier
 						assert os.listdir(features_cache) == ['features-17.pickle']
 
 				clfier = 'meta' if fake_metaclassifier else None
-				task = tm.get_task(priority=17, classifier=clfier, change_classifier=False)
+				task = tm.get_task(
+					priority=17,
+					classifier=clfier,
+					change_classifier=False,
+					chunk=1)[0]
 				print(task)
 				assert task is not None, "Task not found"
 
@@ -159,7 +168,16 @@ def test_linfit(PRIVATE_INPUT_DIR):
 
 	with BaseClassifier(tset=tset) as cl:
 		# This is only used to easier load the original lightcurve:
-		task = {'priority': 1, 'starid': 29281992, 'tmag': None, 'variance': None, 'rms_hour': None, 'ptp': None, 'other_classifiers': None, 'lightcurve': fname}
+		task = {
+			'priority': 1,
+			'starid': 29281992,
+			'tmag': None,
+			'variance': None,
+			'rms_hour': None,
+			'ptp': None,
+			'other_classifiers': None,
+			'lightcurve': fname
+		}
 		feat = cl.load_star(task)
 		lc = feat['lightcurve']
 		p_rem = feat['detrend_coeff']

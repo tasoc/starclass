@@ -176,15 +176,15 @@ def todolist_insert(cursor, priority=None, lightcurve=None, starid=None,
 
 	Parameters:
 		cursor (sqlite3.Cursor): Cursor in SQLite file.
-		priority (int):
-		lightcurve (str):
-		starid (int):
+		priority (int): Priority in todo-list.
+		lightcurve (str): Path to lightcurve.
+		starid (int): Star identifier (TIC number).
 		tmag (float): TESS Magnitude.
-		datasource (str):
-		variance (float):
-		rms_hour (float):
-		ptp (float):
-		elaptime (float):
+		datasource (str): Source of data. Should be 'ffi' or 'tpf'.
+		variance (float): Variance of lightcurve.
+		rms_hour (float): RMS/hour of ligthcurve.
+		ptp (float): Point-to-point scatter of lightcurve.
+		elaptime (float): Processing time.
 
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
@@ -200,21 +200,23 @@ def todolist_insert(cursor, priority=None, lightcurve=None, starid=None,
 	if tmag is None:
 		tmag = -99
 
-	cursor.execute("INSERT INTO todolist (priority,starid,tmag,datasource,status,corr_status,camera,ccd,cbv_area) VALUES (?,?,?,?,1,1,1,1,111);", (
-		priority,
-		starid,
-		tmag,
+	cursor.execute("INSERT INTO todolist (priority,starid,tmag,datasource,status,corr_status,camera,ccd,cbv_area) VALUES (?,?,?,?,1,1,1,1,111);", [
+		int(priority),
+		int(starid),
+		float(tmag),
 		datasource
-	))
-	cursor.execute("INSERT INTO diagnostics_corr (priority,lightcurve,elaptime,variance,rms_hour,ptp) VALUES (?,?,?,?,?,?);", (
-		priority,
+	])
+	cursor.execute("INSERT INTO diagnostics_corr (priority,lightcurve,elaptime,variance,rms_hour,ptp) VALUES (?,?,?,?,?,?);", [
+		int(priority),
 		lightcurve.replace('\\', '/'),
 		elaptime,
 		variance,
 		rms_hour,
 		ptp
-	))
-	cursor.execute("INSERT INTO datavalidation_corr (priority,approved,dataval) VALUES (?,1,0);", (priority,))
+	])
+	cursor.execute("INSERT INTO datavalidation_corr (priority,approved,dataval) VALUES (?,1,0);", [
+		int(priority),
+	])
 
 #--------------------------------------------------------------------------------------------------
 def todolist_cleanup(conn, cursor):
@@ -234,8 +236,9 @@ def todolist_cleanup(conn, cursor):
 
 	# Run a VACUUM of the table which will force a recreation of the
 	# underlying "pages" of the file.
+	tmp_isolevel = conn.isolation_level
 	try:
 		conn.isolation_level = None
 		cursor.execute("VACUUM;")
 	finally:
-		conn.isolation_level = ''
+		conn.isolation_level = tmp_isolevel

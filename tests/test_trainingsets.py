@@ -33,53 +33,51 @@ def test_trainingset(tsetkey, linfit):
 	# Get training set class using conv. function:
 	tsetclass = get_trainingset(tsetkey)
 
-	for testfraction in (0, 0.2):
-		tset = tsetclass(tf=testfraction, linfit=linfit)
-		print(tset)
-
-		if linfit:
-			assert tset.key == tsetkey + '-linfit'
-		else:
-			assert tset.key == tsetkey
-		assert tset.level == 'L1'
-		assert tset.datalevel == 'corr'
-		assert tset.testfraction == testfraction
-		assert len(tset) > 0
-
 	# Invalid level should give ValueError:
 	with pytest.raises(ValueError):
 		tsetclass(level='nonsense')
 
-	# Test-fractions which should all return in a ValueError:
+	# Test-fractions which should all result in a ValueError:
 	with pytest.raises(ValueError):
-		tset = tsetclass(tf=1.2)
+		tsetclass(tf=1.2)
 	with pytest.raises(ValueError):
-		tset = tsetclass(tf=1.0)
+		tsetclass(tf=1.0)
 	with pytest.raises(ValueError):
-		tset = tsetclass(tf=-0.2)
+		tsetclass(tf=-0.2)
 
 	# Calling with invalid datalevel should throw an error as well:
 	with pytest.raises(ValueError):
-		tset = tsetclass(datalevel='nonsense')
+		tsetclass(datalevel='nonsense')
 
-	tset = tsetclass(tf=0, linfit=linfit)
-	print(tset)
-	lbls = tset.labels()
-	lbls_test = tset.labels_test()
-	print(tset.nobjects)
-	print(len(lbls), len(lbls_test))
+	for testfraction in (0, 0.2):
+		with tsetclass(tf=testfraction, linfit=linfit) as tset:
+			print(tset)
+			if linfit:
+				assert tset.key == tsetkey + '-linfit'
+			else:
+				assert tset.key == tsetkey
+			assert tset.level == 'L1'
+			assert tset.datalevel == 'corr'
+			assert tset.testfraction == testfraction
+			assert len(tset) > 0
 
-	assert len(lbls) == tset.nobjects
-	assert len(lbls_test) == 0
+			lbls = tset.labels()
+			lbls_test = tset.labels_test()
+			print(tset.nobjects)
+			print(len(lbls), len(lbls_test))
 
-	tset = tsetclass(tf=0.2, linfit=linfit)
-	print(tset)
-	lbls = tset.labels()
-	lbls_test = tset.labels_test()
-	print(tset.nobjects)
-	print(len(lbls), len(lbls_test))
+			if testfraction == 0:
+				assert len(lbls) == tset.nobjects
+				assert len(lbls_test) == 0
+			else:
+				assert len(lbls_test) > 0
+				assert len(lbls) + len(lbls_test) == tset.nobjects
 
-	assert len(lbls) + len(lbls_test) == tset.nobjects
+			# If testfraction is 0, then there should be no test-features:
+			if testfraction == 0:
+				with pytest.raises(ValueError) as e:
+					next(tset.features_test())
+				assert str(e.value) == 'features_test requires testfraction > 0'
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize('tsetkey', AVAILABLE_TSETS)
@@ -174,45 +172,42 @@ def test_trainingset_folds(tsetkey, linfit):
 
 	# Get training set class using conv. function:
 	tsetclass = get_trainingset(tsetkey)
-	tset = tsetclass(linfit=linfit)
-
-	for k, fold in enumerate(tset.folds(n_splits=5)):
-		assert isinstance(fold, tsetclass)
-		assert fold.key == tset.key
-		assert fold.crossval_folds == 5
-		assert fold.fold == k + 1
-		assert fold.testfraction == 0.2
-		assert fold.level == tset.level
-		assert fold.random_seed == tset.random_seed
-		assert len(fold.train_idx) > 0
-		assert len(fold.test_idx) > 0
-		assert len(fold.train_idx) > len(fold.test_idx)
-		assert len(fold.train_idx) < len(tset.train_idx)
+	with tsetclass(linfit=linfit) as tset:
+		for k, fold in enumerate(tset.folds(n_splits=5)):
+			assert isinstance(fold, tsetclass)
+			assert fold.key == tset.key
+			assert fold.crossval_folds == 5
+			assert fold.fold == k + 1
+			assert fold.testfraction == 0.2
+			assert fold.level == tset.level
+			assert fold.random_seed == tset.random_seed
+			assert len(fold.train_idx) > 0
+			assert len(fold.test_idx) > 0
+			assert len(fold.train_idx) > len(fold.test_idx)
+			assert len(fold.train_idx) < len(tset.train_idx)
 
 	assert k == 4, "Not the correct number of folds"
 
 #--------------------------------------------------------------------------------------------------
-#@pytest.mark.skipif(not trainingset_available('keplerq9'), reason='TrainingSet not available')
-def test_keplerq9():
+@pytest.mark.parametrize('tsetkey', [
+	'keplerq9v3',
+	'keplerq9v3-instr',
+	pytest.param('keplerq9v2', marks=pytest.mark.skipif(not trainingset_available('keplerq9v2'), reason='TrainingSet not available')),
+	pytest.param('keplerq9', marks=pytest.mark.skipif(not trainingset_available('keplerq9'), reason='TrainingSet not available')),
+])
+def test_only_corr(tsetkey):
+	# Get training set class using conv. function:
+	tsetclass = get_trainingset(tsetkey)
 
 	# KeplerQ9 does not support anything other than datalevel=corr
 	with pytest.raises(ValueError):
-		tsets.keplerq9(datalevel='raw')
+		tsetclass(datalevel='raw')
 	with pytest.raises(ValueError):
-		tsets.keplerq9(datalevel='clean')
-
-#--------------------------------------------------------------------------------------------------
-#@pytest.mark.skipif(not trainingset_available('keplerq9v2'), reason='TrainingSet not available')
-def test_keplerq9v2():
-
-	# KeplerQ9 does not support anything other than datalevel=corr
-	with pytest.raises(ValueError):
-		tsets.keplerq9v2(datalevel='raw')
-	with pytest.raises(ValueError):
-		tsets.keplerq9v2(datalevel='clean')
+		tsetclass(datalevel='clean')
 
 #--------------------------------------------------------------------------------------------------
 @pytest.mark.skip()
+@pytest.mark.skipif(not trainingset_available('tdasim'), reason='TrainingSet not available')
 @pytest.mark.parametrize('datalevel', ['corr', 'raw', 'clean'])
 def test_tdasim(datalevel):
 

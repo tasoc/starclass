@@ -10,6 +10,7 @@ The default is to train the Meta Classifier, which includes training all other c
 
 import argparse
 import os
+import sys
 import logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
@@ -22,6 +23,7 @@ def main():
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
+	parser.add_argument('--no-in-memory', action='store_false', help="Do not run TaskManager completely in-memory.")
 	parser.add_argument('--log', type=str, default=None, metavar='{LOGFILE}', help="Log to file.")
 	parser.add_argument('--log-level', type=str, default=None, choices=['debug','info','warning','error'],
 		help="Logging level to use in file-logging. If not set, use the same level as the console.")
@@ -59,7 +61,7 @@ def main():
 
 	# Setup logging:
 	formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-	console = logging.StreamHandler()
+	console = logging.StreamHandler(sys.stdout)
 	console.setFormatter(formatter)
 	console.setLevel(logging_level)
 	logger = logging.getLogger('starclass')
@@ -93,9 +95,11 @@ def main():
 	# using cross-validation
 	if args.classifier == 'meta':
 		# Loop through all the other classifiers and initialize them:
-		# TODO: Run in parallel?
-		with starclass.TaskManager(tset.todo_file, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
+		with starclass.TaskManager(tset.todo_file, overwrite=args.overwrite,
+			classes=tset.StellarClasses, load_into_memory=args.no_in_memory,
+			backup_interval=500) as tm:
 			# Loop through all classifiers, excluding the MetaClassifier:
+			# TODO: Run in parallel?
 			for cla_key in tm.all_classifiers:
 				# Check if everything is already populated for this classifier, and if so skip it:
 				numtasks = tm.get_number_tasks(classifier=cla_key)
@@ -124,12 +128,20 @@ def main():
 					logger.info("Classifying holdout-set using %s...", stcl.classifier_key)
 					stcl.test(tset, save=tm.save_results, feature_importance=True)
 
+				# Make sure to persistently store results when a classifier is done:
+				# First call backup to force a write to disk of the todo-file,
+				# and then force a reload of the todo-file in the TrainingSet
+				# to make the changes (i.e. MOAT) available for the next training/testing.
+				tm.backup()
+				tset.reload()
+
 		# For the MetaClassifier, we should switch this on for the final training:
 		tset.fake_metaclassifier = True
 
 	# Initialize the classifier:
 	classifier = starclass.get_classifier(args.classifier)
-	with starclass.TaskManager(tset.todo_file, overwrite=False, classes=tset.StellarClasses) as tm:
+	with starclass.TaskManager(tset.todo_file, overwrite=False, classes=tset.StellarClasses,
+		load_into_memory=args.no_in_memory) as tm:
 		with classifier(tset=tset, features_cache=tset.features_cache, data_dir=args.output) as stcl:
 			# Run the training of the classifier:
 			logger.info("Training %s on full training-set...", args.classifier)
@@ -138,6 +150,7 @@ def main():
 			logger.info("Classifying holdout-set using %s...", args.classifier)
 			stcl.test(tset, save=tm.save_results, feature_importance=True)
 
+	tset.close()
 	logger.info("Done.")
 
 #--------------------------------------------------------------------------------------------------

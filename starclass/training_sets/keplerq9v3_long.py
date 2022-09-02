@@ -6,8 +6,6 @@ Kepler Q9 Training Set (version 3), 90 day version.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-import os.path
-import numpy as np
 from . import TrainingSet
 from ..StellarClasses import StellarClassesLevel1Instr
 
@@ -29,24 +27,15 @@ class keplerq9v3_long(TrainingSet):
 		# Point this to the directory where the TDA simulations are stored
 		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/keplerq9v3-long.zip')
 
-		# Find the number of training sets:
-		self.starlist = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
-			dtype='str',
-			delimiter=',',
-			comments='#',
-			encoding='utf-8')
-
-		# Remove the instrumental class from this trainingset:
-		self._valid_indicies = np.arange(self.starlist.shape[0], dtype=int)
-		indx = [star[1] != 'INSTRUMENT' for star in self.starlist]
-		self._valid_indicies = self._valid_indicies[indx]
-
-		# Count the number of objects in trainingset:
-		self.nobjects = len(self._valid_indicies)
-
 		# Initialize parent
 		# NOTE: We do this after setting the input_folder, as it depends on that being set:
 		super().__init__(*args, **kwargs)
+
+	def load_targets(self):
+		# Remove the instrumental class from this trainingset:
+		starlist = super().load_targets()
+		indx = (starlist['starclass'] != 'INSTRUMENT')
+		return starlist[indx]
 
 #--------------------------------------------------------------------------------------------------
 class keplerq9v3_long_instr(TrainingSet):
@@ -67,16 +56,6 @@ class keplerq9v3_long_instr(TrainingSet):
 
 		# Point this to the directory where the TDA simulations are stored
 		self.input_folder = self.tset_datadir('https://tasoc.dk/pipeline/starclass_trainingsets/keplerq9v3-long.zip')
-
-		# Find the number of training sets:
-		self.starlist = np.genfromtxt(os.path.join(self.input_folder, 'targets.txt'),
-			dtype='str',
-			delimiter=',',
-			comments='#',
-			encoding='utf-8')
-
-		# Count the number of objects in trainingset:
-		self.nobjects = self.starlist.shape[0]
 
 		# Pin the StellarClasses Enum to special values for this training set:
 		self.StellarClasses = StellarClassesLevel1Instr

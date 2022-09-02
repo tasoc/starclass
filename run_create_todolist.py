@@ -40,6 +40,9 @@ def main():
 	logger_parent.addHandler(console)
 	logger_parent.setLevel(logging_level)
 
+	# Make sure we have turned plotting to non-interactive:
+	starclass.plots.plots_noninteractive()
+
 	# Download all data:
 	starclass.todolist.create_fake_todolist(args.input_folder,
 		name=args.name,

@@ -18,12 +18,30 @@ if sys.path[0] != os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 	sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 #--------------------------------------------------------------------------------------------------
-def capture_run_cli(cli, params):
+def capture_run_cli(cli, params=[], mpiexec=False):
+	"""
+	Run command-line interface in subprocess.
+
+	Parameters:
+		cli (str): Path to command-line program to execute.
+		params (list or str, optional): List of parameters to pass to CLI.
+		mpiexec (bool, optional): Run in parallel using mpiexec.
+
+	Returns:
+		tuple:
+			- returncode (int): Integer return code from CLI.
+			- stdout (str): Standard output from CLI.
+			- stderr (str): Standard error from CLI.
+	"""
 
 	if isinstance(params, str):
 		params = params.split()
 
 	cmd = [sys.executable, cli] + params
+	if mpiexec:
+		cmd = ['mpiexec', '-n', '2'] + cmd
+
+	print("Running command: " + ' '.join(cmd))
 	proc = subprocess.Popen(cmd,
 		cwd=os.path.join(os.path.dirname(__file__), '..'),
 		stdout=subprocess.PIPE,

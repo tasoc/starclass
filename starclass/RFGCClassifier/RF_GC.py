@@ -16,6 +16,7 @@ from sklearn.ensemble import RandomForestClassifier
 from . import RF_GC_featcalc as fc
 from .. import BaseClassifier, io
 from ..utilities import get_periods
+from ..exceptions import UntrainedClassifierError
 
 # Number of frequencies used as features:
 NFREQUENCIES = 6
@@ -113,6 +114,10 @@ class RFGCClassifier(BaseClassifier):
 		if self.linfit:
 			self.features_names.append('detrend_coeff_norm')
 
+		# Link to the internal RandomForestClassifier classifier model,
+		# which can be used for calculating feature importances:
+		self._classifier_model = self.classifier
+
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile, somoutfile='som.txt'):
 		"""
@@ -169,9 +174,13 @@ class RFGCClassifier(BaseClassifier):
 				EBper = fc.EBperiod(lc.time, lc.flux, periods[0], linflatten=True)
 				featout[k, 0] = EBper # overwrites top period
 
-				featout[k, NFREQUENCIES:NFREQUENCIES+2] = fc.freq_ampratios(obj, n_usedfreqs, usedfreqs)
+				amp21, amp31 = fc.freq_ampratios(obj, n_usedfreqs, usedfreqs)
+				featout[k, NFREQUENCIES] = amp21
+				featout[k, NFREQUENCIES+1] = amp31
 
-				featout[k, NFREQUENCIES+2:NFREQUENCIES+4] = fc.freq_phasediffs(obj, n_usedfreqs, usedfreqs)
+				phi21, phi31 = fc.freq_phasediffs(obj, n_usedfreqs, usedfreqs)
+				featout[k, NFREQUENCIES+2] = phi21
+				featout[k, NFREQUENCIES+3] = phi31
 
 				# Self Organising Map
 				featout[k, NFREQUENCIES+4:NFREQUENCIES+6] = fc.SOMloc(self.classifier.som, lc.time, lc.flux, EBper, cardinality)
@@ -211,8 +220,7 @@ class RFGCClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		if not self.classifier.trained:
-			logger.error('Classifier has not been trained. Exiting.')
-			raise ValueError('Classifier has not been trained. Exiting.')
+			raise UntrainedClassifierError('Classifier has not been trained. Exiting.')
 
 		# Assumes that if self.classifier.trained=True,
 		# ...then self.classifier.som is not None

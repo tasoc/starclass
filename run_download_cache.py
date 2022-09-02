@@ -1,18 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Command-line interface downloading auxillary data.
+
+.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+"""
 
 import argparse
 import logging
 import starclass
 
 #--------------------------------------------------------------------------------------------------
-if __name__ == '__main__':
-
+def main():
 	# Parse command line arguments:
-	parser = argparse.ArgumentParser(description='Download all axillary data for pipeline.')
+	parser = argparse.ArgumentParser(description='Download all auxillary data for pipeline.')
 	parser.add_argument('-d', '--debug', help='Print debug messages.', action='store_true')
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('--all', help='Download all training sets.', action='store_true')
+	parser.add_argument('-t', '--trainingset',
+		default=None,
+		choices=starclass.trainingset_list,
+		action='append',
+		metavar='{TSET}',
+		help='Download this training-set. Choises are ' + ", ".join(starclass.trainingset_list) + '.')
 	args = parser.parse_args()
 
 	# Set logging level:
@@ -33,5 +43,15 @@ if __name__ == '__main__':
 	logger_parent.addHandler(console)
 	logger_parent.setLevel(logging_level)
 
+	# Make sure we have turned plotting to non-interactive:
+	starclass.plots.plots_noninteractive()
+
+	# Select wich training-sets to download:
+	trainingsets = 'all' if args.all else args.trainingset
+
 	# Download all data:
-	starclass.download_cache(all_trainingsets=args.all)
+	starclass.download_cache(trainingsets=trainingsets)
+
+#--------------------------------------------------------------------------------------------------
+if __name__ == '__main__':
+	main()

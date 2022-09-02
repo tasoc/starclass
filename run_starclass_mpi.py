@@ -29,6 +29,8 @@ import traceback
 import os
 import enum
 import itertools
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+import tensorflow as tf
 import starclass
 from timeit import default_timer
 
@@ -40,6 +42,7 @@ def main():
 	parser.add_argument('-q', '--quiet', help='Only report warnings and errors.', action='store_true')
 	parser.add_argument('-o', '--overwrite', help='Overwrite existing results.', action='store_true')
 	parser.add_argument('--chunks', type=int, default=10, help="Number of tasks sent to each worker at a time.")
+	parser.add_argument('--no-in-memory', action='store_false', help="Do not run TaskManager completely in-memory.")
 	parser.add_argument('--clear-cache', help='Clear existing features cache tables before running. Can only be used together with --overwrite.', action='store_true')
 	# Option to select which classifier to run:
 	parser.add_argument('-c', '--classifier',
@@ -62,6 +65,8 @@ def main():
 	group.add_argument('--truncate', dest='truncate', action='store_true', help='Force light curve truncation.')
 	group.add_argument('--no-truncate', dest='truncate', action='store_false', help='Force no light curve truncation.')
 	parser.set_defaults(truncate=None)
+	# Data directory:
+	parser.add_argument('--datadir', type=str, default=None, help='Directory where trained models and diagnostics will be loaded. Default is to load from the programs data directory.')
 	# Input folder:
 	parser.add_argument('input_folder', type=str, help='Input directory. This directory should contain a TODO-file and corresponding lightcurves.', nargs='?', default=None)
 	args = parser.parse_args()
@@ -73,6 +78,18 @@ def main():
 	# Make sure chunks are sensible:
 	if args.chunks < 1:
 		parser.error("--chunks should be an integer larger than 0.")
+
+	# Set logging level:
+	logging_level = logging.INFO
+	if args.quiet:
+		logging_level = logging.WARNING
+	elif args.debug:
+		logging_level = logging.DEBUG
+
+	# Configure logging within starclass:
+	formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+	console = logging.StreamHandler()
+	console.setFormatter(formatter)
 
 	# Get input and output folder from environment variables:
 	input_folder = args.input_folder
@@ -88,6 +105,9 @@ def main():
 		todo_file = os.path.abspath(input_folder)
 		input_folder = os.path.dirname(input_folder)
 
+	# Make sure we have turned plotting to non-interactive:
+	starclass.plots.plots_noninteractive()
+
 	# Initialize the training set:
 	tsetclass = starclass.get_trainingset(args.trainingset)
 	tset = tsetclass(level=args.level, linfit=args.linfit)
@@ -102,15 +122,20 @@ def main():
 	status = MPI.Status()   # get MPI status object
 
 	if rank == 0:
+		logger = logging.getLogger('starclass')
+		logger.addHandler(console)
+		logger.setLevel(logging_level)
+
 		try:
-			with starclass.TaskManager(todo_file, cleanup=True, overwrite=args.overwrite, classes=tset.StellarClasses) as tm:
+			with starclass.TaskManager(todo_file, cleanup=True, overwrite=args.overwrite,
+				classes=tset.StellarClasses, load_into_memory=args.no_in_memory) as tm:
 				# If we were asked to do so, start by clearing the existing MOAT tables:
 				if args.overwrite and args.clear_cache:
 					tm.moat_clear()
 
-				# Get list of tasks:
-				#numtasks = tm.get_number_tasks()
-				#tm.logger.info("%d tasks to be run", numtasks)
+				# Get number of tasks:
+				numtasks = tm.get_number_tasks(classifier=args.classifier)
+				logger.info("%d tasks to be run", numtasks)
 
 				# Number of available workers:
 				num_workers = size - 1
@@ -128,38 +153,42 @@ def main():
 					initial_classifiers = [args.classifier]*num_workers
 					change_classifier = False
 
-				tm.logger.info("Initial classifiers: %s", initial_classifiers)
+				logger.info("Initial classifiers: %s", initial_classifiers)
 
 				# Start the master loop that will assign tasks
 				# to the workers:
 				closed_workers = 0
-				tm.logger.info("Master starting with %d workers", num_workers)
+				logger.info("Master starting with %d workers", num_workers)
 				while closed_workers < num_workers:
 					# Ask workers for information:
 					data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
 					source = status.Get_source()
 					tag = status.Get_tag()
+					logger.debug("Signal from %s: %s", source, tags(tag))
 
 					if tag == tags.DONE:
 						# The worker is done with a task
-						tm.logger.debug("Got data from worker %d: %s", source, data)
+						logger.debug("Got data from worker %d: %s", source, data)
 						tm.save_results(data)
 
 					if tag in (tags.DONE, tags.READY):
 						# Worker is ready, so send it a task
 						# If provided, try to find a task that is with the same classifier
-						cl = initial_classifiers[source-1] if data is None else data.get('classifier')
+						cl = initial_classifiers[source-1] if data is None else data[0].get('classifier')
 						tasks = tm.get_task(classifier=cl, change_classifier=change_classifier, chunk=args.chunks)
 						if tasks:
 							tm.start_task(tasks)
-							tm.logger.debug("Sending %d tasks to worker %d", len(tasks), source)
+							logger.debug("Sending %d tasks to worker %d", len(tasks), source)
 							comm.send(tasks, dest=source, tag=tags.START)
 						else:
 							comm.send(None, dest=source, tag=tags.EXIT)
 
 					elif tag == tags.EXIT:
 						# The worker has exited
-						tm.logger.info("Worker %d exited.", source)
+						if data is None:
+							logger.info("Worker %d exited.", source)
+						else:
+							logger.error("Worker %d exited with error: %s", source, data)
 						closed_workers += 1
 
 					else: # pragma: no cover
@@ -167,26 +196,27 @@ def main():
 						# make sure we don't run into an infinite loop:
 						raise RuntimeError(f"Master received an unknown tag: '{tag}'")
 
-				tm.logger.info("Master finishing")
+				# Assign final classes:
+				if args.classifier is None or args.classifier == 'meta':
+					try:
+						tm.assign_final_class(tset, data_dir=args.datadir)
+					except starclass.exceptions.DiagnosticsNotAvailableError:
+						logger.error("Could not assign final classes due to missing diagnostics information.")
+
+				logger.info("Master finishing")
 
 		except: # noqa: E722, pragma: no cover
 			# If something fails in the master
-			print(traceback.format_exc().strip())
+			print(traceback.format_exc().strip()) # noqa: T001
 			comm.Abort(1)
 
 	else:
 		# Worker processes execute code below
-		# Configure logging within starclass:
-		formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-		console = logging.StreamHandler()
-		console.setFormatter(formatter)
-		logger = logging.getLogger('starclass')
-		logger.addHandler(console)
-		logger.setLevel(logging.WARNING)
 
 		# Get the class for the selected method:
 		current_classifier = None
 		stcl = None
+		errmsg = None
 
 		try:
 			# Send signal that we are ready for task:
@@ -200,21 +230,16 @@ def main():
 				toc_wait = default_timer()
 
 				if tag == tags.START:
-					# Make sure we can loop through tasks,
-					# even in the case we have only gotten one:
-					results = []
-					if not isinstance(tasks, (list, tuple)):
-						tasks = list(tasks)
-
 					# Run the classification prediction:
 					if tasks[0]['classifier'] != current_classifier or stcl is None:
 						current_classifier = tasks[0]['classifier']
 						if stcl:
 							stcl.close()
 						stcl = starclass.get_classifier(current_classifier)
-						stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate)
+						stcl = stcl(tset=tset, features_cache=None, truncate_lightcurves=args.truncate, data_dir=args.datadir)
 
 					# Loop through the tasks given to us:
+					results = []
 					for task in tasks:
 						result = stcl.classify(task)
 
@@ -239,10 +264,12 @@ def main():
 					raise RuntimeError(f"Worker received an unknown tag: '{tag}'")
 
 		except: # noqa: E722, pragma: no cover
-			logger.exception("Something failed in worker")
+			errmsg = traceback.format_exc().strip()
 
 		finally:
-			comm.send(None, dest=0, tag=tags.EXIT)
+			comm.send(errmsg, dest=0, tag=tags.EXIT)
+
+	tset.close()
 
 #--------------------------------------------------------------------------------------------------
 if __name__ == '__main__':

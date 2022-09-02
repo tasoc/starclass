@@ -13,9 +13,9 @@ import requests
 import zipfile
 import shutil
 import logging
-import tempfile
 import sqlite3
 from contextlib import closing
+from astropy.table import Table
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from .. import BaseClassifier, TaskManager, utilities, io
@@ -63,7 +63,7 @@ class TrainingSet(object):
 		"""
 
 		if not hasattr(self, 'key'):
-			raise Exception("Training set class does not have 'key' definied.")
+			raise RuntimeError("Training set class does not have 'key' definied.") # pragma: no cover
 
 		# Basic checks of input:
 		if level not in ('L1', 'L2'):
@@ -91,7 +91,7 @@ class TrainingSet(object):
 			}[self.level]
 
 		# Define cache location where we will save common features:
-		features_cache_name = 'features_cache_%s' % self.datalevel
+		features_cache_name = 'features_cache_' + self.datalevel
 		if self.linfit:
 			self.key += '-linfit'
 			self._todo_name += '-linfit'
@@ -104,47 +104,106 @@ class TrainingSet(object):
 		if not os.path.isfile(self.todo_file):
 			self.generate_todolist()
 
+		# Create in-memory TaskManager connected to this todo-file:
+		self.tm = None
+		self.reload()
+
+		# Make sure we have a "modern" version of the trainingset built:
+		self.tm.cursor.execute("PRAGMA table_info(todolist);")
+		columns = [col['name'] for col in self.tm.cursor.fetchall()]
+		if 'starclass' not in columns: # pragma: no cover
+			self.close()
+			raise RuntimeError("Please re-download the training-set using 'run_download_cache'.")
+
+		# Count the number of objects in trainingset:
+		self.tm.cursor.execute("SELECT COUNT(*) FROM starclass_todolist;")
+		self.nobjects = int(self.tm.cursor.fetchone()[0])
+
+		# Pull in the full list of known labels to be used in training:
+		self.tm.cursor.execute("SELECT starclass FROM todolist ORDER BY priority;")
+		self._lookup = []
+		for row in self.tm.cursor.fetchall():
+			lbls = [self.StellarClasses[lbl.strip()] for lbl in row['starclass'].split(';')]
+			self._lookup.append(tuple(set(lbls)))
+
+		# Basic sanity check:
+		if len(self._lookup) != self.nobjects: # pragma: no cover
+			self.close()
+			raise RuntimeError("Inconsistency detected in number of labels.") # pragma: no cover
+
 		# Generate training/test indices
 		# Define here because it is needed by self.labels() used below
-		if hasattr(self, '_valid_indicies'):
-			self.train_idx = self._valid_indicies
-		else:
-			self.train_idx = np.arange(self.nobjects, dtype=int)
+		self.train_idx = np.arange(self.nobjects, dtype=int)
 		self.test_idx = np.array([], dtype=int)
 		if self.testfraction > 0:
 			self.train_idx, self.test_idx = train_test_split(
 				self.train_idx,
 				test_size=self.testfraction,
 				random_state=self.random_seed,
-				stratify=self.labels()
+				stratify=self.labels() # [lbl[0].name for lbl in self.labels()]
 			)
 
 		# Cross Validation
 		self.fold = 0
 		self.crossval_folds = 0
 
+		self.fake_metaclassifier = False
+
+	#----------------------------------------------------------------------------------------------
+	def reload(self):
+		"""Reload in-memory TaskManager connected to TrainingSet todo-file."""
+		# First make sure we properly close any previously loaded TaskManager:
+		if self.tm is not None:
+			self.tm.close()
+
+		# Create a new in-memory TaskManager:
+		# Make sure overwrite=False, or else previous results will be deleted,
+		# meaning there would be no results for the MetaClassifier to work with
+		self.tm = TaskManager(self.todo_file,
+			classes=self.StellarClasses,
+			load_into_memory=True,
+			overwrite=False,
+			cleanup=False,
+			backup_interval=None)
+
+		# This is a hack to make sure the todo-file is not overwritten
+		# when the TrainingSet is closed, because the TaskManager will
+		# otherwise try to overwrite it:
+		self.tm.run_from_memory = False
+
+	#----------------------------------------------------------------------------------------------
+	def close(self):
+		if hasattr(self, 'tm') and self.tm is not None:
+			self.tm.close()
+
+	#----------------------------------------------------------------------------------------------
+	def __del__(self):
+		self.close()
+
+	#----------------------------------------------------------------------------------------------
+	def __exit__(self, *args):
+		self.close()
+
+	#----------------------------------------------------------------------------------------------
+	def __enter__(self):
+		return self
+
 	#----------------------------------------------------------------------------------------------
 	def __str__(self):
-		str_fold = '' if self.fold == 0 else ', fold={0:d}/{1:d}'.format(self.fold, self.crossval_folds)
-		return "<TrainingSet({key:s}, {datalevel:s}, tf={tf:.2f}{fold:s})>".format(
-			key=self.key,
-			datalevel=self.datalevel,
-			tf=self.testfraction,
-			fold=str_fold
-		)
+		str_fold = '' if self.fold == 0 else f', fold={self.fold:d}/{self.crossval_folds:d}'
+		return f"<TrainingSet({self.key:s}, {self.datalevel:s}, tf={self.testfraction:.2f}{str_fold:s})>"
 
 	#----------------------------------------------------------------------------------------------
 	def __len__(self):
 		return len(self.train_idx)
 
 	#----------------------------------------------------------------------------------------------
-	def folds(self, n_splits=5, tf=0.2):
+	def folds(self, n_splits=5):
 		"""
 		Split training set object into stratified folds.
 
 		Parameters:
 			n_splits (int, optional): Number of folds to split training set into. Default=5.
-			tf (float, optional): Test-fraction, between 0 and 1, to split from each fold.
 
 		Returns:
 			Iterator of :class:`TrainingSet` objects: Iterator of folds, which are also
@@ -153,6 +212,7 @@ class TrainingSet(object):
 
 		logger = logging.getLogger(__name__)
 
+		# FIXME: Use BaseClassifier.parse_labels
 		labels_test = [lbl[0].value for lbl in self.labels()]
 
 		# If keyword is true then split according to KFold cross-validation
@@ -175,8 +235,11 @@ class TrainingSet(object):
 				random_seed=self.random_seed,
 				tf=0.0)
 
+			# Transfer settings not set during initialization:
+			newtset.fake_metaclassifier = self.fake_metaclassifier
+
 			# Set testfraction to value from CV i.e. 1/n_splits
-			newtset.testfraction = tf
+			newtset.testfraction = 1/n_splits
 			newtset.train_idx = self.train_idx[train_idx]
 			newtset.test_idx = self.train_idx[test_idx]
 			newtset.crossval_folds = n_splits
@@ -192,7 +255,7 @@ class TrainingSet(object):
 		This is a class method, so it can be called without having to initialize the training set.
 		"""
 		if not hasattr(cls, 'key'):
-			raise Exception("Training set class does not have 'key' definied.")
+			raise RuntimeError("Training set class does not have 'key' definied.") # pragma: no cover
 
 		# Point this to the directory where the training set data are stored
 		INPUT_DIR = os.environ.get('STARCLASS_TSETS')
@@ -219,14 +282,14 @@ class TrainingSet(object):
 		"""
 
 		if not hasattr(self, 'key'):
-			raise Exception("Training set class does not have 'key' definied.")
+			raise RuntimeError("Training set class does not have 'key' definied.") # pragma: no cover
 
 		logger = logging.getLogger(__name__)
 		tqdm_settings = {
 			'unit': 'B',
 			'unit_scale': True,
 			'unit_divisor': 1024,
-			'disable': not logger.isEnabledFor(logging.INFO)
+			'disable': None if logger.isEnabledFor(logging.INFO) else True
 		}
 
 		# Find folder where training set is stored:
@@ -251,7 +314,7 @@ class TrainingSet(object):
 				# Extract ZIP file:
 				logger.info("Step 2: Unpacking %s training set...", self.key)
 				with zipfile.ZipFile(zip_tmp, 'r') as myzip:
-					for fileName in tqdm(myzip.namelist(), disable=not logger.isEnabledFor(logging.INFO)):
+					for fileName in tqdm(myzip.namelist(), disable=None if logger.isEnabledFor(logging.INFO) else True):
 						myzip.extract(fileName, input_folder)
 
 			except: # noqa: E722, pragma: no cover
@@ -266,6 +329,12 @@ class TrainingSet(object):
 		return input_folder
 
 	#----------------------------------------------------------------------------------------------
+	def load_targets(self):
+		starlist_file = os.path.join(self.input_folder, 'targets.ecsv')
+		starlist = Table.read(starlist_file, format='ascii.ecsv')
+		return starlist
+
+	#----------------------------------------------------------------------------------------------
 	def generate_todolist(self):
 		"""
 		Generate todo.sqlite file in training set directory.
@@ -273,6 +342,13 @@ class TrainingSet(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 		logger = logging.getLogger(__name__)
+
+		logger.info("Step 3: Reading file and extracting information...")
+		starlist = self.load_targets()
+
+		# Set of names of stellar classes to perform checks:
+		classnames = set(item.name for item in self.StellarClasses)
+		colnames = set(starlist.colnames)
 
 		try:
 			with closing(sqlite3.connect(self.todo_file)) as conn:
@@ -282,20 +358,16 @@ class TrainingSet(object):
 				# Create the basic file structure of a TODO-list:
 				todolist_structure(conn)
 
-				logger.info("Step 3: Reading file and extracting information...")
-				pri = 0
+				cursor.execute("ALTER TABLE todolist ADD COLUMN starclass TEXT;")
+				conn.commit()
 
-				diagnostics_file = os.path.join(self.input_folder, 'diagnostics.txt')
-				diagnostics = None
-				if os.path.isfile(diagnostics_file):
-					diagnostics = np.genfromtxt(diagnostics_file,
-						delimiter=',', comments='#', dtype=None, encoding='utf-8')
-
-				for k, star in tqdm(enumerate(self.starlist), total=len(self.starlist)):
+				for k, star in tqdm(enumerate(starlist), total=len(starlist)):
 					# Get starid:
-					starname = star[0]
-					starclass = star[1]
-					if starname.startswith('constant_'):
+					starname = star['starname']
+					starclass = star['starclass']
+					if 'starid' in colnames:
+						starid = star['starid']
+					elif starname.startswith('constant_'):
 						starid = -10000 - int(starname[9:])
 					elif starname.startswith('fakerrlyr_'):
 						starid = -20000 - int(starname[10:])
@@ -303,18 +375,29 @@ class TrainingSet(object):
 						starid = int(starname)
 						starname = '{0:09d}'.format(starid)
 
+					# Make sure that the provided class names are valid:
+					for cl in starclass.split(';'):
+						if cl not in classnames:
+							raise RuntimeError(f"'{starclass:s}' is not a valid classification class") # pragma: no cover
+
 					# Path to lightcurve:
-					lightcurve = starclass + '/' + starname + '.txt'
+					if 'lightcurve' in colnames:
+						lightcurve = star['lightcurve']
+					else:
+						lightcurve = starclass + '/' + starname + '.txt'
 
 					# Check that the file actually exists:
 					if not os.path.exists(os.path.join(self.input_folder, lightcurve)):
-						raise FileNotFoundError(lightcurve)
+						raise FileNotFoundError(lightcurve) # pragma: no cover
 
 					# Load diagnostics from file, to speed up the process:
-					if diagnostics is not None:
-						variance, rms_hour, ptp = diagnostics[k]
-					else:
-						# Try to load the lightcurve using the BaseClassifier method.
+					variance = star['variance'] if 'variance' in colnames else None
+					rms_hour = star['rms_hour'] if 'rms_hour' in colnames else None
+					ptp = star['ptp'] if 'ptp' in colnames else None
+					tmag = star['tmag'] if 'tmag' in colnames else None
+
+					if variance is None or rms_hour is None or ptp is None:
+						# Load the lightcurve using the load_lightcurve method.
 						# This will ensure that the lightcurve can actually be read by the system.
 						lc = io.load_lightcurve(os.path.join(self.input_folder, lightcurve))
 
@@ -330,16 +413,21 @@ class TrainingSet(object):
 
 					elaptime = np.random.normal(3.14, 0.5)
 
-					pri += 1
 					todolist_insert(cursor,
-						priority=pri,
+						priority=k+1,
 						starid=starid,
 						lightcurve=lightcurve,
 						datasource='ffi',
 						variance=variance,
 						rms_hour=rms_hour,
 						ptp=ptp,
-						elaptime=elaptime)
+						elaptime=elaptime,
+						tmag=tmag)
+
+					cursor.execute("UPDATE todolist SET starclass=? WHERE priority=?;", [
+						starclass,
+						k+1
+					])
 
 				conn.commit()
 				todolist_cleanup(conn, cursor)
@@ -363,36 +451,20 @@ class TrainingSet(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		# Create a temporary copy of the TODO-file that we are going to read from.
-		# This is due to errors we have detected, where the database is unexpectively locked
-		# when opened several times in parallel.
-		try:
-			with tempfile.NamedTemporaryFile(dir=self.input_folder, suffix='.sqlite', delete=False) as tmpdir:
-				# Copy the original TODO-file to the new temp file:
-				with open(self.todo_file, 'rb') as fid:
-					shutil.copyfileobj(fid, tmpdir)
-				tmpdir.flush()
+		cl = 'meta' if self.fake_metaclassifier else None
 
-				# Make sure overwrite=False, or else previous results will be deleted,
-				# meaning there would be no results for the MetaClassifier to work with
-				with TaskManager(tmpdir.name, overwrite=False, cleanup=False, classes=self.StellarClasses) as tm:
-					# NOTE: This does not propergate the 'data_dir' keyword to the BaseClassifier,
-					#       But since we are not doing anything other than loading data,
-					#       this should not cause any problems.
-					with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
-						for rowidx in self.train_idx:
-							task = tm.get_task(priority=rowidx+1, change_classifier=False)
+		# NOTE: This does not propergate the 'data_dir' keyword to the BaseClassifier,
+		#       But since we are not doing anything other than loading data,
+		#       this should not cause any problems.
+		with BaseClassifier(tset=self, features_cache=self.features_cache) as stcl:
+			for rowidx in self.train_idx:
+				task = self.tm.get_task(priority=rowidx+1, classifier=cl,
+					change_classifier=False, chunk=1, ignore_existing=True)
 
-							# Lightcurve file to load:
-							# We do not use the one from the database because in the simulations the
-							# raw and corrected light curves are stored in different files.
-							yield stcl.load_star(task)
-
-		finally:
-			if os.path.exists(tmpdir.name):
-				os.remove(tmpdir.name)
-			if os.path.exists(tmpdir.name + '-journal'):
-				os.remove(tmpdir.name + '-journal')
+				# Lightcurve file to load:
+				# We do not use the one from the database because in the simulations the
+				# raw and corrected light curves are stored in different files.
+				yield stcl.load_star(task[0])
 
 	#----------------------------------------------------------------------------------------------
 	def features_test(self):
@@ -408,32 +480,19 @@ class TrainingSet(object):
 		if self.testfraction <= 0:
 			raise ValueError('features_test requires testfraction > 0')
 
+		cl = 'meta' if self.fake_metaclassifier else None
+
 		# Create a temporary copy of the TODO-file that we are going to read from.
 		# This is due to errors we have detected, where the database is unexpectively locked
 		# when opened several times in parallel.
-		try:
-			with tempfile.NamedTemporaryFile(dir=self.input_folder, suffix='.sqlite', delete=False) as tmpdir:
-				# Copy the original TODO-file to the new temp file:
-				with open(self.todo_file, 'rb') as fid:
-					shutil.copyfileobj(fid, tmpdir)
-				tmpdir.flush()
+		for rowidx in self.test_idx:
+			task = self.tm.get_task(priority=rowidx+1, classifier=cl,
+				change_classifier=False, chunk=1, ignore_existing=True)
 
-				# Make sure overwrite=False, or else previous results will be deleted,
-				# meaning there would be no results for the MetaClassifier to work with
-				with TaskManager(tmpdir.name, overwrite=False, cleanup=False, classes=self.StellarClasses) as tm:
-					for rowidx in self.test_idx:
-						task = tm.get_task(priority=rowidx+1, change_classifier=False)
-
-						# Lightcurve file to load:
-						# We do not use the one from the database because in the simulations the
-						# raw and corrected light curves are stored in different files.
-						yield task
-
-		finally:
-			if os.path.exists(tmpdir.name):
-				os.remove(tmpdir.name)
-			if os.path.exists(tmpdir.name + '-journal'):
-				os.remove(tmpdir.name + '-journal')
+			# Lightcurve file to load:
+			# We do not use the one from the database because in the simulations the
+			# raw and corrected light curves are stored in different files.
+			yield task[0]
 
 	#----------------------------------------------------------------------------------------------
 	def labels(self):
@@ -446,15 +505,7 @@ class TrainingSet(object):
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-		# Create list of all the classes for each star:
-		lookup = []
-		for rowidx in self.train_idx:
-			row = self.starlist[rowidx, :]
-			labels = row[1].strip().split(';')
-			lbls = [self.StellarClasses[lbl.strip()] for lbl in labels]
-			lookup.append(tuple(set(lbls)))
-
-		return tuple(lookup)
+		return tuple([self._lookup[k] for k in self.train_idx])
 
 	#----------------------------------------------------------------------------------------------
 	def labels_test(self):
@@ -467,15 +518,7 @@ class TrainingSet(object):
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-		# Create list of all the classes for each star:
-		lookup = []
-		for rowidx in self.test_idx:
-			row = self.starlist[rowidx, :]
-			labels = row[1].strip().split(';')
-			lbls = [self.StellarClasses[lbl.strip()] for lbl in labels]
-			lookup.append(tuple(set(lbls)))
-
-		return tuple(lookup)
+		return tuple([self._lookup[k] for k in self.test_idx])
 
 	#----------------------------------------------------------------------------------------------
 	def clear_cache(self):
@@ -492,5 +535,4 @@ class TrainingSet(object):
 			shutil.rmtree(self.features_cache)
 
 		# Delete the MOAT tables from the training-set todo-file:
-		with TaskManager(self.todo_file, overwrite=False, classes=self.StellarClasses) as tm:
-			tm.moat_clear()
+		self.tm.moat_clear()

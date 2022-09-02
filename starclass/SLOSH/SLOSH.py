@@ -8,7 +8,7 @@ The SLOSH method for detecting solar-like oscillations (2D deep learning methods
 """
 
 import numpy as np
-import os.path
+import os
 import logging
 from tqdm import tqdm
 import h5py
@@ -18,6 +18,7 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCh
 from sklearn.metrics import classification_report
 from . import SLOSH_prepro as preprocessing
 from .. import BaseClassifier
+from ..exceptions import UntrainedClassifierError
 
 #--------------------------------------------------------------------------------------------------
 class SLOSHClassifier(BaseClassifier):
@@ -29,7 +30,7 @@ class SLOSHClassifier(BaseClassifier):
 	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 
-	def __init__(self, clfile='SLOSH_Classifier_Model.h5', mc_iterations=10, *args, **kwargs):
+	def __init__(self, clfile='SLOSH_Classifier_Model.hdf5', mc_iterations=10, *args, **kwargs):
 		"""
 		Initialization for the class.
 
@@ -58,7 +59,7 @@ class SLOSHClassifier(BaseClassifier):
 			self.model_file = None
 
 		if self.model_file is not None and os.path.exists(self.model_file):
-			logger.info("Loading pre-trained model...")
+			logger.debug("Loading pre-trained model...")
 			# load pre-trained classifier
 			self.predictable = True
 			self.classifier_list.append(tensorflow.keras.models.load_model(self.model_file))
@@ -81,7 +82,7 @@ class SLOSHClassifier(BaseClassifier):
 		"""
 		logger = logging.getLogger(__name__)
 		if not self.predictable:
-			raise ValueError('No saved models provided. Predict functions are disabled.')
+			raise UntrainedClassifierError('No saved models provided. Predict functions are disabled.')
 
 		# Pre-calculated power density spectrum:
 		psd = features['powerspectrum'].standard
@@ -129,7 +130,7 @@ class SLOSHClassifier(BaseClassifier):
 
 		# Settings for progress bar used below:
 		tqdm_settings = {
-			'disable': not logger.isEnabledFor(logging.INFO)
+			'disable': None if logger.isEnabledFor(logging.INFO) else True
 		}
 		dset_settings = {
 			'compression': 'lzf',
@@ -169,10 +170,8 @@ class SLOSHClassifier(BaseClassifier):
 					hdf.flush()
 
 		# Find the level of verbosity to add to tensorflow calls:
-		if logger.isEnabledFor(logging.DEBUG):
+		if logger.isEnabledFor(logging.INFO):
 			verbose = 2
-		elif logger.isEnabledFor(logging.INFO):
-			verbose = 1
 		else:
 			verbose = 0
 
@@ -224,9 +223,9 @@ class SLOSHClassifier(BaseClassifier):
 		'''
 		if not self.predictable:
 			raise ValueError('No saved models in memory.')
-		else:
-			for i in range(len(self.classifier_list)):
-				self.classifier_list[i].save(outfile + '-%s.h5' % i)
+
+		for i in range(len(self.classifier_list)):
+			self.classifier_list[i].save(outfile + '-%s.h5' % i)
 
 	#----------------------------------------------------------------------------------------------
 	def load(self, infile):

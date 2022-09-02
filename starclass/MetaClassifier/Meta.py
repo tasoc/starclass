@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 The meta-classifier.
@@ -15,6 +15,7 @@ from bottleneck import allnan, anynan
 from sklearn.ensemble import RandomForestClassifier
 from .. import BaseClassifier, io
 from ..constants import classifier_list
+from ..exceptions import UntrainedClassifierError
 
 #--------------------------------------------------------------------------------------------------
 class Classifier_obj(RandomForestClassifier):
@@ -26,7 +27,7 @@ class Classifier_obj(RandomForestClassifier):
 			n_estimators=n_estimators,
 			min_samples_split=min_samples_split,
 			class_weight='balanced',
-			max_depth=3,
+			max_depth=7,
 			random_state=random_state
 		)
 		self.trained = False
@@ -71,6 +72,10 @@ class MetaClassifier(BaseClassifier):
 		if self.classifier is None:
 			self.classifier = Classifier_obj(random_state=self.random_state)
 
+		# Link to the internal RandomForestClassifier classifier model,
+		# which can be used for calculating feature importances:
+		self._classifier_model = self.classifier
+
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):
 		"""
@@ -90,7 +95,7 @@ class MetaClassifier(BaseClassifier):
 		self.classifier, self.features_used = io.loadPickle(infile)
 
 		# Extract the features names based on the loaded classifier:
-		self.features_names = ['{0:s}_{1:s}'.format(classifier, stcl.name) for classifier, stcl in self.features_used]
+		self.features_names = [f'{classifier:s}_{stcl.name:s}' for classifier, stcl in self.features_used]
 		logger.debug("Feature names: %s", self.features_names)
 
 	#----------------------------------------------------------------------------------------------
@@ -131,13 +136,18 @@ class MetaClassifier(BaseClassifier):
 
 		Returns:
 			dict: Dictionary of stellar classifications.
+
+		Raises:
+			UntrainedClassifierError: If classifier has not been trained.
+			ValueError: If any features are NaN.
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 		# Start a logger that should be used to output e.g. debug information:
 		logger = logging.getLogger(__name__)
 
 		if not self.classifier.trained:
-			logger.error('Classifier has not been trained. Exiting.')
-			raise ValueError('Classifier has not been trained. Exiting.')
+			raise UntrainedClassifierError('Classifier has not been trained. Exiting.')
 
 		# Build features array from the probabilities from the other classifiers:
 		# TODO: What about NaN values?
@@ -186,7 +196,7 @@ class MetaClassifier(BaseClassifier):
 		# Save this to object, we are using it to keep track of which features were used
 		# to train the classifier:
 		self.features_used = list(itertools.product(all_classifiers, self.StellarClasses))
-		self.features_names = ['{0:s}_{1:s}'.format(classifier, stcl.name) for classifier, stcl in self.features_used]
+		self.features_names = [f'{classifier:s}_{stcl.name:s}' for classifier, stcl in self.features_used]
 
 		# Create table of features:
 		# Create as float32, since that is what RandomForestClassifier converts it to anyway.
@@ -204,7 +214,7 @@ class MetaClassifier(BaseClassifier):
 		# Throw an error if a classifier is not run at all:
 		run_classifiers = set([fu[0] for fu in self.features_used])
 		if run_classifiers != set(all_classifiers):
-			raise Exception("Classifier did not contribute at all: %s" % set(all_classifiers).difference(run_classifiers))
+			raise RuntimeError("Classifier did not contribute at all: %s" % set(all_classifiers).difference(run_classifiers))
 
 		# Raise an exception if there are NaNs left in the features:
 		if anynan(features):

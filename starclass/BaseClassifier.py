@@ -10,20 +10,25 @@ All other specific stellar classification algorithms will inherit from BaseClass
 import numpy as np
 import os.path
 import logging
-import traceback
-from tqdm import tqdm
-import enum
 import warnings
-from sklearn.metrics import accuracy_score, confusion_matrix
+import traceback
+import enum
+from tqdm import tqdm
+from sklearn import metrics
 from bottleneck import nanvar
 from timeit import default_timer
-from .io import load_lightcurve, savePickle, loadPickle
+
+with warnings.catch_warnings():
+	warnings.filterwarnings('ignore', module='shap', message="IPython could not be loaded!")
+	import shap
+
 from .features.freqextr import freqextr, freqextr_table_from_dict, freqextr_table_to_dict
 from .features.fliper import FliPer
 from .features.powerspectrum import powerspectrum
 from .utilities import rms_timescale, ptp
-from .plots import plotConfMatrix, plt
+from .plots import plt
 from .StellarClasses import StellarClassesLevel1
+from . import utilities, io, plots
 
 __docformat__ = 'restructuredtext'
 
@@ -31,7 +36,7 @@ __docformat__ = 'restructuredtext'
 @enum.unique
 class STATUS(enum.Enum):
 	"""
-	Status indicator of the status of the photometry.
+	Status indicator of the processing.
 	"""
 	UNKNOWN = 0 #: The status is unknown. The actual calculation has not started yet.
 	STARTED = 6 #: The calculation has started, but not yet finished.
@@ -95,6 +100,7 @@ class BaseClassifier(object):
 		self._random_seed = 2187
 		self.truncate_lightcurves = truncate_lightcurves
 		self.features_names = None
+		self._classifier_model = None
 
 		# Inherit settings from the Training Set, just as a conveience:
 		if tset is None:
@@ -114,12 +120,15 @@ class BaseClassifier(object):
 		logger.debug("Truncate lightcurves = %s", self.truncate_lightcurves)
 
 		# Set the data directory, where results (trained models) will be saved:
+		if data_dir is None:
+			data_dir = os.environ.get('STARCLASS_DATADIR',
+				os.path.join(os.path.dirname(__file__), 'data'))
+
+		self.data_dir = os.path.abspath(data_dir)
 		if tset is not None:
-			if data_dir is None:
-				data_dir = tset.key
-			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', tset.level, data_dir))
-		else:
-			self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
+			self.data_dir = os.path.join(data_dir, tset.level, tset.key)
+			if tset.fold > 0:
+				self.data_dir = os.path.join(self.data_dir, f'meta_fold{tset.fold:02d}')
 
 		logger.debug("Data Directory: %s", self.data_dir)
 		os.makedirs(self.data_dir, exist_ok=True)
@@ -135,6 +144,12 @@ class BaseClassifier(object):
 			'SortingHatClassifier': 'sortinghat',
 			'MetaClassifier': 'meta'
 		}[self.__class__.__name__]
+
+		# If the training-set has fake_metaclassifier enabled, we change the
+		# classifier key to the MetaClassifier, so we can load things in load_star
+		# as if we are the MetaClassifier.
+		if self.classifier_key == 'base' and tset is not None and tset.fake_metaclassifier:
+			self.classifier_key = 'meta'
 
 		# Just for catching all those places random numbers are used without explicitly requesting
 		# a random_state:
@@ -164,6 +179,11 @@ class BaseClassifier(object):
 	def random_state(self):
 		"""Random state (:class:`numpy.random.RandomState`) corresponding to ``random_seed``."""
 		return np.random.RandomState(self._random_seed)
+
+	#----------------------------------------------------------------------------------------------
+	@property
+	def classifier_model(self):
+		return self._classifier_model
 
 	#----------------------------------------------------------------------------------------------
 	def classify(self, task):
@@ -202,7 +222,7 @@ class BaseClassifier(object):
 			# Basic checks of results:
 			for key, value in res.items():
 				if key not in self.StellarClasses:
-					raise ValueError("Classifier returned unknown stellar class: '%s'" % key)
+					raise ValueError(f"Classifier returned unknown stellar class: '{key}'")
 				if value < 0 or value > 1:
 					raise ValueError("Classifier should return probability between 0 and 1.")
 
@@ -211,7 +231,7 @@ class BaseClassifier(object):
 				if rm in features_common:
 					del features_common[rm]
 
-			if self.features_names and self.classifier_key != 'meta':
+			if self.features_names:
 				# If needed, convert features to dictionary:
 				if not isinstance(features, dict):
 					if isinstance(features, np.ndarray):
@@ -284,7 +304,7 @@ class BaseClassifier(object):
 		raise NotImplementedError()
 
 	#----------------------------------------------------------------------------------------------
-	def test(self, tset, save=None):
+	def test(self, tset, save=None, feature_importance=False):
 		"""
 		Test classifier using training-set, which has been created with a test-fraction.
 
@@ -295,6 +315,7 @@ class BaseClassifier(object):
 
 		# Start logger:
 		logger = logging.getLogger(__name__)
+		tqdm_settings = {'disable': None if logger.isEnabledFor(logging.INFO) else True}
 
 		# If the training-set is created with zero testfraction,
 		# simply don't do anything:
@@ -306,16 +327,24 @@ class BaseClassifier(object):
 		all_classes = [lbl.value for lbl in self.StellarClasses]
 
 		# Classify test set (has to be one by one unless we change classifiers)
-		y_pred = []
-		for task in tqdm(tset.features_test(), total=len(tset.test_idx)):
+		N = len(tset.test_idx)
+		Nclasses = len(all_classes)
+		probs = np.full((N, Nclasses), np.NaN, dtype='float32')
+		features = np.full((N, len(self.features_names)), np.NaN, dtype='float32')
+		for k, task in enumerate(tqdm(tset.features_test(), total=N, **tqdm_settings)):
 
 			# Classify this star from the test-set:
 			result = self.classify(task)
-			#features = {'freq1': 32432, 'amp1': 4, 'unique_feature': 42} # FIXME: This should be returned by do_classify!
 
-			# FIXME: Only keeping the first label
-			prediction = max(result['starclass_results'], key=lambda key: result['starclass_results'][key]).value
-			y_pred.append(prediction)
+			# All probabilities for each class:
+			probs[k, :] = [result['starclass_results'].get(key, np.NaN) for key in self.StellarClasses]
+
+			# Gather up features used for testing:
+			if result['features'] is None:
+				feat = result['features_common']
+			else:
+				feat = {**result['features_common'], **result['features']}
+			features[k, :] = [feat[key] for key in self.features_names]
 
 			# Save results for this classifier/trainingset in database:
 			if save is not None:
@@ -324,22 +353,123 @@ class BaseClassifier(object):
 
 		# Convert labels to ndarray:
 		# FIXME: Only comparing to the first label
-		y_pred = np.array(y_pred)
+		y_pred = np.array(all_classes)[np.nanargmax(probs, axis=1)]
 		labels_test = self.parse_labels(tset.labels_test())
 
+		# Create dictionary which will gather all the diagnostics from the testing:
+		diagnostics = {
+			'tset': tset.key,
+			'classifier': self.classifier_key,
+			'level': tset.level,
+			'classes': [{'name': s.name, 'value': s.value} for s in self.StellarClasses]
+		}
+
 		# Compare to known labels:
-		acc = accuracy_score(labels_test, y_pred)
-		logger.info('Accuracy: %.2f%%', acc*100)
+		# For some reason we have to call the function twice to generate both the dict and string
+		# version of the report. Luckily this is not a demanding function to call.
+		report = metrics.classification_report(
+			labels_test,
+			y_pred,
+			labels=all_classes,
+			target_names=[lbl.name for lbl in self.StellarClasses],
+			output_dict=True,
+			zero_division=0)
+		diagnostics.update(report)
+		if logger.isEnabledFor(logging.INFO):
+			logger.info("Classification report:\n%s", metrics.classification_report(
+				labels_test,
+				y_pred,
+				labels=all_classes,
+				target_names=[lbl.name for lbl in self.StellarClasses],
+				digits=4,
+				output_dict=False,
+				zero_division=0))
 
 		# Confusion Matrix:
-		cf = confusion_matrix(labels_test, y_pred, labels=all_classes)
+		logger.info('Calculating confusion matrix...')
+		diagnostics['confusion_matrix'] = metrics.confusion_matrix(labels_test, y_pred, labels=all_classes)
 
 		# Create plot of confusion matrix:
-		fig = plt.figure(figsize=(12,12))
-		plotConfMatrix(cf, all_classes)
-		plt.title(self.classifier_key + ' - ' + tset.key + ' - ' + tset.level)
+		fig = plots.plot_confusion_matrix(diagnostics=diagnostics)
 		fig.savefig(os.path.join(self.data_dir, 'confusion_matrix_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
 		plt.close(fig)
+
+		# Prepare input for ROC/AUC
+		logger.info('Calculating ROC curve...')
+		diag_roc = utilities.roc_curve(labels_test, probs, self.StellarClasses)
+		diagnostics.update(diag_roc)
+
+		# Create plot of ROC curves:
+		fig = plots.plot_roc_curve(diagnostics)
+		fig.savefig(os.path.join(self.data_dir, 'roc_curve_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
+		plt.close(fig)
+
+		# Save test diagnostics:
+		diagnostics_file = os.path.join(self.data_dir, 'diagnostics_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.json')
+		io.saveJSON(diagnostics_file, diagnostics)
+
+		# Call function-hook where individual classifiers can execute custom diagnostics:
+		self.test_complete(tset=tset, features=features, probs=probs, diagnostics=diagnostics)
+
+		# If we are asked to do so, calculate and plot the feature importances:
+		if feature_importance:
+			logger.info('Calculating feature importances...')
+			if self.classifier_model is not None:
+				with warnings.catch_warnings():
+					# Ignore:
+					#  - DeprecationWarning: `np.bool` is a deprecated alias for the builtin `bool`.
+					#  - DeprecationWarning: `np.int` is a deprecated alias for the builtin `int`.
+					warnings.filterwarnings('ignore', category=DeprecationWarning)
+					explainer = shap.TreeExplainer(self.classifier_model)
+					shap_values = explainer.shap_values(features)
+
+				fig = plots.plot_feature_importance(shap_values, features, self.features_names, all_classes)
+				fig.savefig(os.path.join(self.data_dir, 'feature_importance_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '.png'), bbox_inches='tight')
+				plt.close(fig)
+
+				for k, cl in enumerate(self.StellarClasses):
+					fig = plots.plot_feature_scatter_density(shap_values[k], features, self.features_names, cl.value)
+					fig.savefig(os.path.join(self.data_dir, 'scatter_density_' + tset.key + '_' + tset.level + '_' + self.classifier_key + '_' + cl.name + '.png'), bbox_inches='tight')
+					plt.close(fig)
+
+			# Call function-hook where individual classifiers can execute custom diagnostics:
+			self.feature_importance_complete(tset=tset, features=features, probs=probs, diagnostics=diagnostics)
+
+	#----------------------------------------------------------------------------------------------
+	def test_complete(self, tset=None, features=None, probs=None, diagnostics=None):
+		"""
+		Function which will be called when training is finishing.
+
+		Parameters:
+			tset:
+			features:
+			probs:
+			diagnostics:
+
+		See Also:
+			:py:func:`BaseClassifier.train`
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		pass
+
+	#----------------------------------------------------------------------------------------------
+	def feature_importance_complete(self, tset=None, features=None, probs=None, diagnostics=None):
+		"""
+		Function which will be called when feature importance is finishing.
+
+		Parameters:
+			tset:
+			features:
+			probs:
+			diagnostics:
+
+		See Also:
+			:py:func:`BaseClassifier.train`
+
+		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+		"""
+		pass
 
 	#----------------------------------------------------------------------------------------------
 	def load_star(self, task):
@@ -373,7 +503,7 @@ class BaseClassifier(object):
 			if self.features_cache:
 				features_file = os.path.join(self.features_cache, 'features-' + str(task['priority']) + '.pickle')
 				if os.path.exists(features_file):
-					features = loadPickle(features_file)
+					features = io.loadPickle(features_file)
 				else:
 					save_to_cache = True
 
@@ -395,7 +525,7 @@ class BaseClassifier(object):
 			if 'lightcurve' in features:
 				lightcurve = features['lightcurve']
 			else:
-				lightcurve = load_lightcurve(task['lightcurve'],
+				lightcurve = io.load_lightcurve(task['lightcurve'],
 					starid=task['starid'],
 					truncate_lightcurve=self.truncate_lightcurves)
 
@@ -466,13 +596,11 @@ class BaseClassifier(object):
 
 			# Save features in cache file for later use:
 			if save_to_cache:
-				savePickle(features_file, features)
+				io.savePickle(features_file, features)
 
-		# Add the results from other classifiers to the features:
-		# TODO: Only add this for the MetaClassifier. This can not be done now because
-		#       BaseClassifier is used directly in TrainingSet, which means it doesn't know
-		#       which classifier is being used.
-		features['other_classifiers'] = task['other_classifiers']
+		else:
+			# Add the results from other classifiers to the features:
+			features['other_classifiers'] = task['other_classifiers']
 
 		# Add the fields from the task to the list of features:
 		features['priority'] = task['priority']

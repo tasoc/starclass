@@ -9,16 +9,18 @@ Input/output functions.
 import pickle
 import gzip
 import json
+import enum
 import numpy as np
 from bottleneck import nanmin
 from astropy.units import cds
 from astropy.io import fits
 import lightkurve as lk
+from .quality import TESSQualityFlags, CorrectorQualityFlags
 
 PICKLE_DEFAULT_PROTOCOL = 4 #: Default protocol to use for saving pickle files.
 
 #--------------------------------------------------------------------------------------------------
-def load_lightcurve(fname, starid=None, truncate_lightcurve=False):
+def load_lightcurve(fname, starid=None, truncate_lightcurve=False, exclude_bad_data=True):
 	"""
 	Load light curve from file.
 
@@ -30,6 +32,7 @@ def load_lightcurve(fname, starid=None, truncate_lightcurve=False):
 		truncate_lightcurve (bool): Truncate lightcurve to 27.4 days length, corresponding to
 			the nominal length of a TESS observing sector. This is only applied to Kepler/K2
 			data.
+		exclude_bad_data (bool): Exclude data based on quality flags.
 
 	Returns:
 		:class:`lightkurve.LightCurve`: Lightcurve object.
@@ -56,7 +59,7 @@ def load_lightcurve(fname, starid=None, truncate_lightcurve=False):
 			time_format='jd',
 			time_scale='tdb',
 			targetid=starid,
-			quality_bitmask=2+8+256, # lightkurve.utils.TessQualityFlags.DEFAULT_BITMASK,
+			quality_bitmask=TESSQualityFlags.DEFAULT_BITMASK,
 			meta={}
 		)
 
@@ -82,15 +85,17 @@ def load_lightcurve(fname, starid=None, truncate_lightcurve=False):
 					sector=hdu[0].header.get('SECTOR'),
 					ra=hdu[0].header.get('RA_OBJ'),
 					dec=hdu[0].header.get('DEC_OBJ'),
-					quality_bitmask=1+2+256, # CorrectorQualityFlags.DEFAULT_BITMASK
+					quality_bitmask=CorrectorQualityFlags.DEFAULT_BITMASK,
 					meta={}
 				)
 			elif telescope == 'TESS':
-				lightcurve = lk.TESSLightCurveFile(hdu).PDCSAP_FLUX
+				lightcurve = lk.TessLightCurveFile(hdu,
+					quality_bitmask=TESSQualityFlags.DEFAULT_BITMASK).PDCSAP_FLUX
 				lightcurve = 1e6 * (lightcurve.normalize() - 1)
 				lightcurve.flux_unit = cds.ppm
 			elif telescope == 'Kepler':
-				lightcurve = lk.KeplerLightCurveFile(hdu).PDCSAP_FLUX
+				lightcurve = lk.KeplerLightCurveFile(hdu,
+					quality_bitmask=lk.utils.KeplerQualityFlags.DEFAULT_BITMASK).PDCSAP_FLUX
 				if truncate_lightcurve:
 					indx = (lightcurve.time - nanmin(lightcurve.time) <= 27.4)
 					lightcurve = lightcurve[indx]
@@ -100,6 +105,13 @@ def load_lightcurve(fname, starid=None, truncate_lightcurve=False):
 				raise ValueError("Could not determine FITS lightcurve type")
 	else:
 		raise ValueError("Invalid file format")
+
+	# Exclude bad data points based on quality flags:
+	if exclude_bad_data:
+		# The actual Quality Flags class used doesn't matter, as long as it derives
+		# from BaseQualityFlags.
+		indx = CorrectorQualityFlags.filter(lightcurve.quality, flags=lightcurve.quality_bitmask)
+		lightcurve = lightcurve[indx]
 
 	return lightcurve
 
@@ -112,6 +124,8 @@ def savePickle(fname, obj):
 		fname (str): File name to save to. If the name ends in '.gz' the file
 			will be automatically gzipped.
 		obj (object): Any pickalble object to be saved to file.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 	if fname.endswith('.gz'):
 		o = gzip.open
@@ -132,6 +146,8 @@ def loadPickle(fname):
 
 	Returns:
 		object: The unpickled object from the file.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 	if fname.endswith('.gz'):
 		o = gzip.open
@@ -142,6 +158,26 @@ def loadPickle(fname):
 		return pickle.load(fid)
 
 #--------------------------------------------------------------------------------------------------
+class NumpyJSONEncoder(json.JSONEncoder):
+	"""
+	JSONEncoder class which can automatically encode numpy and Enum objects.
+
+	Can be used as input for :py:func:`json.dump` and :py:func:`json.dumps`.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
+	def default(self, obj):
+		if isinstance(obj, np.ndarray):
+			return obj.tolist()
+		elif isinstance(obj, np.floating):
+			return float(obj)
+		elif isinstance(obj, np.integer):
+			return int(obj)
+		elif issubclass(obj, enum.Enum):
+			return [{'name': s.name, 'value': s.value} for s in obj]
+		return json.JSONEncoder.default(self, obj)
+
+#--------------------------------------------------------------------------------------------------
 def saveJSON(fname, obj):
 	"""
 	Save an object to JSON file.
@@ -150,6 +186,8 @@ def saveJSON(fname, obj):
 		fname (str): File name to save to. If the name ends in '.gz' the file
 			will be automatically gzipped.
 		obj (object): Any pickalble object to be saved to file.
+
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 	"""
 	if fname.endswith('.gz'):
 		o = gzip.open
@@ -157,7 +195,7 @@ def saveJSON(fname, obj):
 		o = open
 
 	with o(fname, 'wt', encoding='utf-8') as fid:
-		json.dump(obj, fid, ensure_ascii=False, indent='\t')
+		json.dump(obj, fid, ensure_ascii=False, indent='\t', cls=NumpyJSONEncoder)
 
 #--------------------------------------------------------------------------------------------------
 def loadJSON(fname):
@@ -170,8 +208,9 @@ def loadJSON(fname):
 
 	Returns:
 		object: The object from the file.
-	"""
 
+	.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
+	"""
 	if fname.endswith('.gz'):
 		o = gzip.open
 	else:

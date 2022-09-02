@@ -21,5 +21,6 @@ trainingset_list = (
 	'keplerq9',
 	'tdasim',
 	'tdasim-raw',
-	'tdasim-clean'
+	'tdasim-clean',
+	'testing' # Special trainingset only used for testing
 )

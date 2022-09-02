@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 General XGB Classification
@@ -7,10 +7,10 @@ General XGB Classification
 """
 import logging
 import os
-import copy
-from xgboost import XGBClassifier as xgb
+import xgboost as xgb
 from . import xgb_feature_calc as xgb_features
-from .. import BaseClassifier, io
+from .. import BaseClassifier
+from ..exceptions import UntrainedClassifierError
 
 #--------------------------------------------------------------------------------------------------
 class XGBClassifier(BaseClassifier):
@@ -20,7 +20,7 @@ class XGBClassifier(BaseClassifier):
 	.. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
 	"""
 
-	def __init__(self, clfile='xgb_classifier_1.pickle', *args, **kwargs):
+	def __init__(self, clfile='xgb_classifier.json', *args, **kwargs):
 		"""
 		Initialize the classifier object with optimised parameters.
 
@@ -52,7 +52,7 @@ class XGBClassifier(BaseClassifier):
 			self.load(self.classifier_file)
 		else:
 			# Create new untrained classifier:
-			self.classifier = xgb(
+			self.classifier = xgb.XGBClassifier(
 				booster='gbtree',
 				colsample_bytree=0.7,
 				eval_metric='mlogloss',
@@ -61,7 +61,8 @@ class XGBClassifier(BaseClassifier):
 				max_depth=6,
 				min_child_weight=1,
 				n_estimators=500,
-				objective='multi:softmax',
+				objective='multi:softprob',
+				num_class=len(self.StellarClasses),
 				random_state=self.random_seed, # XGBoost uses misleading names
 				reg_alpha=1e-5,
 				subsample=0.8,
@@ -86,22 +87,27 @@ class XGBClassifier(BaseClassifier):
 			'psi_Rcs'
 		]
 
+		# Link to the internal XBB classifier model,
+		# which can be used for calculating feature importances:
+		self._classifier_model = self.classifier
+
 	#----------------------------------------------------------------------------------------------
 	def save(self, outfile):
 		"""
-		Save xgb classifier object with pickle
+		Save xgb classifier object.
 		"""
-		#self.classifier = None
-		temp_classifier = copy.deepcopy(self.classifier)
-		io.savePickle(outfile, self.classifier)
-		self.classifier = temp_classifier
+		self.classifier.save_model(outfile)
 
 	#----------------------------------------------------------------------------------------------
 	def load(self, infile):
 		"""
-		Loading the xgb clasifier
+		Load the xgb clasifier.
+
+		Parameters:
+			infile (str): Path to file from which to load the trained XGB classifier model.
 		"""
-		self.classifier = io.loadPickle(infile)
+		self.classifier = xgb.XGBClassifier()
+		self.classifier.load_model(infile)
 		self.trained = True # Assume any classifier loaded is already trained
 
 	#----------------------------------------------------------------------------------------------
@@ -120,8 +126,7 @@ class XGBClassifier(BaseClassifier):
 		logger = logging.getLogger(__name__)
 
 		if not self.trained:
-			logger.error('Please train classifer')
-			raise ValueError("Untrained Classifier")
+			raise UntrainedClassifierError("Untrained Classifier")
 
 		# If classifer has been trained, calculate features
 		logger.debug("Calculating features...")
@@ -140,7 +145,7 @@ class XGBClassifier(BaseClassifier):
 		return class_results, feature_results
 
 	#----------------------------------------------------------------------------------------------
-	def train(self, tset, savecl=True, recalc=False, overwrite=False, save_feature_importances=True):
+	def train(self, tset, savecl=True, recalc=False, overwrite=False):
 		"""
 		Training classifier using the ...
 		"""
@@ -159,19 +164,11 @@ class XGBClassifier(BaseClassifier):
 		intlookup = {key.value: value for value, key in enumerate(self.StellarClasses)}
 		fit_labels = [intlookup[lbl] for lbl in self.parse_labels(tset.labels())]
 
-		logger.info('Training ...')
-		#logger.info('SHAPES ', str(np.shape(featarray)))
-		#logger.info('SHAPES ', str(np.shape(fit_labels)))
+		logger.info('Training...')
 		self.classifier.fit(featarray, fit_labels)
-
-		if save_feature_importances:
-			importances = self.classifier.feature_importances_.astype(float)
-			feature_importances = dict(zip(self.features_names, importances))
-			io.saveJSON(os.path.join(self.data_dir, 'xgbClassifier_feature_importances.json'), feature_importances)
-
 		self.trained = True
 
 		if savecl and self.classifier_file is not None:
 			if not os.path.exists(self.classifier_file) or overwrite:
-				logger.info('Saving pickled xgb classifier to %s', self.classifier_file)
+				logger.info('Saving xgb classifier to %s', self.classifier_file)
 				self.save(self.classifier_file)

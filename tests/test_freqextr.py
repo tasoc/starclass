@@ -6,6 +6,7 @@ Tests of Frequency extraction.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 import pytest
+import os
 import numpy as np
 from bottleneck import allnan
 import lightkurve as lk
@@ -187,13 +188,19 @@ def test_freqextr():
 	np.testing.assert_allclose(peak1['phase'], 0.32, **tol_phase)
 
 #--------------------------------------------------------------------------------------------------
-def test_freqextr_kepler():
+def test_freqextr_kepler(SHARED_INPUT_DIR):
 
-	lcfs = lk.search_lightcurvefile('KIC 1162345', mission='Kepler', cadence='long')
-	# Pretty hacky way of making sure lightkurve only returned the target we want:
-	lcfs.table = lcfs.table[lcfs.target_name == 'kplr001162345']
-	lcfs = lcfs.download_all()
-	lc = lcfs.PDCSAP_FLUX.stitch()
+	# The lightcurve used below was created using the following code snippet:
+	#lcfs = lk.search_lightcurvefile('KIC 1162345', mission='Kepler', cadence='long')
+	## Pretty hacky way of making sure lightkurve only returned the target we want:
+	#lcfs.table = lcfs.table[lcfs.target_name == 'kplr001162345']
+	#lcfs = lcfs.download_all()
+	#lc = lcfs.PDCSAP_FLUX.stitch()
+	#lc.to_fits('./kplr001162345.fits')
+
+	# Load stiched Kepler lightcurve:
+	lc = lk.KeplerLightCurveFile(os.path.join(SHARED_INPUT_DIR, 'kplr001162345.fits.gz')).get_lightcurve('FLUX')
+	print(lc)
 	lc = lc.remove_nans().remove_outliers()
 	lc = 1e6*(lc - 1)
 	lc.flux_unit = cds.ppm

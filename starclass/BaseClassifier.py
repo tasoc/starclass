@@ -91,7 +91,7 @@ class BaseClassifier(object):
 		"""
 
 		# Start logger:
-		logger = logging.getLogger(__name__)
+		self.logger = logging.getLogger(__name__)
 
 		# Store the input:
 		self.tset = tset
@@ -104,7 +104,7 @@ class BaseClassifier(object):
 
 		# Inherit settings from the Training Set, just as a conveience:
 		if tset is None:
-			logger.warning("BaseClassifier initialized without TrainingSet")
+			self.logger.warning("BaseClassifier initialized without TrainingSet")
 			self.StellarClasses = StellarClassesLevel1
 			self.linfit = False
 		else:
@@ -117,7 +117,7 @@ class BaseClassifier(object):
 				self.truncate_lightcurves = False
 			else:
 				self.truncate_lightcurves = (not tset.key.startswith('keplerq9v3-long'))
-		logger.debug("Truncate lightcurves = %s", self.truncate_lightcurves)
+		self.logger.debug("Truncate lightcurves = %s", self.truncate_lightcurves)
 
 		# Set the data directory, where results (trained models) will be saved:
 		if data_dir is None:
@@ -130,7 +130,7 @@ class BaseClassifier(object):
 			if tset.fold > 0:
 				self.data_dir = os.path.join(self.data_dir, f'meta_fold{tset.fold:02d}')
 
-		logger.debug("Data Directory: %s", self.data_dir)
+		self.logger.debug("Data Directory: %s", self.data_dir)
 		os.makedirs(self.data_dir, exist_ok=True)
 
 		if self.features_cache is not None and not os.path.exists(self.features_cache):
@@ -205,7 +205,6 @@ class BaseClassifier(object):
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-		logger = logging.getLogger(__name__)
 		result = task.copy()
 		result.update({
 			'tset': self.tset.key,
@@ -263,7 +262,7 @@ class BaseClassifier(object):
 				'status': STATUS.ERROR,
 				'details': {'errors': [error_msg]},
 			})
-			logger.exception("Classify failed: Priority '%s', Classifier '%s'.",
+			self.logger.exception("Classify failed: Priority '%s', Classifier '%s'.",
 				task.get('priority'), self.classifier_key)
 
 		return result
@@ -314,13 +313,12 @@ class BaseClassifier(object):
 		"""
 
 		# Start logger:
-		logger = logging.getLogger(__name__)
-		tqdm_settings = {'disable': None if logger.isEnabledFor(logging.INFO) else True}
+		tqdm_settings = {'disable': None if self.logger.isEnabledFor(logging.INFO) else True}
 
 		# If the training-set is created with zero testfraction,
 		# simply don't do anything:
 		if tset.testfraction <= 0:
-			logger.info("Test-fraction is zero, so no testing is performed.")
+			self.logger.info("Test-fraction is zero, so no testing is performed.")
 			return
 
 		# All available labels in the current lavel (values):
@@ -348,7 +346,7 @@ class BaseClassifier(object):
 
 			# Save results for this classifier/trainingset in database:
 			if save is not None:
-				logger.debug(result)
+				self.logger.debug(result)
 				save(result)
 
 		# Convert labels to ndarray:
@@ -375,8 +373,8 @@ class BaseClassifier(object):
 			output_dict=True,
 			zero_division=0)
 		diagnostics.update(report)
-		if logger.isEnabledFor(logging.INFO):
-			logger.info("Classification report:\n%s", metrics.classification_report(
+		if self.logger.isEnabledFor(logging.INFO):
+			self.logger.info("Classification report:\n%s", metrics.classification_report(
 				labels_test,
 				y_pred,
 				labels=all_classes,
@@ -386,7 +384,7 @@ class BaseClassifier(object):
 				zero_division=0))
 
 		# Confusion Matrix:
-		logger.info('Calculating confusion matrix...')
+		self.logger.info('Calculating confusion matrix...')
 		diagnostics['confusion_matrix'] = metrics.confusion_matrix(labels_test, y_pred, labels=all_classes)
 
 		# Create plot of confusion matrix:
@@ -395,7 +393,7 @@ class BaseClassifier(object):
 		plt.close(fig)
 
 		# Prepare input for ROC/AUC
-		logger.info('Calculating ROC curve...')
+		self.logger.info('Calculating ROC curve...')
 		diag_roc = utilities.roc_curve(labels_test, probs, self.StellarClasses)
 		diagnostics.update(diag_roc)
 
@@ -413,7 +411,7 @@ class BaseClassifier(object):
 
 		# If we are asked to do so, calculate and plot the feature importances:
 		if feature_importance:
-			logger.info('Calculating feature importances...')
+			self.logger.info('Calculating feature importances...')
 			if self.classifier_model is not None:
 				with warnings.catch_warnings():
 					# Ignore:
@@ -488,8 +486,6 @@ class BaseClassifier(object):
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
 
-		logger = logging.getLogger(__name__)
-
 		# Define variables used below:
 		features = {}
 
@@ -518,7 +514,7 @@ class BaseClassifier(object):
 				if key in task.keys():
 					features[key] = task[key]
 				else:
-					logger.warning("Key '%s' not found in task.", key)
+					self.logger.warning("Key '%s' not found in task.", key)
 					features[key] = np.NaN
 
 			# Load lightcurve file and create a TessLightCurve object:
@@ -547,7 +543,7 @@ class BaseClassifier(object):
 						p = np.polyfit(lc.time[indx] - mintime, lc.flux[indx], 1, w=1/lc.flux_err[indx])
 						lc -= np.polyval(p, lc.time - mintime)
 					except np.RankWarning: # pragma: no cover
-						logger.warning("Could not detrend light curve")
+						self.logger.warning("Could not detrend light curve")
 						p = np.array([0, 0])
 
 				# Store the coefficients of the above detrending as a seperate feature:
@@ -606,7 +602,7 @@ class BaseClassifier(object):
 		features['priority'] = task['priority']
 		features['starid'] = task['starid']
 
-		logger.debug(features)
+		self.logger.debug(features)
 		return features
 
 	#----------------------------------------------------------------------------------------------

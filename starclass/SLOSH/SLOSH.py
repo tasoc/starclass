@@ -40,8 +40,6 @@ class SLOSHClassifier(BaseClassifier):
 		# Initialize parent:
 		super().__init__(*args, **kwargs)
 
-		logger = logging.getLogger(__name__)
-
 		self.classifier_list = []
 		#self.classifier = None
 		self.mc_iterations = mc_iterations
@@ -59,12 +57,12 @@ class SLOSHClassifier(BaseClassifier):
 			self.model_file = None
 
 		if self.model_file is not None and os.path.exists(self.model_file):
-			logger.debug("Loading pre-trained model...")
+			self.logger.debug("Loading pre-trained model...")
 			# load pre-trained classifier
 			self.predictable = True
 			self.classifier_list.append(tensorflow.keras.models.load_model(self.model_file))
 		else:
-			logger.info('No saved models provided. Predict functions are disabled.')
+			self.logger.info('No saved models provided. Predict functions are disabled.')
 			self.predictable = False
 
 	#----------------------------------------------------------------------------------------------
@@ -80,18 +78,17 @@ class SLOSHClassifier(BaseClassifier):
 		Returns:
 			dict: Dictionary of stellar classifications.
 		"""
-		logger = logging.getLogger(__name__)
 		if not self.predictable:
 			raise UntrainedClassifierError('No saved models provided. Predict functions are disabled.')
 
 		# Pre-calculated power density spectrum:
 		psd = features['powerspectrum'].standard
 
-		logger.debug('Generating Image...')
+		self.logger.debug('Generating Image...')
 		img_array = preprocessing.generate_single_image(psd[0], psd[1])
 		img_array = img_array.reshape(1, 128, 128, 1)
 
-		logger.debug('Making Predictions...')
+		self.logger.debug('Making Predictions...')
 		pred_array = np.zeros((self.mc_iterations, self.num_labels))
 		for i in range(self.mc_iterations):
 			pred_array[i, :] = self.classifier_list[0](img_array, training=False)
@@ -122,15 +119,12 @@ class SLOSHClassifier(BaseClassifier):
 		Returns:
 			model: A trained classifier model.
 		"""
-
-		logger = logging.getLogger(__name__)
-
 		if self.predictable:
 			return
 
 		# Settings for progress bar used below:
 		tqdm_settings = {
-			'disable': None if logger.isEnabledFor(logging.INFO) else True
+			'disable': None if self.logger.isEnabledFor(logging.INFO) else True
 		}
 		dset_settings = {
 			'compression': 'lzf',
@@ -144,7 +138,7 @@ class SLOSHClassifier(BaseClassifier):
 		intlookup = {key.value: value for value, key in enumerate(self.StellarClasses)}
 		intlabels = [intlookup[lbl] for lbl in self.parse_labels(tset.labels())]
 
-		logger.info('Generating Train Images...')
+		self.logger.info('Generating Train Images...')
 		if self.features_cache:
 			train_folder = os.path.join(self.features_cache, 'SLOSH_Train_Images')
 			os.makedirs(train_folder, exist_ok=True)
@@ -170,7 +164,7 @@ class SLOSHClassifier(BaseClassifier):
 					hdf.flush()
 
 		# Find the level of verbosity to add to tensorflow calls:
-		if logger.isEnabledFor(logging.INFO):
+		if self.logger.isEnabledFor(logging.INFO):
 			verbose = 2
 		else:
 			verbose = 0
@@ -191,7 +185,7 @@ class SLOSHClassifier(BaseClassifier):
 
 			model = preprocessing.default_classifier_model(num_classes=len(self.StellarClasses))
 
-			logger.info('Training Classifier...')
+			self.logger.info('Training Classifier...')
 			epochs = 50
 			model.fit(train_generator, epochs=epochs, steps_per_epoch=len(train_generator),
 				validation_data=valid_generator, validation_steps=len(valid_generator),

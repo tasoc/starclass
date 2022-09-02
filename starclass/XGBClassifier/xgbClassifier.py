@@ -5,7 +5,7 @@ General XGB Classification
 
 .. codeauthor:: Refilwe Kgoadi <refilwe.kgoadi1@my.jcu.edu.au>
 """
-import logging
+
 import os
 import xgboost as xgb
 from . import xgb_feature_calc as xgb_features
@@ -121,21 +121,17 @@ class XGBClassifier(BaseClassifier):
 		Returns:
 			dict: Dictionary of stellar classifications.
 		"""
-
-		# Start a logger that should be used to output e.g. debug information:
-		logger = logging.getLogger(__name__)
-
 		if not self.trained:
 			raise UntrainedClassifierError("Untrained Classifier")
 
 		# If classifer has been trained, calculate features
-		logger.debug("Calculating features...")
+		self.logger.debug("Calculating features...")
 		feature_results = xgb_features.feature_extract(features, self.features_names, total=1)
-		#logger.info('Feature Extraction done')
+		#self.logger.info('Feature Extraction done')
 
 		# Do the magic:
 		xgb_classprobs = self.classifier.predict_proba(feature_results)[0]
-		logger.debug("Classification complete")
+		self.logger.debug("Classification complete")
 
 		class_results = {}
 		for k, stcl in enumerate(self.StellarClasses):
@@ -149,26 +145,22 @@ class XGBClassifier(BaseClassifier):
 		"""
 		Training classifier using the ...
 		"""
-
-		# Start a logger that should be used to output e.g. debug information:
-		logger = logging.getLogger(__name__)
-
 		if self.trained:
 			return
 
-		logger.info('Calculating/Loading Features.')
+		self.logger.info('Calculating/Loading Features.')
 		featarray = xgb_features.feature_extract(tset.features(), self.features_names, total=len(tset), recalc=recalc)
-		logger.info('Features calculated/loaded.')
+		self.logger.info('Features calculated/loaded.')
 
 		# Convert classification labels to integers:
 		intlookup = {key.value: value for value, key in enumerate(self.StellarClasses)}
 		fit_labels = [intlookup[lbl] for lbl in self.parse_labels(tset.labels())]
 
-		logger.info('Training...')
+		self.logger.info('Training...')
 		self.classifier.fit(featarray, fit_labels)
 		self.trained = True
 
 		if savecl and self.classifier_file is not None:
 			if not os.path.exists(self.classifier_file) or overwrite:
-				logger.info('Saving xgb classifier to %s', self.classifier_file)
+				self.logger.info('Saving xgb classifier to %s', self.classifier_file)
 				self.save(self.classifier_file)

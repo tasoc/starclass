@@ -6,12 +6,10 @@ The RF-GC classifier (general random forest).
 .. codeauthor:: David Armstrong <d.j.armstrong@warwick.ac.uk>
 """
 
-import numpy as np
-from bottleneck import anynan
-import logging
-import os.path
 import os
 import copy
+import numpy as np
+from bottleneck import anynan
 from sklearn.ensemble import RandomForestClassifier
 from . import RF_GC_featcalc as fc
 from .. import BaseClassifier, io
@@ -216,23 +214,19 @@ class RFGCClassifier(BaseClassifier):
 		Returns:
 			dict: Dictionary of stellar classifications.
 		"""
-		# Start a logger that should be used to output e.g. debug information:
-		logger = logging.getLogger(__name__)
-
 		if not self.classifier.trained:
 			raise UntrainedClassifierError('Classifier has not been trained. Exiting.')
 
 		# Assumes that if self.classifier.trained=True,
 		# ...then self.classifier.som is not None
 
-		logger.debug("Calculating features...")
+		self.logger.debug("Calculating features...")
 		featarray = self.featcalc(features, total=1, recalc=recalc)
 		#logger.info("Features calculated.")
 
 		# Do the magic:
-		#logger.info("We are starting the magic...")
 		classprobs = self.classifier.predict_proba(featarray)[0]
-		logger.debug("Classification complete")
+		self.logger.debug("Classification complete")
 
 		result = {}
 		for c, cla in enumerate(self.classifier.classes_):
@@ -254,9 +248,6 @@ class RFGCClassifier(BaseClassifier):
 			recalc (bool, optional): Recalculates features.
 
 		"""
-		# Start a logger that should be used to output e.g. debug information:
-		logger = logging.getLogger(__name__)
-
 		if self.classifier.trained:
 			return
 
@@ -264,29 +255,29 @@ class RFGCClassifier(BaseClassifier):
 
 		fitlabels = self.parse_labels(tset.labels())
 
-		logger.info('Calculating features...')
+		self.logger.info('Calculating features...')
 
 		# Check for pre-calculated som
 		if self.classifier.som is None:
-			logger.info("No SOM loaded. Creating new SOM, saving to '%s'.", self.somfile)
+			self.logger.info("No SOM loaded. Creating new SOM, saving to '%s'.", self.somfile)
 			self.classifier.som = fc.makeSOM(tset.features(), outfile=self.somfile, overwrite=overwrite, random_seed=self.random_seed)
-			logger.info('SOM created and saved.')
+			self.logger.info('SOM created and saved.')
 
-		logger.info('Calculating/Loading Features.')
+		self.logger.info('Calculating/Loading Features.')
 		featarray = self.featcalc(tset.features(), total=len(tset), recalc=recalc)
-		logger.info('Features calculated/loaded.')
+		self.logger.info('Features calculated/loaded.')
 
 		self.classifier.oob_score = True
 		self.classifier.fit(featarray, fitlabels)
-		logger.info('Trained. OOB Score = %f', self.classifier.oob_score_)
+		self.logger.info('Trained. OOB Score = %f', self.classifier.oob_score_)
 		#logger.info([estimator.tree_.max_depth for estimator in self.classifier.estimators_])
 		self.classifier.oob_score = False
 		self.classifier.trained = True
 
 		if savecl and self.clfile is not None:
 			if not os.path.exists(self.clfile) or overwrite or recalc:
-				logger.info("Saving pickled classifier instance to '%s'", self.clfile)
-				logger.info("Saving SOM to '%s'", self.somfile)
+				self.logger.info("Saving pickled classifier instance to '%s'", self.clfile)
+				self.logger.info("Saving SOM to '%s'", self.somfile)
 				self.save(self.clfile, self.somfile)
 
 	#----------------------------------------------------------------------------------------------

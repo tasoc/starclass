@@ -7,10 +7,9 @@ The meta-classifier.
 .. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 """
 
-import logging
 import os
-import numpy as np
 import itertools
+import numpy as np
 from bottleneck import allnan, anynan
 from sklearn.ensemble import RandomForestClassifier
 from .. import BaseClassifier, io
@@ -88,15 +87,12 @@ class MetaClassifier(BaseClassifier):
 		"""
 		Loads classifier object.
 		"""
-		# Start a logger that should be used to output e.g. debug information:
-		logger = logging.getLogger(__name__)
-
 		# Load the pickle file:
 		self.classifier, self.features_used = io.loadPickle(infile)
 
 		# Extract the features names based on the loaded classifier:
 		self.features_names = [f'{classifier:s}_{stcl.name:s}' for classifier, stcl in self.features_used]
-		logger.debug("Feature names: %s", self.features_names)
+		self.logger.debug("Feature names: %s", self.features_names)
 
 	#----------------------------------------------------------------------------------------------
 	def build_features_table(self, features, total=None):
@@ -143,24 +139,21 @@ class MetaClassifier(BaseClassifier):
 
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-		# Start a logger that should be used to output e.g. debug information:
-		logger = logging.getLogger(__name__)
-
 		if not self.classifier.trained:
 			raise UntrainedClassifierError('Classifier has not been trained. Exiting.')
 
 		# Build features array from the probabilities from the other classifiers:
 		# TODO: What about NaN values?
-		logger.debug("Importing features...")
+		self.logger.debug("Importing features...")
 		featarray = self.build_features_table([features], total=1)
 
 		if anynan(featarray):
 			raise ValueError("Features contains NaNs")
 
-		logger.debug("We are starting the magic...")
+		self.logger.debug("We are starting the magic...")
 		# Comes out with shape (1,8), but instead want shape (8,) so squeeze
 		classprobs = self.classifier.predict_proba(featarray).squeeze()
-		logger.debug("Classification complete")
+		self.logger.debug("Classification complete")
 
 		# Format the output:
 		result = {}
@@ -182,9 +175,6 @@ class MetaClassifier(BaseClassifier):
 		.. codeauthor:: James S. Kuszlewicz <kuszlewicz@mps.mpg.de>
 		.. codeauthor:: Rasmus Handberg <rasmush@phys.au.dk>
 		"""
-		# Start a logger that should be used to output e.g. debug information:
-		logger = logging.getLogger(__name__)
-
 		# Check for pre-calculated features
 		fitlabels = self.parse_labels(tset.labels())
 
@@ -200,7 +190,7 @@ class MetaClassifier(BaseClassifier):
 
 		# Create table of features:
 		# Create as float32, since that is what RandomForestClassifier converts it to anyway.
-		logger.info("Importing features...")
+		self.logger.info("Importing features...")
 		features = self.build_features_table(tset.features(), total=len(tset))
 
 		# Remove columns that are all NaN:
@@ -220,16 +210,16 @@ class MetaClassifier(BaseClassifier):
 		if anynan(features):
 			raise ValueError("Features contains NaNs")
 
-		logger.info("Features imported. Shape = %s", features.shape)
+		self.logger.info("Features imported. Shape = %s", features.shape)
 
 		# Run actual training:
 		self.classifier.oob_score = True
-		logger.info("Fitting model.")
+		self.logger.info("Fitting model.")
 		self.classifier.fit(features, fitlabels)
-		logger.info('Trained. OOB Score = %s', self.classifier.oob_score_)
+		self.logger.info('Trained. OOB Score = %s', self.classifier.oob_score_)
 		self.classifier.trained = True
 
 		if savecl and self.classifier.trained and self.clfile is not None:
 			if overwrite or not os.path.exists(self.clfile):
-				logger.info("Saving pickled classifier instance to '%s'", self.clfile)
+				self.logger.info("Saving pickled classifier instance to '%s'", self.clfile)
 				self.save(self.clfile)

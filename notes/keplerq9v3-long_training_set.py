@@ -14,6 +14,7 @@ from bottleneck import nanvar
 from tqdm import tqdm
 import requests
 import subprocess
+from astropy.table import Table, Column
 if sys.path[0] != os.path.abspath('..'):
 	sys.path.insert(0, os.path.abspath('..'))
 import starclass.utilities as util
@@ -87,7 +88,7 @@ def create_constant_star(fpath, timelen=90.0, sampling=30.0, random_state=None):
 def create_fake_rrlyr(fpath, timelen=90.0, sampling=30.0, random_state=None):
 
 	# Directory where original simulations by Laszlo Molnar are stored:
-	rootdir = r'G:\keplerq9\fake_cepheids_kepler-tess\fake_cepheids_kepler'
+	rootdir = r'I:\keplerq9\fake_cepheids_kepler-tess\fake_cepheids_kepler'
 
 	# FIXME: How do these map to each other???
 	identifier = os.path.basename(fpath).replace('.txt', '')
@@ -132,7 +133,8 @@ if __name__ == '__main__':
 	#sampling = 30
 
 	# Long (90 day) Kepler dataset primarily to be used with K2:
-	output_dir = r'G:\keplerq9\keplerq9v3-long'  # Where output will be saved
+	#output_dir = r'I:\keplerq9\keplerq9v3-long'  # Where output will be saved
+	output_dir = r'../starclass/training_sets/data/keplerq9v3-long'  # Where output will be saved
 	timelen = 90
 	sampling = 29.425
 
@@ -140,15 +142,26 @@ if __name__ == '__main__':
 	rng = np.random.RandomState(42)
 
 	# Directory where KeplerQ9 files are stored locally:
-	thisdir = r'G:\keplerq9\full_fits'
+	thisdir = r'I:\keplerq9\full_fits'
 
 	# Make sure directories exists:
 	os.makedirs(output_dir, exist_ok=True)
-	shutil.copy('keplerq9v3_targets.txt', os.path.join(output_dir, 'targets.txt'))
+	shutil.copy('keplerq9v3_targets.txt', os.path.join(output_dir, 'targets.ecsv'))
 
 	# Load the list of KIC numbers and stellar classes:
-	starlist = np.genfromtxt(os.path.join(output_dir, 'targets.txt'),
-		delimiter=',', comments='#', dtype='str', encoding='utf-8')
+	starlist = Table.read(os.path.join(output_dir, 'targets.ecsv'),
+		format='ascii.csv',
+		delimiter=',',
+		comment='#',
+		names=['starname','starclass'])
+
+	starlist['starname'].description = 'Star identifier (mostly KIC number)'
+	starlist['starclass'].description = 'Known stellar class'
+
+	# Fix the header description:
+	del starlist.meta['comments']
+	starlist.meta['description'] = 'Kepler Q9 Training Set (version 3), 90-day edition'
+	print(starlist)
 
 	# Make sure that there are not duplicate entries:
 	starlist_unique, cnt = np.unique(starlist, return_counts=True, axis=0)
@@ -158,7 +171,7 @@ if __name__ == '__main__':
 			print('%s,%s' % tuple(line))
 
 	# Make sure that there are not duplicate starids:
-	us, cnt = np.unique(starlist[:, 0], return_counts=True)
+	us, cnt = np.unique(starlist['starname'], return_counts=True)
 	if len(starlist) != len(us):
 		print("Duplicate starids in multiple classes:")
 		for s in us[cnt > 1]:
@@ -174,86 +187,91 @@ if __name__ == '__main__':
 	if timelen not in (27.4, 90):
 		raise NotImplementedError("Time length is not supported")
 
-	# Open the diagnostics file for writing and loop through the
-	# list of starids, load the data file, restructure the timeseries,
+	# Loop through the list of stars, load the data file, restructure the timeseries,
 	# calculate diagnostics and save these to files:
-	with open(os.path.join(output_dir, 'diagnostics.txt'), 'w') as diag:
-		diag.write("# Kepler Q9 Training Set Targets (version 3, long)\n")
-		diag.write("# Pre-calculated diagnostics\n")
-		diag.write("# Column 1: Variance (ppm2)\n")
-		diag.write("# Column 2: RMS per hour (ppm2/hour)\n")
-		diag.write("# Column 3: Point-to-point scatter (ppm)\n")
-		diag.write("#-------------------------------------------\n")
+	lightcurves = []
+	col_variance = np.full(len(starlist), np.NaN, dtype='float64')
+	col_rms_hour = np.full(len(starlist), np.NaN, dtype='float64')
+	col_ptp = np.full(len(starlist), np.NaN, dtype='float64')
+	for k, row in enumerate(tqdm(starlist)):
 
-		for starid, sclass in tqdm(starlist):
-			sclass = sclass.upper()
-			if starid.startswith('constant_'):
-				fpath_save = os.path.join(output_dir, sclass, starid + '.txt')
-				starid = -10000 - int(starid[9:])
-				if not os.path.isfile(fpath_save):
-					create_constant_star(fpath_save, timelen=timelen, sampling=sampling, random_state=rng)
+		starname = row['starname']
+		sclass = row['starclass'].upper()
 
-			elif starid.startswith('fakerrlyr_'):
-				fpath_save = os.path.join(output_dir, sclass, starid + '.txt')
-				starid = -20000 - int(starid[10:])
-				if not os.path.isfile(fpath_save):
-					create_fake_rrlyr(fpath_save, timelen=timelen, sampling=sampling, random_state=rng)
+		if starname.startswith('constant_'):
+			fpath_save = os.path.join(output_dir, sclass, starname + '.txt')
+			starid = -10000 - int(starname[9:])
+			if not os.path.isfile(fpath_save):
+				create_constant_star(fpath_save, timelen=timelen, sampling=sampling, random_state=rng)
 
-			else:
-				starid = int(starid)
-				# The path to save the final timeseries:
-				fname = f'kplr{starid:09d}-2011177032512_llc.fits'
-				fpath_save = os.path.join(output_dir, sclass, fname)
+		elif starname.startswith('fakerrlyr_'):
+			fpath_save = os.path.join(output_dir, sclass, starname + '.txt')
+			starid = -20000 - int(starname[10:])
+			if not os.path.isfile(fpath_save):
+				create_fake_rrlyr(fpath_save, timelen=timelen, sampling=sampling, random_state=rng)
 
-			if starid < 0:
-				lc = io.load_lightcurve(fpath_save)
-			elif os.path.isfile(fpath_save + '.gz'):
-				# Load file that should already exist:
-				lc = io.load_lightcurve(fpath_save + '.gz')
-			else:
-				subdir = os.path.join(thisdir, f'{starid:09d}'[:5])
-				fpath = os.path.join(subdir, fname)
+		else:
+			starid = int(starname)
+			# The path to save the final timeseries:
+			fname = f'kplr{starid:09d}-2011177032512_llc.fits'
+			fpath_save = os.path.join(output_dir, sclass, fname)
 
-				# Check if the file is available as gzipped FITS:
-				if os.path.isfile(fpath + '.gz'):
-					fpath += '.gz'
-					fpath_save += '.gz'
+		if starid < 0:
+			lc = io.load_lightcurve(fpath_save)
+		elif os.path.isfile(fpath_save + '.gz'):
+			# Load file that should already exist:
+			lc = io.load_lightcurve(fpath_save + '.gz')
+		else:
+			subdir = os.path.join(thisdir, f'{starid:09d}'[:5])
+			fpath = os.path.join(subdir, fname)
 
-				# Print if file does not exist, instead of failing one
-				# at a time. Making debugging a little easier:
-				#tqdm.write(fpath)
-				if not os.path.isfile(fpath):
-					urlsubdir = f'{starid:09d}'[:4]
-					url = f'https://mast.stsci.edu/api/v0.1/Download/file?uri=mast:Kepler/url/missions/kepler/lightcurves/{urlsubdir:s}/{starid:09d}/{fname:s}'
-					os.makedirs(subdir, exist_ok=True)
-					download_file(url, fpath)
+			# Check if the file is available as gzipped FITS:
+			if os.path.isfile(fpath + '.gz'):
+				fpath += '.gz'
+				fpath_save += '.gz'
 
-				# Save file:
-				os.makedirs(os.path.dirname(fpath_save), exist_ok=True)
-				shutil.copy(fpath, fpath_save)
-				if not fpath_save.endswith('.gz'):
-					subprocess.check_output(['gzip', fpath_save])
+			# Print if file does not exist, instead of failing one
+			# at a time. Making debugging a little easier:
+			#tqdm.write(fpath)
+			if not os.path.isfile(fpath):
+				urlsubdir = f'{starid:09d}'[:4]
+				url = f'https://mast.stsci.edu/api/v0.1/Download/file?uri=mast:Kepler/url/missions/kepler/lightcurves/{urlsubdir:s}/{starid:09d}/{fname:s}'
+				os.makedirs(subdir, exist_ok=True)
+				download_file(url, fpath)
 
-				# Load Kepler Q9 FITS file (PDC corrected):
-				lc = io.load_lightcurve(fpath_save)
+			# Save file:
+			os.makedirs(os.path.dirname(fpath_save), exist_ok=True)
+			shutil.copy(fpath, fpath_save)
+			if not fpath_save.endswith('.gz'):
+				subprocess.check_output(['gzip', fpath_save])
 
-			#print(fpath)
-			#lc.show_properties()
-			#lc.plot()
-			#plt.show()
+			# Load Kepler Q9 FITS file (PDC corrected):
+			lc = io.load_lightcurve(fpath_save)
 
-			# Calculate diagnostics:
-			variance = nanvar(lc.flux, ddof=1)
-			rms_hour = util.rms_timescale(lc, timescale=3600/86400)
-			ptp = util.ptp(lc)
+		#print(fpath)
+		#lc.show_properties()
+		#lc.plot()
+		#plt.show()
 
-			# Add target to TODO-list:
-			diag.write("{variance:.16e},{rms_hour:.16e},{ptp:.16e}\n".format(
-				variance=variance,
-				rms_hour=rms_hour,
-				ptp=ptp
-			))
+		# Relative path to lightcurve:
+		lightcurves.append(os.path.relpath(fpath_save, output_dir).replace('\\', '/').replace('.fits', '.fits.gz'))
 
-		diag.write("#-------------------------------------------\n")
+		# Calculate diagnostics:
+		#col_variance[k] = nanvar(lc.flux, ddof=1)
+		#col_rms_hour[k] = util.rms_timescale(lc, timescale=3600/86400)
+		#col_ptp[k] = util.ptp(lc)
+
+	col_lightcurve = Column(data=lightcurves, name='lightcurve', dtype='str', description='Relative path to lightcurve')
+	col_variance = Column(data=col_variance, name='variance', dtype='float64', unit='ppm^2', description='Variance (ppm2)')
+	col_rms_hour = Column(data=col_rms_hour, name='rms_hour', dtype='float64', unit='ppm^2 / hour', description='RMS per hour (ppm2/hour)')
+	col_ptp = Column(data=col_ptp, name='ptp', dtype='float64', unit='ppm', description='Point-to-point scatter (ppm)')
+	starlist.add_columns([col_lightcurve, col_variance, col_rms_hour, col_ptp])
+
+	print(starlist)
+
+	starlist.write(os.path.join(output_dir, 'targets.ecsv'),
+		delimiter=',',
+		overwrite=True,
+		format='ascii.ecsv')
 
 	print("DONE")

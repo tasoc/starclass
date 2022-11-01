@@ -27,10 +27,10 @@ jobs:
       with:
         lfs: false
 
-    - name: Setup Python 3.7
-      uses: actions/setup-python@v3
+    - name: Setup Python 3.9
+      uses: actions/setup-python@v4
       with:
-        python-version: 3.7
+        python-version: '3.9'
         cache: 'pip'
 
     - name: Install dependencies
@@ -83,7 +83,7 @@ jobs:
       run: git lfs pull
 
     - name: Setup Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
@@ -128,10 +128,10 @@ jobs:
       with:
         lfs: false
 
-    - name: Setup Python 3.7
-      uses: actions/setup-python@v3
+    - name: Setup Python 3.9
+      uses: actions/setup-python@v4
       with:
-        python-version: 3.7
+        python-version: '3.9'
         cache: 'pip'
 
     - name: Install dependencies
@@ -176,10 +176,10 @@ jobs:
     - name: Git LFS Pull
       run: git lfs pull
 
-    - name: Setup Python 3.7
-      uses: actions/setup-python@v3
+    - name: Setup Python 3.9
+      uses: actions/setup-python@v4
       with:
-        python-version: 3.7
+        python-version: 3.9
         cache: 'pip'
 
     - name: Install dependencies

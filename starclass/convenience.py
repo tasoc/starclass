@@ -54,6 +54,8 @@ def get_trainingset(tset_key='keplerq9v3'):
 	TsetClass = {
 		'keplerq9v3': tsets.keplerq9v3,
 		'keplerq9v3-instr': tsets.keplerq9v3_instr,
+		'keplerq9v3-long': tsets.keplerq9v3_long,
+		'keplerq9v3-long-instr': tsets.keplerq9v3_long_instr,
 		'keplerq9v2': tsets.keplerq9v2,
 		'keplerq9': tsets.keplerq9,
 		'tdasim': tsets.tdasim,

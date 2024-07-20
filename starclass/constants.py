@@ -15,6 +15,8 @@ classifier_list = ('rfgc', 'slosh', 'xgb', 'sortinghat', 'meta')
 trainingset_list = (
 	'keplerq9v3',
 	'keplerq9v3-instr',
+	'keplerq9v3-long',
+	'keplerq9v3-long-instr',
 	'keplerq9v2',
 	'keplerq9',
 	'tdasim',
